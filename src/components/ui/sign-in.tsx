@@ -1,5 +1,6 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -138,12 +139,7 @@ export function SignInPage({
           <Link href="/">
             <BrandLogo />
           </Link>
-          <Link
-            href="/"
-            className="rounded-full px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-red-50 hover:text-red-700"
-          >
-            Back to Home
-          </Link>
+          <BackButton href="/" />
         </nav>
       </header>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MessageCenter } from "@/components/ui/message-center";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -192,12 +193,7 @@ export function MessageModulePage({
                 isLightMode={isLightMode}
                 onToggle={() => setIsLightMode((current) => !current)}
               />
-              <Link
-                href={dashboardHref}
-                className="hidden rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-600 hover:bg-stone-100 sm:inline-flex"
-              >
-                Back to Dashboard
-              </Link>
+              <BackButton href={dashboardHref} className="hidden sm:inline-flex" />
               <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">
                 <User className="h-6 w-6" />
               </div>

@@ -1,11 +1,11 @@
 "use client";
 
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
+import { NextButton } from "@/components/ui/next-button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
-  ArrowLeft,
-  ArrowRight,
   Bell,
   ChevronDown,
   ClipboardList,
@@ -693,14 +693,10 @@ export function CustomerHouseDesignPage() {
               )}
 
               <div className="mt-6 flex justify-end border-t border-stone-200 pt-5">
-                <button
+                <NextButton
                   type="button"
                   onClick={() => setActiveSlide("houseTypes")}
-                  className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800"
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                />
               </div>
             </>
           ) : (
@@ -712,14 +708,10 @@ export function CustomerHouseDesignPage() {
                     Select one of six house styles for the next estimate preview.
                   </p>
                 </div>
-                <button
+                <BackButton
                   type="button"
                   onClick={() => setActiveSlide("designs")}
-                  className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-100"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back
-                </button>
+                />
               </div>
               <ColorChangeCards />
             </div>

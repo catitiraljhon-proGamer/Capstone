@@ -1,8 +1,9 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
 import ImageGallery from "@/components/ui/image-gallery";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { NextButton } from "@/components/ui/next-button";
 import { useState } from "react";
 
 export function AdminProjectSlides() {
@@ -16,14 +17,10 @@ export function AdminProjectSlides() {
         <>
           <ImageGallery />
           <div className="flex justify-end border-t border-stone-200 pt-5">
-            <button
+            <NextButton
               type="button"
               onClick={() => setActiveSlide("houseTypes")}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800"
-            >
-              Next
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            />
           </div>
         </>
       ) : (
@@ -38,14 +35,10 @@ export function AdminProjectSlides() {
                 estimate setup.
               </p>
             </div>
-            <button
+            <BackButton
               type="button"
               onClick={() => setActiveSlide("projects")}
-              className="inline-flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
+            />
           </div>
           <ColorChangeCards />
         </div>
