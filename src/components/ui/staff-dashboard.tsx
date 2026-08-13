@@ -1,4 +1,7 @@
+"use client";
+
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Bell,
   Calculator,
@@ -8,13 +11,16 @@ import {
   FolderKanban,
   Gauge,
   LogOut,
+  Menu,
   ReceiptText,
   ShieldCheck,
   User,
   Users,
   WalletCards,
+  X,
 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 
 type IconType = ComponentType<{ className?: string }>;
@@ -30,34 +36,84 @@ type StaffDashboardProps = {
   queueTitle: string;
   queueItems: { title: string; meta: string; amount?: string; status: string }[];
   activityItems: { title: string; body: string; date: string }[];
+  footerContent?: ReactNode;
+  mainContent?: ReactNode;
 };
 
 const clerkNav = [
-  { label: "Dashboard", icon: Gauge, href: "/billing-clerk", active: true },
+  { label: "Dashboard", icon: Gauge, href: "/billing-clerk" },
   { label: "Messages", icon: Bell, href: "/billing-clerk/messages" },
-  { label: "Progress Billings", icon: ReceiptText, href: "#" },
-  { label: "Payments", icon: WalletCards, href: "#" },
-  { label: "Invoices", icon: FileText, href: "#" },
-  { label: "Customer Accounts", icon: Users, href: "#" },
-  { label: "Reports", icon: ClipboardCheck, href: "#" },
+  { label: "Progress Billings", icon: ReceiptText, href: "/billing-clerk/progress-billings" },
+  { label: "Payments", icon: WalletCards, href: "/billing-clerk/payments" },
+  { label: "Invoices", icon: FileText, href: "/billing-clerk/invoices" },
+  { label: "Customer Accounts", icon: Users, href: "/billing-clerk/customer-accounts" },
+  { label: "Reports", icon: ClipboardCheck, href: "/billing-clerk/reports" },
 ];
 
 const adminNav = [
-  { label: "Dashboard", icon: Gauge, href: "/admin", active: true },
+  { label: "Dashboard", icon: Gauge, href: "/admin" },
   { label: "Messages", icon: Bell, href: "/admin/messages" },
-  { label: "Projects", icon: FolderKanban, href: "#" },
-  { label: "Approvals", icon: ShieldCheck, href: "#" },
-  { label: "Cost Estimates", icon: Calculator, href: "#" },
-  { label: "Billing Control", icon: ReceiptText, href: "#" },
-  { label: "Users & Roles", icon: Users, href: "#" },
-  { label: "Reports", icon: ClipboardCheck, href: "#" },
+  { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
+  { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
+  { label: "Billing Control", icon: ReceiptText, href: "/admin/billing-control" },
+  { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
+  { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
 ];
+
+const setActiveNav = (
+  items: StaffDashboardProps["navItems"],
+  activeLabel: string,
+) => items.map((item) => ({ ...item, active: item.label === activeLabel }));
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-xl border border-stone-200 bg-white shadow-sm ${className}`}>
       {children}
     </section>
+  );
+}
+
+function StaffSidebar({
+  navItems,
+  onNavigate,
+}: {
+  navItems: StaffDashboardProps["navItems"];
+  onNavigate?: () => void;
+}) {
+  return (
+    <>
+      <div className="flex h-24 items-center border-b border-stone-200 px-5">
+        <BrandLogo compact />
+      </div>
+      <nav className="flex-1 space-y-1 px-4 py-5">
+        {navItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            onClick={onNavigate}
+            className={[
+              "flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium transition",
+              item.active
+                ? "bg-red-700 text-white shadow-sm"
+                : "text-stone-600 hover:bg-red-50 hover:text-red-800",
+            ].join(" ")}
+          >
+            <item.icon className="h-5 w-5" />
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      <div className="px-4 pb-6">
+        <Link
+          href="/login"
+          onClick={onNavigate}
+          className="flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-950"
+        >
+          <LogOut className="h-5 w-5" />
+          Log out
+        </Link>
+      </div>
+    </>
   );
 }
 
@@ -72,49 +128,70 @@ function StaffDashboard({
   queueTitle,
   queueItems,
   activityItems,
+  footerContent,
+  mainContent,
 }: StaffDashboardProps) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(true);
+
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-950">
+    <div
+      className={[
+        "min-h-screen bg-stone-50 text-stone-950",
+        isLightMode ? "" : "night-mode",
+      ].join(" ")}
+    >
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:flex lg:flex-col">
-        <div className="flex h-24 items-center border-b border-stone-200 px-5">
-          <BrandLogo compact />
-        </div>
-        <nav className="flex-1 space-y-1 px-4 py-5">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={[
-                "flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium transition",
-                item.active
-                  ? "bg-red-700 text-white shadow-sm"
-                  : "text-stone-600 hover:bg-red-50 hover:text-red-800",
-              ].join(" ")}
-            >
-              <item.icon className="h-5 w-5" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="px-4 pb-6">
-          <Link
-            href="/login"
-            className="flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-950"
-          >
-            <LogOut className="h-5 w-5" />
-            Log out
-          </Link>
-        </div>
+        <StaffSidebar navItems={navItems} />
       </aside>
+
+      {isSidebarOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-transparent"
+            aria-label="Close navigation menu"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+          <aside className="relative flex h-full w-72 flex-col border-r border-stone-200 bg-white shadow-xl">
+            <button
+              type="button"
+              className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-100"
+              aria-label="Close navigation menu"
+              onClick={() => setIsSidebarOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <StaffSidebar
+              navItems={navItems}
+              onNavigate={() => setIsSidebarOpen(false)}
+            />
+          </aside>
+        </div>
+      ) : null}
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
           <div className="flex min-h-20 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <div>
-              <p className="text-xl font-semibold tracking-tight">{title}</p>
-              <p className="mt-1 text-sm text-stone-600">{description}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100 lg:hidden"
+                aria-label="Open navigation menu"
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold tracking-tight">{title}</p>
+                <p className="mt-1 text-sm text-stone-600">{description}</p>
+              </div>
             </div>
             <div className="flex items-center gap-4">
+              <ThemeToggle
+                isLightMode={isLightMode}
+                onToggle={() => setIsLightMode((current) => !current)}
+              />
               <button
                 type="button"
                 className="relative grid h-10 w-10 place-items-center rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100"
@@ -139,6 +216,10 @@ function StaffDashboard({
         </header>
 
         <main className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+          {mainContent ? (
+            mainContent
+          ) : (
+            <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => (
               <Panel key={metric.label} className="p-5">
@@ -223,6 +304,9 @@ function StaffDashboard({
               )}
             </Panel>
           </div>
+          {footerContent ? footerContent : null}
+            </>
+          )}
         </main>
       </div>
     </div>
@@ -236,7 +320,7 @@ export function BillingClerkDashboard() {
       name="Billing Clerk"
       title="Billing Clerk Dashboard"
       description="Monitor customer balances, progress billings, receipts, and invoice follow-ups."
-      navItems={clerkNav}
+      navItems={setActiveNav(clerkNav, "Dashboard")}
       metrics={[
         { label: "Pending Billings", value: "0", note: "No records yet", icon: ReceiptText },
         { label: "Collected This Month", value: "PHP 0.00", note: "No payments recorded", icon: WalletCards },
@@ -274,8 +358,8 @@ export function AdminDashboard() {
       role="Admin"
       name="Admin"
       title="Admin Dashboard"
-      description="Oversee projects, approvals, estimates, billing health, and user access."
-      navItems={adminNav}
+      description="Oversee projects, approvals, billing health, and user access."
+      navItems={setActiveNav(adminNav, "Dashboard")}
       metrics={[
         { label: "Active Projects", value: "0", note: "No project records yet", icon: FolderKanban },
         { label: "Pending Approvals", value: "0", note: "No approvals yet", icon: ShieldCheck },
@@ -303,6 +387,90 @@ export function AdminDashboard() {
       queueTitle="Approval Queue"
       queueItems={[]}
       activityItems={[]}
+    />
+  );
+}
+
+export function BillingClerkSectionPage({
+  activeLabel,
+  title,
+  description,
+}: {
+  activeLabel: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <StaffDashboard
+      role="Billing Clerk"
+      name="Billing Clerk"
+      title={title}
+      description={description}
+      navItems={setActiveNav(clerkNav, activeLabel)}
+      metrics={[
+        { label: "Open Records", value: "0", note: "No records yet", icon: ReceiptText },
+        { label: "Pending Review", value: "0", note: "No pending items", icon: ClipboardCheck },
+        { label: "Customers", value: "0", note: "No customer records yet", icon: Users },
+        { label: "Reports Ready", value: "0", note: "No reports generated", icon: FileText },
+      ]}
+      primaryPanel={
+        <Panel className="p-6">
+          <p className="text-sm font-semibold text-red-700">{activeLabel}</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+            This screen is ready for {activeLabel.toLowerCase()} records once the
+            system has connected data.
+          </p>
+        </Panel>
+      }
+      queueTitle={`${activeLabel} Queue`}
+      queueItems={[]}
+      activityItems={[]}
+    />
+  );
+}
+
+export function AdminSectionPage({
+  activeLabel,
+  title,
+  description,
+  children,
+  mainContent,
+}: {
+  activeLabel: string;
+  title: string;
+  description: string;
+  children?: ReactNode;
+  mainContent?: ReactNode;
+}) {
+  return (
+    <StaffDashboard
+      role="Admin"
+      name="Admin"
+      title={title}
+      description={description}
+      navItems={setActiveNav(adminNav, activeLabel)}
+      metrics={[
+        { label: "Open Records", value: "0", note: "No records yet", icon: FolderKanban },
+        { label: "Pending Review", value: "0", note: "No pending items", icon: ShieldCheck },
+        { label: "Users", value: "3", note: "Demo role accounts only", icon: Users },
+        { label: "Reports Ready", value: "0", note: "No reports generated", icon: ClipboardCheck },
+      ]}
+      primaryPanel={
+        <Panel className="p-6">
+          <p className="text-sm font-semibold text-red-700">{activeLabel}</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+            This screen is ready for {activeLabel.toLowerCase()} records once the
+            system has connected data.
+          </p>
+        </Panel>
+      }
+      queueTitle={`${activeLabel} Queue`}
+      queueItems={[]}
+      activityItems={[]}
+      footerContent={children}
+      mainContent={mainContent}
     />
   );
 }

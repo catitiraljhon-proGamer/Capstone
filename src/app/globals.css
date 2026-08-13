@@ -19,6 +19,59 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.night-mode {
+  color-scheme: dark;
+}
+
+.night-mode,
+.night-mode .bg-stone-50,
+.night-mode .bg-white,
+.night-mode .bg-white\/95 {
+  background-color: #0f1115;
+}
+
+.night-mode .bg-stone-100,
+.night-mode .bg-stone-200,
+.night-mode .bg-red-50,
+.night-mode .bg-rose-50 {
+  background-color: #181b20;
+}
+
+.night-mode .border-stone-200,
+.night-mode .ring-stone-200 {
+  border-color: #2f333a;
+  --tw-ring-color: #2f333a;
+}
+
+.night-mode .text-stone-950,
+.night-mode .text-stone-800,
+.night-mode .text-stone-700,
+.night-mode .text-stone-600 {
+  color: #f5f5f4;
+}
+
+.night-mode .text-stone-500,
+.night-mode .text-stone-400 {
+  color: #a8a29e;
+}
+
+.night-mode input,
+.night-mode select,
+.night-mode textarea {
+  background-color: #14171c;
+  color: #f5f5f4;
+}
+
+.night-mode input::placeholder,
+.night-mode textarea::placeholder {
+  color: #78716c;
+}
+
+.night-mode .shadow-sm,
+.night-mode .shadow-xl {
+  box-shadow: 0 12px 35px rgb(0 0 0 / 0.24);
+}
+
 @keyframes fadeSlideIn {
   to {
     opacity: 1;
