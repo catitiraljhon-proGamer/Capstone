@@ -3,7 +3,8 @@
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
-import { NextButton } from "@/components/ui/next-button";
+import { designOptions, exteriorItemChoices, formatPeso, getExteriorEstimate } from "@/components/ui/house-design-data";
+import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import {
   Bell,
@@ -47,114 +48,6 @@ type CustomerSection =
 
 const houseImage = "/House/image.png";
 
-const designOptions = [
-  {
-    name: "Modern Minimalist",
-    style: "Modern",
-    finish: "Standard",
-    area: 150,
-    rooms: "3 bedrooms, 2 toilets",
-    rate: 40000,
-    image: "/House/image.png",
-    notes: "Clean layout for subdivision-ready residential builds.",
-  },
-  {
-    name: "Contemporary Family",
-    style: "Contemporary",
-    finish: "Semi-luxury",
-    area: 180,
-    rooms: "4 bedrooms, 3 toilets",
-    rate: 48000,
-    image: "/House/Screenshot%202026-07-29%20003940.png",
-    notes: "Balanced room sizes with stronger facade treatment.",
-  },
-  {
-    name: "Compact Bungalow",
-    style: "Bungalow",
-    finish: "Standard",
-    area: 120,
-    rooms: "2 bedrooms, 2 toilets",
-    rate: 35000,
-    image: "/House/Screenshot%202026-07-29%20003957.png",
-    notes: "Lower starting estimate for smaller lots and budgets.",
-  },
-];
-
-const roofOptions = [
-  { name: "Rib-type long span roofing", unit: "sqm", quantity: 95, unitPrice: 1450 },
-  { name: "Pre-painted metal tile roofing", unit: "sqm", quantity: 95, unitPrice: 1850 },
-  { name: "Stone-coated steel roofing", unit: "sqm", quantity: 95, unitPrice: 2400 },
-];
-
-const exteriorItemChoices = [
-  {
-    item: "Roof",
-    detail: "Main roof material",
-    quantityByArea: 0.63,
-    options: roofOptions,
-  },
-  {
-    item: "Exterior wall finish",
-    detail: "Primer, skim coat, and weatherproof finish",
-    quantityByArea: 1.4,
-    options: [
-      { name: "Standard exterior paint system", unit: "sqm", unitPrice: 520 },
-      { name: "Elastomeric waterproof coating", unit: "sqm", unitPrice: 690 },
-      { name: "Textured premium exterior finish", unit: "sqm", unitPrice: 860 },
-    ],
-  },
-  {
-    item: "Windows",
-    detail: "Exterior window package",
-    quantityByArea: 0.08,
-    options: [
-      { name: "Powder-coated aluminum windows", unit: "set", unitPrice: 11500 },
-      { name: "Analok aluminum sliding windows", unit: "set", unitPrice: 13800 },
-      { name: "uPVC awning windows", unit: "set", unitPrice: 16800 },
-    ],
-  },
-  {
-    item: "Main exterior door",
-    detail: "Primary entry door",
-    quantity: 1,
-    options: [
-      { name: "Steel panel entry door", unit: "set", unitPrice: 28000 },
-      { name: "Solid wood entry door", unit: "set", unitPrice: 42000 },
-      { name: "Aluminum glass entry door", unit: "set", unitPrice: 36000 },
-    ],
-  },
-  {
-    item: "Exterior accent cladding",
-    detail: "Facade accent surface",
-    quantityByArea: 0.16,
-    options: [
-      { name: "Ceramic facade tile accent", unit: "sqm", unitPrice: 1850 },
-      { name: "Natural stone cladding", unit: "sqm", unitPrice: 3200 },
-      { name: "Composite wood-look cladding", unit: "sqm", unitPrice: 2750 },
-    ],
-  },
-  {
-    item: "Gutter and downspout",
-    detail: "Roof drainage line",
-    quantityByArea: 0.28,
-    options: [
-      { name: "Pre-painted metal gutter", unit: "lm", unitPrice: 780 },
-      { name: "PVC gutter system", unit: "lm", unitPrice: 620 },
-      { name: "Seamless aluminum gutter", unit: "lm", unitPrice: 980 },
-    ],
-  },
-  {
-    item: "Exterior floor area",
-    detail: "Porch, service area, and exterior landing",
-    quantityByArea: 0.12,
-    options: [
-      { name: "Plain concrete exterior floor", unit: "sqm", unitPrice: 2200 },
-      { name: "Non-slip exterior tiles", unit: "sqm", unitPrice: 3200 },
-      { name: "Stamped concrete finish", unit: "sqm", unitPrice: 3800 },
-    ],
-  },
-];
-
 const customerNav: {
   label: string;
   icon: IconType;
@@ -172,13 +65,6 @@ const customerNav: {
   { label: "Support", icon: HelpCircle, href: "/customer/support", section: "support" },
 ];
 
-const formatPeso = (value: number) =>
-  new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: "PHP",
-    maximumFractionDigits: 0,
-  }).format(value);
-
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <section className={`rounded-xl border border-stone-200 bg-white shadow-sm ${className}`}>
@@ -193,133 +79,6 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       <p className="text-sm font-semibold text-stone-950">{title}</p>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">{body}</p>
     </div>
-  );
-}
-
-function ProjectExteriorEstimatePanel({
-  design,
-  selections,
-  onSelectionChange,
-}: {
-  design: (typeof designOptions)[number];
-  selections: number[];
-  onSelectionChange: (itemIndex: number, optionIndex: number) => void;
-}) {
-  const baseEstimate = design.area * design.rate;
-  const exteriorRows = exteriorItemChoices.map((item, itemIndex) => {
-    const selectedOption = item.options[selections[itemIndex] ?? 0];
-    const quantity =
-      typeof item.quantity === "number"
-        ? item.quantity
-        : Math.max(1, Math.round(design.area * item.quantityByArea));
-    const amount = quantity * selectedOption.unitPrice;
-
-    return {
-      ...item,
-      selectedOption,
-      quantity,
-      amount,
-    };
-  });
-  const exteriorTotal = exteriorRows.reduce(
-    (total, material) => total + material.amount,
-    0,
-  );
-  const revisedEstimate = baseEstimate + exteriorTotal;
-
-  return (
-    <Panel className="p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">
-            {design.name} Exterior Materials & Pricing
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
-            These are the exterior items used on this selected project. Change
-            any item option to preview how the estimated project price updates.
-          </p>
-        </div>
-        <div className="grid gap-1 rounded-lg border border-stone-200 p-4 text-right">
-          <p className="text-xs font-semibold uppercase text-stone-500">
-            Revised Estimate
-          </p>
-          <p className="text-2xl font-semibold tracking-tight text-red-700">
-            {formatPeso(revisedEstimate)}
-          </p>
-          <p className="text-xs text-stone-500">
-            Base {formatPeso(baseEstimate)} + exterior {formatPeso(exteriorTotal)}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
-          <thead>
-            <tr className="text-left text-xs font-semibold uppercase text-stone-500">
-              <th className="border-b border-stone-200 px-3 py-3">Exterior Item</th>
-              <th className="border-b border-stone-200 px-3 py-3">Client Change Option</th>
-              <th className="border-b border-stone-200 px-3 py-3">Unit</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Quantity</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Unit Price</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exteriorRows.map((material, itemIndex) => (
-                <tr key={material.item}>
-                  <td className="border-b border-stone-100 px-3 py-4">
-                    <p className="font-semibold text-stone-950">{material.item}</p>
-                    <p className="mt-1 text-xs text-stone-500">{material.detail}</p>
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-4">
-                    <select
-                      value={selections[itemIndex] ?? 0}
-                      onChange={(event) =>
-                        onSelectionChange(itemIndex, Number(event.target.value))
-                      }
-                      className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600"
-                      aria-label={`Change ${material.item}`}
-                    >
-                      {material.options.map((option, optionIndex) => (
-                        <option key={option.name} value={optionIndex}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-4 text-stone-600">
-                    {material.selectedOption.unit}
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-4 text-right font-medium">
-                    {material.quantity}
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-4 text-right">
-                    {formatPeso(material.selectedOption.unitPrice)}
-                  </td>
-                  <td className="border-b border-stone-100 px-3 py-4 text-right font-semibold text-stone-950">
-                    {formatPeso(material.amount)}
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-900">
-          This is an editable estimate preview for client-requested changes.
-          Final pricing still needs G4 Builders Inc review before approval.
-        </div>
-        <div className="rounded-lg border border-stone-200 p-4 text-right">
-          <p className="text-xs font-semibold uppercase text-stone-500">
-            Exterior Subtotal
-          </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-red-700">
-            {formatPeso(exteriorTotal)}
-          </p>
-        </div>
-      </div>
-    </Panel>
   );
 }
 
@@ -379,15 +138,9 @@ function CustomerShell({
   children: ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(true);
 
   return (
-    <div
-      className={[
-        "min-h-screen bg-stone-50 text-stone-950",
-        isLightMode ? "" : "night-mode",
-      ].join(" ")}
-    >
+    <div className="min-h-screen bg-stone-50 text-stone-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:flex lg:flex-col">
         <SidebarContent activeSection={activeSection} />
       </aside>
@@ -435,10 +188,7 @@ function CustomerShell({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <ThemeToggle
-                isLightMode={isLightMode}
-                onToggle={() => setIsLightMode((current) => !current)}
-              />
+              <ThemeToggle />
               <Link
                 href="/customer/notifications"
                 className="relative grid h-10 w-10 place-items-center rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100"
@@ -584,11 +334,15 @@ export function CustomerDashboard() {
 }
 
 export function CustomerHouseDesignPage() {
-  const [activeSlide, setActiveSlide] = useState<"designs" | "houseTypes">("designs");
+  const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
+  const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
   const [selectedDesignIndex, setSelectedDesignIndex] = useState<number | null>(null);
   const [materialSelections, setMaterialSelections] = useState(
     exteriorItemChoices.map(() => 0),
   );
+  const filteredDesigns = selectedHouseType
+    ? designOptions.filter((design) => design.houseType === selectedHouseType)
+    : [];
   const selectedDesign =
     selectedDesignIndex === null ? null : designOptions[selectedDesignIndex];
 
@@ -596,124 +350,189 @@ export function CustomerHouseDesignPage() {
     <CustomerShell
       activeSection="design"
       title="My House Design"
-      description="Compare designs, finishes, floor area, and rough estimates."
+      description="Select a house type, choose a design, review details, and edit exterior materials."
     >
       <div className="space-y-6">
         <Panel className="p-5">
-          {activeSlide === "designs" ? (
-            <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h1 className="text-xl font-semibold tracking-tight">Compare House Designs</h1>
-                  <p className="mt-1 text-sm text-stone-600">
-                    Visual previews with starting cost per square meter.
-                  </p>
-                </div>
-                <p className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-600">
-                  Click a project to view editable exterior pricing
+          {activeStep === "types" ? (
+            <div>
+              <div className="mb-5">
+                <h1 className="text-xl font-semibold tracking-tight">Select House Type</h1>
+                <p className="mt-1 text-sm text-stone-600">
+                  Start by choosing a house type. Design images appear after a type is selected.
                 </p>
               </div>
-              <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                {designOptions.map((design, index) => (
-                  <button
-                    key={design.name}
-                    type="button"
-                    onClick={() => {
-                      setSelectedDesignIndex(index);
-                      setMaterialSelections(exteriorItemChoices.map(() => 0));
-                    }}
-                    className={[
-                      "overflow-hidden rounded-xl border bg-white text-left transition hover:border-red-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600",
-                      selectedDesignIndex === index
-                        ? "border-red-700 ring-2 ring-red-100"
-                        : "border-stone-200",
-                    ].join(" ")}
-                    aria-label={`View exterior materials and estimate for ${design.name}`}
-                  >
-                    <div className="relative h-44">
-                      <Image
-                        src={design.image}
-                        alt={`${design.name} visual preview`}
-                        fill
-                        className="object-cover"
-                        sizes="(min-width: 1024px) 25vw, 100vw"
-                      />
-                    </div>
-                    <div className="p-4">
-                      <h2 className="font-semibold tracking-tight">{design.name}</h2>
-                      <p className="mt-1 text-xs text-stone-500">
-                        {design.style} - {design.finish}
-                      </p>
-                      <p className="mt-3 text-sm leading-5 text-stone-600">{design.notes}</p>
-                      <dl className="mt-4 grid gap-3 text-sm">
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-stone-500">Area</dt>
-                          <dd className="font-semibold">{design.area} sqm</dd>
-                        </div>
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-stone-500">Starts at</dt>
-                          <dd className="font-semibold">{formatPeso(design.rate)} / sqm</dd>
-                        </div>
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-stone-500">Estimated total</dt>
-                          <dd className="font-semibold text-red-700">
-                            {formatPeso(design.area * design.rate)}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-                  </button>
-                ))}
+              <ColorChangeCards
+                onSelect={(houseType) => {
+                  setSelectedHouseType(houseType);
+                  setSelectedDesignIndex(null);
+                  setMaterialSelections(exteriorItemChoices.map(() => 0));
+                  setActiveStep("designs");
+                }}
+              />
+            </div>
+          ) : activeStep === "designs" ? (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h1 className="text-xl font-semibold tracking-tight">
+                    {selectedHouseType} House Designs
+                  </h1>
+                  <p className="mt-1 text-sm text-stone-600">
+                    Select one house design to view project details and estimated construction cost.
+                  </p>
+                </div>
+                <BackButton type="button" onClick={() => setActiveStep("types")} />
               </div>
 
-              {selectedDesign ? (
-                <div className="mt-6">
-                  <ProjectExteriorEstimatePanel
-                    design={selectedDesign}
-                    selections={materialSelections}
-                    onSelectionChange={(itemIndex, optionIndex) =>
-                      setMaterialSelections((current) =>
-                        current.map((value, index) =>
-                          index === itemIndex ? optionIndex : value,
-                        ),
-                      )
-                    }
-                  />
+              {filteredDesigns.length > 0 ? (
+                <div className="mt-5 columns-1 gap-4 sm:columns-2 xl:columns-3">
+                  {filteredDesigns.map((design) => {
+                    const designIndex = designOptions.findIndex(
+                      (option) => option.name === design.name,
+                    );
+
+                    return (
+                      <button
+                        key={design.name}
+                        type="button"
+                        onClick={() => {
+                          setSelectedDesignIndex(designIndex);
+                          setMaterialSelections(exteriorItemChoices.map(() => 0));
+                          setActiveStep("details");
+                        }}
+                        className="mb-4 inline-block w-full break-inside-avoid overflow-hidden rounded-xl bg-white text-left transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600"
+                        aria-label={`View project details for ${design.name}`}
+                      >
+                        <div
+                          className={[
+                            "relative overflow-hidden rounded-xl",
+                            designIndex % 3 === 0
+                              ? "h-56"
+                              : designIndex % 3 === 1
+                                ? "h-72"
+                                : "h-48",
+                          ].join(" ")}
+                        >
+                          <Image
+                            src={design.image}
+                            alt={`${design.name} visual preview`}
+                            fill
+                            className="object-cover"
+                            sizes="(min-width: 1024px) 25vw, 100vw"
+                          />
+                        </div>
+                        <div className="px-1 py-3">
+                          <h2 className="text-sm font-semibold tracking-tight text-stone-950">
+                            {design.name}
+                          </h2>
+                          <p className="mt-1 text-xs text-stone-500">
+                            {design.style} - {design.area} sqm
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-6 text-center">
                   <p className="text-sm font-semibold text-stone-950">
-                    Select a project to view its exterior items and prices.
-                  </p>
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-stone-600">
-                    The editable estimate table will appear here after choosing
-                    one of the project cards above.
+                    No designs available for this house type yet.
                   </p>
                 </div>
               )}
-
-              <div className="mt-6 flex justify-end border-t border-stone-200 pt-5">
-                <NextButton
-                  type="button"
-                  onClick={() => setActiveSlide("houseTypes")}
-                />
-              </div>
             </>
-          ) : (
+          ) : selectedDesign ? (
             <div>
-              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-5 flex justify-start">
+                <BackButton type="button" onClick={() => setActiveStep("designs")} />
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+                <div className="relative h-[320px] bg-stone-100 sm:h-[460px] xl:h-[560px]">
+                  <Image
+                    src={selectedDesign.image}
+                    alt={`${selectedDesign.name} enlarged house design`}
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 72vw, 100vw"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div>
-                  <h1 className="text-xl font-semibold tracking-tight">Choose House Type</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight text-stone-950">
+                    {selectedDesign.name}
+                  </h1>
                   <p className="mt-1 text-sm text-stone-600">
-                    Select one of six house styles for the next estimate preview.
+                    {selectedDesign.notes}
+                  </p>
+                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div className="rounded-lg border border-stone-200 p-4">
+                      <dt className="text-xs font-semibold uppercase text-stone-500">
+                        House Type
+                      </dt>
+                      <dd className="mt-1 font-semibold text-stone-950">
+                        {selectedDesign.houseType}
+                      </dd>
+                    </div>
+                    <div className="rounded-lg border border-stone-200 p-4">
+                      <dt className="text-xs font-semibold uppercase text-stone-500">
+                        Floor Area
+                      </dt>
+                      <dd className="mt-1 font-semibold text-stone-950">
+                        {selectedDesign.area} sqm
+                      </dd>
+                    </div>
+                    <div className="rounded-lg border border-stone-200 p-4">
+                      <dt className="text-xs font-semibold uppercase text-stone-500">
+                        Rooms
+                      </dt>
+                      <dd className="mt-1 font-semibold text-stone-950">
+                        {selectedDesign.rooms}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="rounded-xl border border-stone-200 bg-white p-5 text-right shadow-sm">
+                  <p className="text-sm font-semibold text-stone-500">
+                    Estimated Project Cost
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight text-red-700">
+                    {formatPeso(
+                      getExteriorEstimate(selectedDesign, materialSelections)
+                        .revisedEstimate,
+                    )}
                   </p>
                 </div>
-                <BackButton
-                  type="button"
-                  onClick={() => setActiveSlide("designs")}
-                />
               </div>
-              <ColorChangeCards />
+
+              <div className="mt-6">
+              <ProjectExteriorEstimatePanel
+                design={selectedDesign}
+                selections={materialSelections}
+                isEditing={false}
+                onSelectionChange={(itemIndex, optionIndex) =>
+                  setMaterialSelections((current) =>
+                    current.map((value, index) =>
+                      index === itemIndex ? optionIndex : value,
+                    ),
+                  )
+                }
+              />
+              </div>
+
+              <div className="mt-6 flex justify-end border-t border-stone-200 pt-5">
+                <Link href="/customer/design-requests" className="rounded-lg bg-red-700 px-5 py-2 text-sm font-semibold text-white hover:bg-red-800">Request Material Changes</Link>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-stone-200 p-6 text-center">
+              <p className="text-sm font-semibold text-stone-950">
+                Select a house type to begin.
+              </p>
             </div>
           )}
         </Panel>
@@ -721,7 +540,6 @@ export function CustomerHouseDesignPage() {
     </CustomerShell>
   );
 }
-
 export function CustomerDesignRequestsPage() {
   return (
     <CustomerShell
@@ -902,3 +720,6 @@ export function CustomerSupportPage() {
     </CustomerShell>
   );
 }
+
+
+

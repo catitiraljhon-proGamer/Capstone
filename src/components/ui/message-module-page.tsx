@@ -129,15 +129,9 @@ export function MessageModulePage({
 }: MessageModulePageProps) {
   const navItems = navByRole[role];
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(true);
 
   return (
-    <div
-      className={[
-        "min-h-screen bg-stone-50 text-stone-950",
-        isLightMode ? "" : "night-mode",
-      ].join(" ")}
-    >
+    <div className="min-h-screen bg-stone-50 text-stone-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:flex lg:flex-col">
         <MessageSidebar navItems={navItems} />
       </aside>
@@ -189,10 +183,7 @@ export function MessageModulePage({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <ThemeToggle
-                isLightMode={isLightMode}
-                onToggle={() => setIsLightMode((current) => !current)}
-              />
+              <ThemeToggle />
               <BackButton href={dashboardHref} className="hidden sm:inline-flex" />
               <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">
                 <User className="h-6 w-6" />

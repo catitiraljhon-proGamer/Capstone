@@ -2,14 +2,15 @@
 
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { getAdminDashboardData } from "@/lib/admin-dashboard-data";
 import {
   Bell,
-  Calculator,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   FolderKanban,
   Gauge,
+  House,
   LogOut,
   Menu,
   ReceiptText,
@@ -52,12 +53,15 @@ const clerkNav = [
 
 const adminNav = [
   { label: "Dashboard", icon: Gauge, href: "/admin" },
-  { label: "Messages", icon: Bell, href: "/admin/messages" },
-  { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
+  { label: "House Designs", icon: House, href: "/admin/house-designs" },
+  { label: "Clients", icon: Users, href: "/admin/clients" },
   { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
-  { label: "Billing Control", icon: ReceiptText, href: "/admin/billing-control" },
+  { label: "Cost Estimates", icon: ClipboardCheck, href: "/admin/cost-estimates" },
+  { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
+  { label: "Billing", icon: ReceiptText, href: "/admin/billing-control" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
+  { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },
 ];
 
 const setActiveNav = (
@@ -132,15 +136,9 @@ function StaffDashboard({
   mainContent,
 }: StaffDashboardProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isLightMode, setIsLightMode] = useState(true);
 
   return (
-    <div
-      className={[
-        "min-h-screen bg-stone-50 text-stone-950",
-        isLightMode ? "" : "night-mode",
-      ].join(" ")}
-    >
+    <div className="min-h-screen bg-stone-50 text-stone-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:flex lg:flex-col">
         <StaffSidebar navItems={navItems} />
       </aside>
@@ -188,10 +186,7 @@ function StaffDashboard({
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <ThemeToggle
-                isLightMode={isLightMode}
-                onToggle={() => setIsLightMode((current) => !current)}
-              />
+              <ThemeToggle />
               <button
                 type="button"
                 className="relative grid h-10 w-10 place-items-center rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100"
@@ -313,6 +308,196 @@ function StaffDashboard({
   );
 }
 
+function AdminOverviewCard({
+  label,
+  value,
+  note,
+  href,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  note: string;
+  href: string;
+  icon: IconType;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-red-200 hover:bg-red-50/40"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-stone-500">{label}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">
+            {value}
+          </p>
+          <p className="mt-2 text-xs text-stone-500">{note}</p>
+        </div>
+        <span className="grid h-11 w-11 place-items-center rounded-lg bg-red-50 text-red-700">
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+function AdminDashboardOverview() {
+  const { summary, pendingApprovals, recentActivities } = getAdminDashboardData();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AdminOverviewCard
+          label="Active Projects"
+          value={summary.activeProjects}
+          note={
+            summary.activeProjects === 0
+              ? "No active projects yet"
+              : `${summary.activeProjects} active projects`
+          }
+          href="/admin/projects"
+          icon={FolderKanban}
+        />
+        <AdminOverviewCard
+          label="Pending Approvals"
+          value={summary.pendingApprovals}
+          note={
+            summary.pendingApprovals === 0
+              ? "No pending approvals"
+              : `${summary.pendingApprovals} records waiting for review`
+          }
+          href="/admin/approvals"
+          icon={ShieldCheck}
+        />
+        <AdminOverviewCard
+          label="Pending Billing"
+          value={summary.pendingBilling}
+          note={
+            summary.pendingBilling === 0
+              ? "No pending billing records"
+              : `${summary.pendingBilling} billing records pending`
+          }
+          href="/admin/billing-control"
+          icon={ReceiptText}
+        />
+        <AdminOverviewCard
+          label="Total Clients"
+          value={summary.totalClients}
+          note={
+            summary.totalClients === 0
+              ? "No registered clients yet"
+              : "Registered clients"
+          }
+          href="/admin/clients"
+          icon={Users}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Panel className="p-5">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Pending Approvals
+            </h2>
+            <Link
+              href="/admin/approvals"
+              className="text-sm font-medium text-red-700 hover:text-red-900"
+            >
+              View All
+            </Link>
+          </div>
+
+          {pendingApprovals.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[620px] border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold uppercase text-stone-500">
+                    <th className="border-b border-stone-200 px-3 py-3">
+                      Reference
+                    </th>
+                    <th className="border-b border-stone-200 px-3 py-3">
+                      Client
+                    </th>
+                    <th className="border-b border-stone-200 px-3 py-3">
+                      Type
+                    </th>
+                    <th className="border-b border-stone-200 px-3 py-3">
+                      Status
+                    </th>
+                    <th className="border-b border-stone-200 px-3 py-3 text-right">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingApprovals.map((approval) => (
+                    <tr key={approval.reference}>
+                      <td className="border-b border-stone-100 px-3 py-4 font-semibold">
+                        {approval.reference}
+                      </td>
+                      <td className="border-b border-stone-100 px-3 py-4">
+                        {approval.client}
+                      </td>
+                      <td className="border-b border-stone-100 px-3 py-4">
+                        {approval.type}
+                      </td>
+                      <td className="border-b border-stone-100 px-3 py-4">
+                        <span className="rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
+                          {approval.status}
+                        </span>
+                      </td>
+                      <td className="border-b border-stone-100 px-3 py-4 text-right">
+                        <Link
+                          href={approval.href}
+                          className="text-sm font-semibold text-red-700 hover:text-red-900"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-dashed border-stone-200 p-6 text-center text-sm text-stone-500">
+              No pending approvals.
+            </div>
+          )}
+        </Panel>
+
+        <Panel className="p-5">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Recent Activity
+          </h2>
+          {recentActivities.length > 0 ? (
+            <div className="mt-4 divide-y divide-stone-200">
+              {recentActivities.map((activity) => (
+                <div key={`${activity.title}-${activity.date}`} className="py-4">
+                  <div className="flex gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+                    <div>
+                      <p className="text-sm font-semibold">{activity.title}</p>
+                      <p className="mt-1 text-xs text-stone-500">
+                        {activity.date}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-dashed border-stone-200 p-6 text-center text-sm text-stone-500">
+              No recent activity yet.
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
 export function BillingClerkDashboard() {
   return (
     <StaffDashboard
@@ -358,35 +543,14 @@ export function AdminDashboard() {
       role="Admin"
       name="Admin"
       title="Admin Dashboard"
-      description="Oversee projects, approvals, billing health, and user access."
+      description="Quick overview of projects, approvals, billing, clients, and recent system activity."
       navItems={setActiveNav(adminNav, "Dashboard")}
-      metrics={[
-        { label: "Active Projects", value: "0", note: "No project records yet", icon: FolderKanban },
-        { label: "Pending Approvals", value: "0", note: "No approvals yet", icon: ShieldCheck },
-        { label: "Projected Revenue", value: "PHP 0.00", note: "No project pipeline yet", icon: Calculator },
-        { label: "System Users", value: "3", note: "Demo role accounts only", icon: Users },
-      ]}
-      primaryPanel={
-        <Panel className="p-6">
-          <p className="text-sm font-semibold text-red-700">Operations Command</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-            Keep project cost, billing, and approvals aligned.
-          </h1>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {["Review Approvals", "Manage Users", "Open Reports"].map((action) => (
-              <button
-                key={action}
-                className="rounded-lg border border-stone-200 bg-white px-4 py-4 text-left text-sm font-semibold shadow-sm hover:border-red-200 hover:bg-red-50"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-        </Panel>
-      }
-      queueTitle="Approval Queue"
+      metrics={[]}
+      primaryPanel={null}
+      queueTitle="Pending Approvals"
       queueItems={[]}
       activityItems={[]}
+      mainContent={<AdminDashboardOverview />}
     />
   );
 }

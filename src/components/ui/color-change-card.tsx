@@ -9,11 +9,16 @@ type HouseType = {
   imgSrc: string;
 };
 
-const houseTypes: HouseType[] = [
+export const houseTypes: HouseType[] = [
   {
     heading: "Modern",
     description: "Clean lines, open planning, and large glass openings for a sharper residential profile.",
     imgSrc: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80",
+  },
+  {
+    heading: "Minimalist",
+    description: "Simple forms, efficient spaces, and restrained details for budget-conscious planning.",
+    imgSrc: "https://images.unsplash.com/photo-1600047509358-9dc75507daeb?auto=format&fit=crop&w=1200&q=80",
   },
   {
     heading: "Contemporary",
@@ -21,7 +26,7 @@ const houseTypes: HouseType[] = [
     imgSrc: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
   },
   {
-    heading: "Praise",
+    heading: "Prairie",
     description: "Warm frontage, balanced details, and a welcoming plan suited for calm daily routines.",
     imgSrc: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&w=1200&q=80",
   },
@@ -42,20 +47,36 @@ const houseTypes: HouseType[] = [
   },
 ];
 
-export default function ColorChangeCards() {
+export default function ColorChangeCards({
+  onSelect,
+}: {
+  onSelect?: (houseType: string) => void;
+}) {
   return (
-    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-7">
       {houseTypes.map((houseType) => (
-        <Card key={houseType.heading} {...houseType} />
+        <Card
+          key={houseType.heading}
+          {...houseType}
+          onSelect={() => onSelect?.(houseType.heading)}
+        />
       ))}
     </div>
   );
 }
 
-function Card({ heading, description, imgSrc }: HouseType) {
+function Card({
+  heading,
+  description,
+  imgSrc,
+  onSelect,
+}: HouseType & {
+  onSelect: () => void;
+}) {
   return (
     <motion.button
       type="button"
+      onClick={onSelect}
       transition={{ staggerChildren: 0.035 }}
       whileHover="hover"
       whileFocus="hover"
