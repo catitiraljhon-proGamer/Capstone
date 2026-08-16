@@ -1,5 +1,46 @@
-export const designOptions = [
+export type HouseDesignFinish = "Standard" | "Semi-luxury" | "Luxury";
+export type HouseDesignStatus = "Draft" | "Published" | "Archived";
+
+export const houseDesignFinishes: HouseDesignFinish[] = [
+  "Standard",
+  "Semi-luxury",
+  "Luxury",
+];
+
+/** An extra exterior line item defined by admin, outside the standard list. */
+export type CustomExteriorItem = {
+  id: string;
+  item: string;
+  material: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type HouseDesign = {
+  id: string;
+  name: string;
+  /** Optional sub-label shown under the card title. Falls back to houseType. */
+  style?: string;
+  houseType: string;
+  finish: HouseDesignFinish;
+  area: number;
+  rooms: string;
+  rate: number;
+  /** First image is the cover shown on cards. */
+  images: string[];
+  notes: string;
+  status: HouseDesignStatus;
+  /** One option index per entry in exteriorItemChoices. */
+  defaultSelections: number[];
+  customItems: CustomExteriorItem[];
+  createdAt: string;
+  createdBy: string;
+};
+
+export const seedDesigns: HouseDesign[] = [
   {
+    id: "seed-modern-minimalist",
     name: "Modern Minimalist",
     style: "Modern",
     houseType: "Modern",
@@ -7,10 +48,20 @@ export const designOptions = [
     area: 150,
     rooms: "3 bedrooms, 2 toilets",
     rate: 40000,
-    image: "/House/image.png",
+    images: [
+      "/House/image.png",
+      "/House/Screenshot%202026-07-29%20003957.png",
+      "/House/Screenshot%202026-07-29%20011237.png",
+    ],
     notes: "Clean layout for subdivision-ready residential builds.",
+    status: "Published",
+    defaultSelections: [0, 0, 0, 0, 0, 0, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:00:00.000Z",
+    createdBy: "Admin",
   },
   {
+    id: "seed-modern-glass-front",
     name: "Modern Glass Front",
     style: "Modern",
     houseType: "Modern",
@@ -18,10 +69,19 @@ export const designOptions = [
     area: 165,
     rooms: "3 bedrooms, 3 toilets",
     rate: 45000,
-    image: "/House/Screenshot%202026-07-29%20003940.png",
+    images: [
+      "/House/Screenshot%202026-07-29%20003940.png",
+      "/House/image.png",
+    ],
     notes: "Modern facade with wider openings and stronger street presence.",
+    status: "Published",
+    defaultSelections: [1, 1, 0, 0, 0, 0, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:05:00.000Z",
+    createdBy: "Admin",
   },
   {
+    id: "seed-contemporary-family",
     name: "Contemporary Family",
     style: "Contemporary",
     houseType: "Contemporary",
@@ -29,10 +89,16 @@ export const designOptions = [
     area: 180,
     rooms: "4 bedrooms, 3 toilets",
     rate: 48000,
-    image: "/House/Screenshot%202026-07-29%20003940.png",
+    images: ["/House/Screenshot%202026-07-29%20003940.png"],
     notes: "Balanced room sizes with stronger facade treatment.",
+    status: "Published",
+    defaultSelections: [1, 1, 1, 0, 0, 0, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:10:00.000Z",
+    createdBy: "Admin",
   },
   {
+    id: "seed-contemporary-corner-lot",
     name: "Contemporary Corner Lot",
     style: "Contemporary",
     houseType: "Contemporary",
@@ -40,10 +106,16 @@ export const designOptions = [
     area: 145,
     rooms: "3 bedrooms, 2 toilets",
     rate: 42000,
-    image: "/House/Screenshot%202026-07-29%20011237.png",
+    images: ["/House/Screenshot%202026-07-29%20011237.png"],
     notes: "Compact contemporary plan with practical exterior materials.",
+    status: "Published",
+    defaultSelections: [0, 0, 0, 0, 0, 0, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:15:00.000Z",
+    createdBy: "Admin",
   },
   {
+    id: "seed-compact-bungalow",
     name: "Compact Bungalow",
     style: "Minimalist",
     houseType: "Minimalist",
@@ -51,10 +123,16 @@ export const designOptions = [
     area: 120,
     rooms: "2 bedrooms, 2 toilets",
     rate: 35000,
-    image: "/House/Screenshot%202026-07-29%20003957.png",
+    images: ["/House/Screenshot%202026-07-29%20003957.png"],
     notes: "Lower starting estimate for smaller lots and budgets.",
+    status: "Published",
+    defaultSelections: [0, 0, 0, 0, 0, 1, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:20:00.000Z",
+    createdBy: "Admin",
   },
   {
+    id: "seed-minimalist-two-storey",
     name: "Minimalist Two-Storey",
     style: "Minimalist",
     houseType: "Minimalist",
@@ -62,8 +140,13 @@ export const designOptions = [
     area: 135,
     rooms: "3 bedrooms, 2 toilets",
     rate: 39000,
-    image: "/House/image.png",
+    images: ["/House/image.png"],
     notes: "Simple exterior composition with efficient floor area planning.",
+    status: "Published",
+    defaultSelections: [0, 0, 0, 0, 0, 0, 0],
+    customItems: [],
+    createdAt: "2026-01-05T08:25:00.000Z",
+    createdBy: "Admin",
   },
 ];
 
@@ -142,6 +225,18 @@ export const exteriorItemChoices = [
   },
 ];
 
+export const createDefaultSelections = () => exteriorItemChoices.map(() => 0);
+
+/** Pads or trims a stored selection list so it always matches the item list. */
+export function normalizeSelections(selections: number[] | undefined) {
+  return exteriorItemChoices.map((item, index) => {
+    const value = selections?.[index] ?? 0;
+    return value >= 0 && value < item.options.length ? value : 0;
+  });
+}
+
+export const isDataImage = (src: string) => src.startsWith("data:");
+
 export const formatPeso = (value: number) =>
   new Intl.NumberFormat("en-PH", {
     style: "currency",
@@ -149,26 +244,63 @@ export const formatPeso = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+/** One rendered line in the material breakdown, standard or custom. */
+export type EstimateRow = {
+  key: string;
+  item: string;
+  detail: string;
+  material: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+  isCustom: boolean;
+};
+
 export function getExteriorEstimate(
-  design: (typeof designOptions)[number],
+  design: Pick<HouseDesign, "area" | "rate"> & {
+    customItems?: CustomExteriorItem[];
+  },
   selections: number[],
 ) {
   const baseEstimate = design.area * design.rate;
-  const exteriorRows = exteriorItemChoices.map((item, itemIndex) => {
-    const selectedOption = item.options[selections[itemIndex] ?? 0];
-    const quantity =
-      typeof item.quantity === "number"
-        ? item.quantity
-        : Math.max(1, Math.round(design.area * item.quantityByArea));
-    const amount = quantity * selectedOption.unitPrice;
 
-    return {
-      ...item,
-      selectedOption,
-      quantity,
-      amount,
-    };
-  });
+  const standardRows: EstimateRow[] = exteriorItemChoices.map(
+    (item, itemIndex) => {
+      const selectedOption =
+        item.options[selections[itemIndex] ?? 0] ?? item.options[0];
+      const quantity =
+        typeof item.quantity === "number"
+          ? item.quantity
+          : Math.max(1, Math.round(design.area * item.quantityByArea));
+
+      return {
+        key: item.item,
+        item: item.item,
+        detail: item.detail,
+        material: selectedOption.name,
+        unit: selectedOption.unit,
+        quantity,
+        unitPrice: selectedOption.unitPrice,
+        amount: quantity * selectedOption.unitPrice,
+        isCustom: false,
+      };
+    },
+  );
+
+  const customRows: EstimateRow[] = (design.customItems ?? []).map((item) => ({
+    key: item.id,
+    item: item.item,
+    detail: "Custom exterior item",
+    material: item.material,
+    unit: item.unit,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    amount: item.quantity * item.unitPrice,
+    isCustom: true,
+  }));
+
+  const exteriorRows = [...standardRows, ...customRows];
   const exteriorTotal = exteriorRows.reduce(
     (total, material) => total + material.amount,
     0,

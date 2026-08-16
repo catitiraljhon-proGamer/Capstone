@@ -1,28 +1,23 @@
 import {
-  designOptions,
   formatPeso,
   getExteriorEstimate,
+  type HouseDesign,
 } from "@/components/ui/house-design-data";
 
 type ProjectExteriorEstimatePanelProps = {
-  design: (typeof designOptions)[number];
+  design: HouseDesign;
   selections: number[];
-  onSelectionChange: (itemIndex: number, optionIndex: number) => void;
-  isEditing: boolean;
   editorRole?: "Admin" | "Client";
 };
 
 export function ProjectExteriorEstimatePanel({
   design,
   selections,
-  onSelectionChange,
-  isEditing,
   editorRole = "Client",
 }: ProjectExteriorEstimatePanelProps) {
   const { baseEstimate, exteriorRows, exteriorTotal, revisedEstimate } =
     getExteriorEstimate(design, selections);
-  const optionColumnLabel =
-    editorRole === "Admin" ? "Admin Material Selection" : "Selected Material";
+  const customCount = exteriorRows.filter((row) => row.isCustom).length;
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -33,7 +28,7 @@ export function ProjectExteriorEstimatePanel({
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
             {editorRole === "Admin"
-              ? "Admin can update the selected materials for this house design. Changing selections recalculates the estimated project cost."
+              ? "Use Edit Design to change materials, add custom exterior items, or update the design details. Changes recalculate the estimated project cost."
               : "Review the materials used for this project. Clients may request preferred changes, but material management stays with Admin."}
           </p>
         </div>
@@ -41,10 +36,10 @@ export function ProjectExteriorEstimatePanel({
           <p className="text-xs font-semibold uppercase text-stone-500">
             Revised Estimate
           </p>
-          <p className="text-2xl font-semibold tracking-tight text-red-700">
+          <p className="text-2xl font-semibold tracking-tight tabular-nums text-red-700">
             {formatPeso(revisedEstimate)}
           </p>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs tabular-nums text-stone-600">
             Base {formatPeso(baseEstimate)} + exterior {formatPeso(exteriorTotal)}
           </p>
         </div>
@@ -57,7 +52,9 @@ export function ProjectExteriorEstimatePanel({
         </div>
         <div className="rounded-lg border border-stone-200 p-4">
           <p className="text-xs font-semibold uppercase text-stone-500">Floor Area</p>
-          <p className="mt-1 font-semibold text-stone-950">{design.area} sqm</p>
+          <p className="mt-1 font-semibold tabular-nums text-stone-950">
+            {design.area} sqm
+          </p>
         </div>
         <div className="rounded-lg border border-stone-200 p-4">
           <p className="text-xs font-semibold uppercase text-stone-500">Room Setup</p>
@@ -71,55 +68,67 @@ export function ProjectExteriorEstimatePanel({
 
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
+          <caption className="sr-only">
+            Exterior material breakdown for {design.name}
+          </caption>
           <thead>
             <tr className="text-left text-xs font-semibold uppercase text-stone-500">
-              <th className="border-b border-stone-200 px-3 py-3">Exterior Item</th>
-              <th className="border-b border-stone-200 px-3 py-3">{optionColumnLabel}</th>
-              <th className="border-b border-stone-200 px-3 py-3">Unit</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Quantity</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Unit Price</th>
-              <th className="border-b border-stone-200 px-3 py-3 text-right">Amount</th>
+              <th scope="col" className="border-b border-stone-200 px-3 py-3">
+                Exterior Item
+              </th>
+              <th scope="col" className="border-b border-stone-200 px-3 py-3">
+                Selected Material
+              </th>
+              <th scope="col" className="border-b border-stone-200 px-3 py-3">
+                Unit
+              </th>
+              <th
+                scope="col"
+                className="border-b border-stone-200 px-3 py-3 text-right"
+              >
+                Quantity
+              </th>
+              <th
+                scope="col"
+                className="border-b border-stone-200 px-3 py-3 text-right"
+              >
+                Unit Price
+              </th>
+              <th
+                scope="col"
+                className="border-b border-stone-200 px-3 py-3 text-right"
+              >
+                Amount
+              </th>
             </tr>
           </thead>
           <tbody>
-            {exteriorRows.map((material, itemIndex) => (
-              <tr key={material.item}>
+            {exteriorRows.map((material) => (
+              <tr key={material.key}>
                 <td className="border-b border-stone-100 px-3 py-4">
-                  <p className="font-semibold text-stone-950">{material.item}</p>
-                  <p className="mt-1 text-xs text-stone-500">{material.detail}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-stone-950">{material.item}</p>
+                    {material.isCustom ? (
+                      <span className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-700">
+                        Custom
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs text-stone-600">{material.detail}</p>
                 </td>
                 <td className="border-b border-stone-100 px-3 py-4">
-                  {isEditing ? (
-                    <select
-                      value={selections[itemIndex] ?? 0}
-                      onChange={(event) =>
-                        onSelectionChange(itemIndex, Number(event.target.value))
-                      }
-                      className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600"
-                      aria-label={`Change ${material.item}`}
-                    >
-                      {material.options.map((option, optionIndex) => (
-                        <option key={option.name} value={optionIndex}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <p className="font-medium text-stone-950">
-                      {material.selectedOption.name}
-                    </p>
-                  )}
+                  <p className="font-medium text-stone-950">{material.material}</p>
                 </td>
                 <td className="border-b border-stone-100 px-3 py-4 text-stone-600">
-                  {material.selectedOption.unit}
+                  {material.unit}
                 </td>
-                <td className="border-b border-stone-100 px-3 py-4 text-right font-medium">
+                <td className="border-b border-stone-100 px-3 py-4 text-right font-medium tabular-nums">
                   {material.quantity}
                 </td>
-                <td className="border-b border-stone-100 px-3 py-4 text-right">
-                  {formatPeso(material.selectedOption.unitPrice)}
+                <td className="border-b border-stone-100 px-3 py-4 text-right tabular-nums">
+                  {formatPeso(material.unitPrice)}
                 </td>
-                <td className="border-b border-stone-100 px-3 py-4 text-right font-semibold text-stone-950">
+                <td className="border-b border-stone-100 px-3 py-4 text-right font-semibold tabular-nums text-stone-950">
                   {formatPeso(material.amount)}
                 </td>
               </tr>
@@ -130,15 +139,15 @@ export function ProjectExteriorEstimatePanel({
 
       <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
         <div className="rounded-lg border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-900">
-          {isEditing
-            ? "Changing material selections updates the estimated project cost preview."
+          {customCount > 0
+            ? `Includes ${customCount} custom exterior item${customCount === 1 ? "" : "s"} defined by Admin for this design.`
             : "The material list is shown for review. Admin controls material selection and pricing setup."}
         </div>
         <div className="rounded-lg border border-stone-200 p-4 text-right">
           <p className="text-xs font-semibold uppercase text-stone-500">
             Exterior Subtotal
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-red-700">
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-red-700">
             {formatPeso(exteriorTotal)}
           </p>
         </div>

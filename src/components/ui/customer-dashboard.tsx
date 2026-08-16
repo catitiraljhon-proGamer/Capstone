@@ -3,9 +3,18 @@
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
-import { designOptions, exteriorItemChoices, formatPeso, getExteriorEstimate } from "@/components/ui/house-design-data";
+import {
+  createDefaultSelections,
+  formatPeso,
+  getExteriorEstimate,
+  isDataImage,
+  normalizeSelections,
+  type HouseDesign,
+} from "@/components/ui/house-design-data";
+import { HouseDesignGallery } from "@/components/ui/house-design-gallery";
 import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useHouseDesigns } from "@/lib/house-design-store";
 import {
   Bell,
   ChevronDown,
@@ -334,17 +343,27 @@ export function CustomerDashboard() {
 }
 
 export function CustomerHouseDesignPage() {
+  const { designs } = useHouseDesigns();
   const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
   const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
-  const [selectedDesignIndex, setSelectedDesignIndex] = useState<number | null>(null);
+  const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
   const [materialSelections, setMaterialSelections] = useState(
-    exteriorItemChoices.map(() => 0),
+    createDefaultSelections,
+  );
+  const publishedDesigns = designs.filter(
+    (design) => design.status === "Published",
   );
   const filteredDesigns = selectedHouseType
-    ? designOptions.filter((design) => design.houseType === selectedHouseType)
+    ? publishedDesigns.filter((design) => design.houseType === selectedHouseType)
     : [];
   const selectedDesign =
-    selectedDesignIndex === null ? null : designOptions[selectedDesignIndex];
+    publishedDesigns.find((design) => design.id === selectedDesignId) ?? null;
+
+  const openDesign = (design: HouseDesign) => {
+    setSelectedDesignId(design.id);
+    setMaterialSelections(normalizeSelections(design.defaultSelections));
+    setActiveStep("details");
+  };
 
   return (
     <CustomerShell
@@ -365,8 +384,7 @@ export function CustomerHouseDesignPage() {
               <ColorChangeCards
                 onSelect={(houseType) => {
                   setSelectedHouseType(houseType);
-                  setSelectedDesignIndex(null);
-                  setMaterialSelections(exteriorItemChoices.map(() => 0));
+                  setSelectedDesignId(null);
                   setActiveStep("designs");
                 }}
               />
@@ -387,52 +405,50 @@ export function CustomerHouseDesignPage() {
 
               {filteredDesigns.length > 0 ? (
                 <div className="mt-5 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                  {filteredDesigns.map((design) => {
-                    const designIndex = designOptions.findIndex(
-                      (option) => option.name === design.name,
-                    );
-
-                    return (
-                      <button
-                        key={design.name}
-                        type="button"
-                        onClick={() => {
-                          setSelectedDesignIndex(designIndex);
-                          setMaterialSelections(exteriorItemChoices.map(() => 0));
-                          setActiveStep("details");
-                        }}
-                        className="mb-4 inline-block w-full break-inside-avoid overflow-hidden rounded-xl bg-white text-left transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600"
-                        aria-label={`View project details for ${design.name}`}
+                  {filteredDesigns.map((design, designIndex) => (
+                    <button
+                      key={design.id}
+                      type="button"
+                      onClick={() => openDesign(design)}
+                      className="mb-4 inline-block w-full break-inside-avoid overflow-hidden rounded-xl bg-white text-left transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-red-600"
+                      aria-label={`View project details for ${design.name}`}
+                    >
+                      <div
+                        className={[
+                          "relative overflow-hidden rounded-xl bg-stone-100",
+                          designIndex % 3 === 0
+                            ? "h-56"
+                            : designIndex % 3 === 1
+                              ? "h-72"
+                              : "h-48",
+                        ].join(" ")}
                       >
-                        <div
-                          className={[
-                            "relative overflow-hidden rounded-xl",
-                            designIndex % 3 === 0
-                              ? "h-56"
-                              : designIndex % 3 === 1
-                                ? "h-72"
-                                : "h-48",
-                          ].join(" ")}
-                        >
+                        {design.images[0] ? (
                           <Image
-                            src={design.image}
+                            src={design.images[0]}
                             alt={`${design.name} visual preview`}
                             fill
+                            unoptimized={isDataImage(design.images[0])}
                             className="object-cover"
                             sizes="(min-width: 1024px) 25vw, 100vw"
                           />
-                        </div>
-                        <div className="px-1 py-3">
-                          <h2 className="text-sm font-semibold tracking-tight text-stone-950">
-                            {design.name}
-                          </h2>
-                          <p className="mt-1 text-xs text-stone-500">
-                            {design.style} - {design.area} sqm
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
+                        ) : null}
+                        {design.images.length > 1 ? (
+                          <span className="absolute bottom-2 right-2 rounded-md bg-stone-950/70 px-2 py-0.5 text-xs font-semibold text-white">
+                            {design.images.length} photos
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="px-1 py-3">
+                        <h2 className="text-sm font-semibold tracking-tight text-stone-950">
+                          {design.name}
+                        </h2>
+                        <p className="mt-1 text-xs text-stone-600">
+                          {design.style ?? design.houseType} - {design.area} sqm
+                        </p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-6 text-center">
@@ -448,18 +464,10 @@ export function CustomerHouseDesignPage() {
                 <BackButton type="button" onClick={() => setActiveStep("designs")} />
               </div>
 
-              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-                <div className="relative h-[320px] bg-stone-100 sm:h-[460px] xl:h-[560px]">
-                  <Image
-                    src={selectedDesign.image}
-                    alt={`${selectedDesign.name} enlarged house design`}
-                    fill
-                    priority
-                    className="object-cover"
-                    sizes="(min-width: 1024px) 72vw, 100vw"
-                  />
-                </div>
-              </div>
+              <HouseDesignGallery
+                images={selectedDesign.images}
+                name={selectedDesign.name}
+              />
 
               <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <div>
@@ -510,18 +518,10 @@ export function CustomerHouseDesignPage() {
               </div>
 
               <div className="mt-6">
-              <ProjectExteriorEstimatePanel
-                design={selectedDesign}
-                selections={materialSelections}
-                isEditing={false}
-                onSelectionChange={(itemIndex, optionIndex) =>
-                  setMaterialSelections((current) =>
-                    current.map((value, index) =>
-                      index === itemIndex ? optionIndex : value,
-                    ),
-                  )
-                }
-              />
+                <ProjectExteriorEstimatePanel
+                  design={selectedDesign}
+                  selections={materialSelections}
+                />
               </div>
 
               <div className="mt-6 flex justify-end border-t border-stone-200 pt-5">
