@@ -1,6 +1,7 @@
 "use client";
 
 import { BackButton } from "@/components/ui/back-button";
+import { Button } from "@/components/ui/button";
 import ColorChangeCards from "@/components/ui/color-change-card";
 import {
   designOptions,
@@ -9,6 +10,7 @@ import {
   getExteriorEstimate,
 } from "@/components/ui/house-design-data";
 import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
+import { AdminSectionPage } from "@/components/ui/staff-dashboard";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -24,8 +26,22 @@ export function AdminHouseDesignManager() {
     : [];
   const selectedDesign =
     selectedDesignIndex === null ? null : designOptions[selectedDesignIndex];
+  const pageTitle = selectedHouseType
+    ? `${selectedHouseType} House Designs`
+    : "House Designs";
+  const pageDescription = selectedHouseType
+    ? "Select a design to review and edit its exterior material setup."
+    : "Review house design submissions and design-related project records.";
 
-  return (
+  const handleAddNewProject = () => {
+    // TODO: Implement project creation.
+  };
+
+  const handleArchive = () => {
+    // TODO: Implement project archiving.
+  };
+
+  const mainContent = (
     <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
       {activeStep === "types" ? (
         <div>
@@ -50,15 +66,17 @@ export function AdminHouseDesignManager() {
       ) : activeStep === "designs" ? (
         <>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-                {selectedHouseType} House Designs
-              </h1>
-              <p className="mt-1 text-sm text-stone-600">
-                Select a design to review and edit its exterior material setup.
-              </p>
-            </div>
-            <BackButton type="button" onClick={() => setActiveStep("types")} />
+            <BackButton
+              type="button"
+              onClick={() => {
+                setSelectedHouseType(null);
+                setSelectedDesignIndex(null);
+                setActiveStep("types");
+              }}
+            />
+            <Button type="button" onClick={handleAddNewProject}>
+              Add New Project
+            </Button>
           </div>
 
           {filteredDesigns.length > 0 ? (
@@ -120,8 +138,11 @@ export function AdminHouseDesignManager() {
         </>
       ) : selectedDesign ? (
         <div>
-          <div className="mb-5 flex justify-start">
+          <div className="mb-5 flex items-center justify-between gap-3">
             <BackButton type="button" onClick={() => setActiveStep("designs")} />
+            <Button type="button" variant="outline" onClick={handleArchive}>
+              Archive
+            </Button>
           </div>
 
           <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
@@ -195,5 +216,14 @@ export function AdminHouseDesignManager() {
         </div>
       ) : null}
     </section>
+  );
+
+  return (
+    <AdminSectionPage
+      activeLabel="House Designs"
+      title={pageTitle}
+      description={pageDescription}
+      mainContent={mainContent}
+    />
   );
 }
