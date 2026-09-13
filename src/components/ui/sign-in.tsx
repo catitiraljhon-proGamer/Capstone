@@ -137,16 +137,16 @@ export function SignInPage({
   return (
     <div className="min-h-screen bg-white text-stone-950">
       <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-white/90 backdrop-blur">
-        <nav className="mx-auto flex min-h-24 w-full max-w-[1180px] items-center justify-between gap-6 px-4 py-4 md:px-6 lg:px-0">
-          <Link href="/">
+        <nav aria-label="Account navigation" className="mx-auto flex min-h-20 w-full max-w-[1244px] items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 lg:px-8">
+          <Link href="/" aria-label="G4 Builders home" className="min-w-0">
             <BrandLogo />
           </Link>
           <BackButton href="/" />
         </nav>
       </header>
 
-      <main className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-[1180px] grid-cols-1 gap-8 px-4 py-8 md:grid-cols-[0.9fr_1.1fr] md:px-6 lg:px-0">
-        <section className="flex items-center justify-center">
+      <main className="mx-auto grid min-h-[calc(100dvh-5rem)] w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:px-8">
+        <section className="flex min-w-0 items-center justify-center">
           <div className="w-full max-w-md">
             <div className="flex flex-col gap-6">
               <div>
@@ -159,7 +159,7 @@ export function SignInPage({
               </div>
 
               {googleLinkEmail ? (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-700">
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 break-words text-stone-700">
                   An account already exists for{" "}
                   <strong>{googleLinkEmail}</strong>. Enter your G4 Builders
                   password once to connect Google and sign in.
@@ -216,7 +216,7 @@ export function SignInPage({
                       <button
                         type="button"
                         onClick={() => setShowPassword((value) => !value)}
-                        className="absolute inset-y-0 right-3 flex items-center text-stone-500 transition hover:text-stone-950"
+                        className="absolute inset-y-0 right-1 flex w-11 items-center justify-center text-stone-500 transition hover:text-stone-950"
                         aria-label={
                           showPassword ? "Hide password" : "Show password"
                         }
@@ -231,8 +231,8 @@ export function SignInPage({
                   </InputShell>
                 </div>
 
-                <div className="animate-element animate-delay-500 flex items-center justify-between gap-4 text-sm">
-                  <label className="flex cursor-pointer items-center gap-3 text-stone-700">
+                <div className="animate-element animate-delay-500 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-stone-700">
                     <input
                       type="checkbox"
                       name="rememberMe"
@@ -306,7 +306,7 @@ export function SignInPage({
           </div>
         </section>
 
-        <section className="relative hidden overflow-hidden rounded-xl shadow-lg ring-1 ring-stone-200 md:block">
+        <section className="relative hidden min-w-0 overflow-hidden rounded-xl shadow-lg ring-1 ring-stone-200 lg:block">
           <div
             className="animate-slide-right absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url(${heroImageSrc})` }}

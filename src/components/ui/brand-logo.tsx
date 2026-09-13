@@ -14,8 +14,8 @@ export function BrandLogo({ compact = false }: BrandLogoProps) {
       priority={compact}
       className={
         compact
-          ? "h-12 w-auto max-w-[240px] object-contain sm:h-14 sm:max-w-[300px]"
-          : "h-16 w-auto max-w-[300px] object-contain sm:h-20 sm:max-w-[430px]"
+          ? "h-auto w-52 max-w-full object-contain"
+          : "h-auto w-52 max-w-full object-contain sm:w-72"
       }
     />
   );

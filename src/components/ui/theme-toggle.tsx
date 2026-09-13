@@ -41,7 +41,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     <Button
       type="button"
       onClick={toggleTheme}
-      className={cn("h-9 px-2.5 text-stone-700", className)}
+      className={cn("h-11 w-11 shrink-0 px-2.5 text-stone-700", className)}
       variant="outline"
       aria-label={isDark ? "Switch to light mode" : "Switch to night mode"}
       aria-pressed={isDark}

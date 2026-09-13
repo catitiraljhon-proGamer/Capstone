@@ -122,7 +122,7 @@ export function NotificationBell() {
             void window.Notification.requestPermission();
           }
         }}
-        className="relative grid h-10 w-10 place-items-center rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100"
+        className="relative grid h-11 w-11 place-items-center rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100"
         aria-label={
           unreadCount > 0
             ? `${unreadCount} unread notifications`
@@ -143,7 +143,7 @@ export function NotificationBell() {
         <section
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white text-stone-950 shadow-xl sm:w-96"
+          className="absolute right-0 top-12 z-50 max-h-[calc(100dvh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white text-stone-950 shadow-xl sm:w-96"
         >
           <div className="flex items-start justify-between gap-3 border-b border-stone-200 px-4 py-3">
             <div>

@@ -74,16 +74,16 @@ export function RegisterAccountPage({
   return (
     <div className="min-h-screen bg-stone-50 text-stone-950">
       <header className="border-b border-stone-200/80 bg-white/95 backdrop-blur">
-        <nav className="mx-auto flex min-h-24 w-full max-w-[1180px] items-center justify-between gap-6 px-4 py-4 md:px-6 lg:px-0">
-          <Link href="/" aria-label="G4 Builders home">
+        <nav aria-label="Account navigation" className="mx-auto flex min-h-20 w-full max-w-[1244px] items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 lg:px-8">
+          <Link href="/" aria-label="G4 Builders home" className="min-w-0">
             <BrandLogo />
           </Link>
           <BackButton href="/login" />
         </nav>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1180px] gap-8 px-4 py-10 md:px-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:px-0 lg:py-14">
-        <section className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
+      <main className="mx-auto grid w-full max-w-[1244px] gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)] lg:px-8 lg:py-14">
+        <section className="min-w-0 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8 lg:p-10">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
               Client registration
@@ -176,7 +176,7 @@ export function RegisterAccountPage({
                   <button
                     type="button"
                     onClick={() => setShowPasswords((value) => !value)}
-                    className="absolute inset-y-0 right-3 flex items-center text-stone-500 transition hover:text-stone-950"
+                    className="absolute inset-y-0 right-1 flex w-11 items-center justify-center text-stone-500 transition hover:text-stone-950"
                     aria-label={
                       showPasswords ? "Hide passwords" : "Show passwords"
                     }

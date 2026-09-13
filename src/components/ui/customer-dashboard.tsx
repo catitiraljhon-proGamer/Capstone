@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
 import {
@@ -34,7 +35,6 @@ import {
   ReceiptText,
   User,
   UserRound,
-  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -72,7 +72,7 @@ const customerNav: {
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-stone-200 bg-white shadow-sm ${className}`}>
+    <section className={`min-w-0 rounded-xl border border-stone-200 bg-white shadow-sm ${className}`}>
       {children}
     </section>
   );
@@ -96,10 +96,10 @@ function SidebarContent({
 }) {
   return (
     <>
-      <div className="flex h-24 items-center border-b border-stone-200 px-5">
+      <div className={`flex h-24 shrink-0 items-center border-b border-stone-200 px-5 ${onNavigate ? "pr-16" : ""}`}>
         <BrandLogo compact />
       </div>
-      <nav className="flex-1 space-y-1 px-4 py-5">
+      <nav aria-label="Customer navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-5">
         {customerNav.map((item) => (
           <Link
             key={item.label}
@@ -117,7 +117,7 @@ function SidebarContent({
           </Link>
         ))}
       </nav>
-      <div className="px-4 pb-6">
+      <div className="shrink-0 px-4 pb-6">
         <LogoutButton onLogout={onNavigate} />
       </div>
     </>
@@ -144,66 +144,48 @@ function CustomerShell({
         <SidebarContent activeSection={activeSection} />
       </aside>
 
-      {isSidebarOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-transparent"
-            aria-label="Close navigation menu"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-          <aside className="relative flex h-full w-72 flex-col border-r border-stone-200 bg-white shadow-xl">
-            <button
-              type="button"
-              className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-100"
-              aria-label="Close navigation menu"
-              onClick={() => setIsSidebarOpen(false)}
-            >
-              <X className="h-5 w-5" />
-            </button>
-            <SidebarContent
-              activeSection={activeSection}
-              onNavigate={() => setIsSidebarOpen(false)}
-            />
-          </aside>
-        </div>
-      ) : null}
+      <MobileNavigation open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+        <SidebarContent activeSection={activeSection} onNavigate={() => setIsSidebarOpen(false)} />
+      </MobileNavigation>
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
-          <div className="flex min-h-20 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100 lg:hidden"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100 lg:hidden"
                 aria-label="Open navigation menu"
+                aria-haspopup="dialog"
+                aria-expanded={isSidebarOpen}
                 onClick={() => setIsSidebarOpen(true)}
               >
                 <Menu className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="text-xl font-semibold tracking-tight text-stone-950">{title}</p>
-                <p className="mt-1 text-sm text-stone-600">{description}</p>
+                <p className="text-base font-semibold tracking-tight break-words text-stone-950 sm:text-xl">{title}</p>
+                <p className="mt-1 hidden text-sm text-stone-600 sm:block">{description}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <ThemeToggle />
               <CustomerNotificationBell />
-              <div className="flex items-center gap-3">
+              <div className="hidden max-w-52 items-center gap-3 md:flex">
                 <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">
                   <User className="h-6 w-6" />
                 </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-semibold">{user?.name ?? "Customer"}</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold" title={user?.name ?? "Customer"}>{user?.name ?? "Customer"}</p>
                   <p className="text-xs text-stone-500">Customer</p>
                 </div>
                 <ChevronDown className="hidden h-4 w-4 text-stone-400 sm:block" />
               </div>
             </div>
+            <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
           </div>
         </header>
 
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

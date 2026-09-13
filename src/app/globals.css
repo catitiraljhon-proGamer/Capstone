@@ -19,6 +19,15 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Keep form text legible on phones without triggering input-focus zoom. */
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+}
+
 .night-mode {
   color-scheme: dark;
 }

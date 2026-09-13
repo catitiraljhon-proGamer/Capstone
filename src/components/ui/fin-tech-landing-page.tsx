@@ -226,7 +226,7 @@ const socialLinks = ["GitHub", "LinkedIn", "Facebook", "YouTube", "Instagram"];
 function LandingFooter() {
   return (
     <footer className="border-t border-stone-200 bg-white">
-      <div className="mx-auto w-full max-w-[1180px] px-4 py-16 md:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[1244px] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
         <div className="max-w-3xl">
           <BrandLogo />
           <p className="mt-8 text-sm leading-7 text-stone-600">
@@ -325,9 +325,11 @@ export default function MoneyflowLandingPage() {
   return (
     <div className="min-h-screen w-full bg-white text-stone-950">
       <header className="sticky top-0 z-50 border-b border-stone-200/70 bg-white/90 backdrop-blur">
-        <nav className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-6 px-4 py-5 md:px-6 lg:px-0">
-          <BrandLogo />
-          <div className="hidden items-center gap-8 lg:flex">
+        <nav aria-label="Main navigation" className="mx-auto flex w-full max-w-[1244px] flex-col items-center justify-between gap-3 px-4 py-3 sm:flex-row sm:gap-6 sm:px-6 lg:px-8">
+          <Link href="/" aria-label="G4 Builders home" className="min-w-0">
+            <BrandLogo />
+          </Link>
+          <div className="hidden items-center gap-6 lg:flex">
             {["Estimates", "Billing", "Projects", "Reports"].map((item) => (
               <a
                 key={item}
@@ -338,16 +340,16 @@ export default function MoneyflowLandingPage() {
               </a>
             ))}
           </div>
-          <div className="hidden shrink-0 gap-2 md:flex">
+          <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto">
             <Link
               href="/login"
-              className="rounded-full px-4 py-2 text-sm text-stone-700 hover:bg-red-50 hover:text-red-700"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             >
               Log in
             </Link>
             <Link
               href="/register"
-              className="rounded-full bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             >
               Register
             </Link>
@@ -355,29 +357,29 @@ export default function MoneyflowLandingPage() {
         </nav>
       </header>
 
-      <main className="mx-auto grid w-full max-w-[1180px] grid-cols-1 gap-6 px-4 pb-14 md:grid-cols-2 md:px-6 lg:px-0">
-        <section className="flex flex-col justify-center space-y-8 pr-2">
+      <main className="mx-auto grid w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-2 lg:gap-10 lg:px-8">
+        <section className="flex min-w-0 flex-col justify-center space-y-6 sm:space-y-8">
           <div>
-            <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight text-stone-950 md:text-6xl">
+            <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
               Build costs
               <br />
               with control.
             </h1>
-            <p className="mt-4 max-w-md text-stone-600">
+            <p className="mt-4 max-w-md text-base leading-7 text-stone-600">
               A construction cost estimation and billing workspace for G4
               Builders Inc, built to keep quantities, approvals, invoices, and
               project margins aligned.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 pt-2 md:max-w-sm">
+          <div className="grid grid-cols-2 gap-4 pt-2 sm:max-w-sm sm:gap-8">
             <Stat label="Published Designs" value={String(stats.publishedDesigns)} />
             <Stat label="Active Projects" value={String(stats.activeProjects)} />
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-5 opacity-75">
             <span className="text-xs text-stone-500">BUILT FOR SITE TEAMS</span>
-            <div className="flex items-center gap-5 text-sm font-semibold text-stone-400">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-stone-400">
               <span>BOQ</span>
               <span>Progress Billing</span>
               <span>Cost Tracking</span>
@@ -385,7 +387,7 @@ export default function MoneyflowLandingPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -454,25 +456,25 @@ export default function MoneyflowLandingPage() {
             </div>
             <div className="mt-1 flex items-center gap-1 text-xs text-red-500">
               <ClipboardCheck className="h-3.5 w-3.5" />
-              Live project data from MongoDB
+              Live project updates
             </div>
             <MiniBars />
           </motion.div>
 
-          <div className="hidden md:block" />
+          <div className="hidden sm:block" />
         </section>
       </main>
 
       <section className="border-y border-stone-200 bg-white">
-        <div className="mx-auto grid w-full max-w-[1180px] grid-cols-1 items-center gap-10 px-4 py-20 md:grid-cols-[0.9fr_1.1fr] md:px-6 lg:px-0">
-          <div>
+        <div className="mx-auto grid w-full max-w-[1244px] grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-10 lg:px-8">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700">
               Better every project
             </p>
-            <h2 className="mt-6 max-w-xl text-5xl font-semibold leading-[1.05] tracking-tight text-stone-950 md:text-6xl">
+            <h2 className="mt-4 max-w-xl text-3xl font-semibold leading-[1.1] tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">
               See costs move before they become problems.
             </h2>
-            <p className="mt-6 max-w-lg text-lg leading-8 text-stone-600">
+            <p className="mt-4 max-w-lg text-base leading-7 text-stone-600 sm:text-lg sm:leading-8">
               Rotate through site progress, material planning, billing reviews,
               and office coordination in one visual workspace for G4 Builders
               Inc.
