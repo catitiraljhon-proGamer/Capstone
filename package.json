@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:auth": "node --import tsx --test tests/google-auth.test.ts",
+    "test:database": "node --import tsx --test tests/mongodb.test.ts",
     "db:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-mongodb.ps1",
     "db:seed": "node scripts/seed-database.mjs"
   },

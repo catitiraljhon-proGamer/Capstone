@@ -5,6 +5,8 @@ const messages: Record<string, string> = {
   expired:
     "Your Google sign-in request expired or could not be verified. Please try again.",
   failed: "Unable to sign in with Google. Please try again.",
+  database_unavailable:
+    "Sign-in is temporarily unavailable because of a database problem. Please try again shortly.",
   unverified_email:
     "Please verify your email address with Google before continuing.",
   account_unavailable:

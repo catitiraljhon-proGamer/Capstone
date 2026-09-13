@@ -162,7 +162,13 @@ verified after the production configuration is complete.
 | `redirect_uri_mismatch` | The Google client's authorized callback exactly matches `GOOGLE_REDIRECT_URI`. |
 | Returns to localhost or a different domain | Vercel still has the local callback or an old domain; update it and redeploy. |
 | Google succeeds but the application cannot finish login | Check Atlas database credentials, network access, database permissions, and Vercel runtime logs. |
+| Sign-in is temporarily unavailable because of a database problem | Open `/api/public/stats` on the production domain. A server error there confirms the database problem also affects other routes. Check Atlas Network Access for the Vercel server, not just your computer. |
+| Vercel logs show `MongoServerSelectionError`, `ReplicaSetNoPrimary`, or TLS alert 80 | Confirm the cluster is running and Atlas permits the deployment's outbound connections. Verify the URI and database credentials. Keep TLS and certificate verification enabled. After correcting Atlas access, retry; failed connection and index attempts are now cleared automatically. |
 | Sign-in request expired | Start again from the configured production domain, allow cookies, and finish within ten minutes. Starting a second Google flow in the same browser replaces the first. |
 | Account cannot use Google sign-in | The application account may be disabled or already connected to a different Google identity. |
 | Organization-only or access-blocked error | Check Google Audience and any Google Workspace restrictions; use External for customers outside your organization. |
 | Google login in a preview opens production | This app returns to the configured callback domain. To test independently in previews, use a stable preview domain, matching Preview variables, and register that exact callback in Google. |
+
+The Google callback logs a fixed failure stage (such as `token_exchange` or
+`database`) and error category in Vercel Runtime Logs. It does not log raw provider
+errors, authorization codes, tokens, cookies, connection strings, or secrets.

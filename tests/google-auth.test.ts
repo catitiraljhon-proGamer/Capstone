@@ -10,7 +10,7 @@ import {
 } from "jose";
 import { hash } from "bcryptjs";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { type Db, ObjectId } from "mongodb";
+import { type Db, MongoClient, MongoNetworkError, ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
 import { getDatabase } from "@/lib/database/mongodb";
 import { type UserDocument } from "@/lib/database/collections";
@@ -610,4 +610,40 @@ test("provider failure and unverified identity do not create an account or sessi
   );
   assert.equal(failure.cookies.has(sessionCookieName), false);
   assert.equal(await db.collection("users").countDocuments(), 0);
+});
+
+test("database failures return a useful error, log no secrets, and allow the next login to recover", async () => {
+  const cache = globalThis as typeof globalThis & {
+    mongoClientPromise?: Promise<MongoClient>;
+  };
+  const healthyConnection = cache.mongoClientPromise;
+  cache.mongoClientPromise = undefined;
+  const errorLog = mock.method(console, "error", () => {});
+  mock.method(MongoClient.prototype, "connect", async () => {
+    throw new MongoNetworkError("private database URI and credentials");
+  });
+  try {
+    const response = await googleCallback(await callbackRequest("register"));
+    assert.equal(
+      response.headers.get("location"),
+      `${origin}/register?google_error=database_unavailable`,
+    );
+    assert.equal(response.cookies.has(sessionCookieName), false);
+    assert.equal(response.cookies.get(googleFlowCookieName)?.maxAge, 0);
+    assert.equal(await db.collection("users").countDocuments(), 0);
+    assert.equal(cache.mongoClientPromise, undefined);
+    assert.deepEqual(errorLog.mock.calls.map((call) => call.arguments), [
+      ["Google sign-in failed", {
+        stage: "database",
+        code: "database_unavailable",
+        errorType: "MongoNetworkError",
+      }],
+    ]);
+  } finally {
+    mock.restoreAll();
+    cache.mongoClientPromise = healthyConnection;
+  }
+  const retry = await googleCallback(await callbackRequest("register"));
+  assert.equal(retry.headers.get("location"), `${origin}/customer`);
+  assert.equal(retry.cookies.has(sessionCookieName), true);
 });

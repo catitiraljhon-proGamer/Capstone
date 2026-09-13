@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/google-oauth";
 import { createSessionToken, sessionCookieName } from "@/lib/server/session";
 import { roleHomePaths, type SessionUser } from "@/types/domain";
+import { MongoError, MongoNetworkError, MongoServerSelectionError } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -35,8 +36,10 @@ function redirectResponse(url: URL) {
 export async function GET(request: NextRequest) {
   let mode = "login";
   let origin = request.nextUrl.origin;
+  let stage = "configuration";
   try {
     origin = getGoogleConfig().origin;
+    stage = "state_verification";
     const flow = await readGoogleFlow(
       request.cookies.get(googleFlowCookieName)?.value,
       request.nextUrl.searchParams.get("state"),
@@ -50,12 +53,16 @@ export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get("code");
     if (!code) throw new GoogleAuthError("failed");
 
+    stage = "token_exchange";
     const profile = await exchangeGoogleCode(code, flow);
+    stage = "database";
     const db = await getDatabase();
+    stage = "account";
     const { user, created, needsLink } = await resolveGoogleAccount(
       db,
       profile,
     );
+    stage = "session";
     if (needsLink) {
       const response = redirectResponse(
         new URL("/login?google_link=1", origin),
@@ -85,6 +92,7 @@ export async function GET(request: NextRequest) {
       { ...sessionUser, authVersion: user.authVersion ?? 0 },
       `${maxAge}s`,
     );
+    stage = "audit";
     await recordAuditLog({
       db,
       actor: sessionUser,
@@ -110,12 +118,31 @@ export async function GET(request: NextRequest) {
     });
     return response;
   } catch (error) {
-    // Do not log authorization codes, provider tokens, cookies, or client secrets.
+    const code =
+      error instanceof GoogleAuthError
+        ? error.code
+        : stage === "database" || error instanceof MongoError
+          ? "database_unavailable"
+          : "failed";
+    if (["failed", "not_configured", "database_unavailable"].includes(code)) {
+      // Log only fixed diagnostic labels, never raw errors, URLs or credentials.
+      console.error("Google sign-in failed", {
+        stage,
+        code,
+        errorType:
+          error instanceof MongoServerSelectionError
+            ? "MongoServerSelectionError"
+            : error instanceof MongoNetworkError
+              ? "MongoNetworkError"
+              : error instanceof MongoError
+                ? "MongoError"
+                : error instanceof GoogleAuthError
+                  ? "GoogleAuthError"
+                  : "UnexpectedError",
+      });
+    }
     const url = new URL(`/${mode}`, origin);
-    url.searchParams.set(
-      "google_error",
-      error instanceof GoogleAuthError ? error.code : "failed",
-    );
+    url.searchParams.set("google_error", code);
     return redirectResponse(url);
   }
 }

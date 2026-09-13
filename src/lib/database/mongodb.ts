@@ -31,7 +31,15 @@ function getClientPromise() {
       },
     });
 
-    globalForMongo.mongoClientPromise = client.connect();
+    const connection = client.connect().catch(async (error: unknown) => {
+      // A failed first connection must not poison every request in a warm function.
+      if (globalForMongo.mongoClientPromise === connection) {
+        globalForMongo.mongoClientPromise = undefined;
+      }
+      await client.close().catch(() => undefined);
+      throw error;
+    });
+    globalForMongo.mongoClientPromise = connection;
   }
 
   return globalForMongo.mongoClientPromise;
@@ -39,7 +47,7 @@ function getClientPromise() {
 
 async function ensureIndexes(db: Db) {
   if (!globalForMongo.mongoIndexesPromise) {
-    globalForMongo.mongoIndexesPromise = Promise.all([
+    const indexes = Promise.all([
       db.collection("users").createIndex({ email: 1 }, { unique: true }),
       db.collection("users").createIndex(
         { googleSub: 1 },
@@ -85,7 +93,15 @@ async function ensureIndexes(db: Db) {
       db.collection("audit_logs").createIndex({ action: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ entityType: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ actorId: 1, createdAt: -1 }),
-    ]).then(() => undefined);
+    ])
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        if (globalForMongo.mongoIndexesPromise === indexes) {
+          globalForMongo.mongoIndexesPromise = undefined;
+        }
+        throw error;
+      });
+    globalForMongo.mongoIndexesPromise = indexes;
   }
 
   await globalForMongo.mongoIndexesPromise;
