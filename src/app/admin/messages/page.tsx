@@ -6,8 +6,18 @@ export const metadata: Metadata = {
   description: "Admin message module for reviewing customer conversations.",
 };
 
-export default function AdminMessagesPage() {
+export default async function AdminMessagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customerId?: string }>;
+}) {
+  const { customerId } = await searchParams;
+
   return (
-    <MessageModulePage role="Admin" name="Admin" dashboardHref="/admin" />
+    <MessageModulePage
+      role="Admin"
+      dashboardHref="/admin"
+      initialCustomerId={customerId}
+    />
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
+import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { GoogleAuthButton } from "@/components/ui/google-auth-button";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,6 +22,9 @@ interface SignInPageProps {
   onSignIn?: (event: FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
+  initialError?: string;
+  googleLinkEmail?: string;
+  initialRememberMe?: boolean;
 }
 
 const defaultTestimonials: Testimonial[] = [
@@ -35,42 +40,10 @@ const defaultTestimonials: Testimonial[] = [
   },
 ];
 
-const demoAccounts: Record<string, string> = {
-  "customer@gmail.com": "/customer",
-  "clerk@gmail.com": "/billing-clerk",
-  "admin@gmail.com": "/admin",
-};
-
 const InputShell = ({ children }: { children: ReactNode }) => (
   <div className="rounded-xl border border-stone-200 bg-white shadow-sm transition focus-within:border-red-600 focus-within:ring-2 focus-within:ring-red-600/15">
     {children}
   </div>
-);
-
-const GoogleIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
-    viewBox="0 0 48 48"
-    aria-hidden="true"
-  >
-    <path
-      fill="#FFC107"
-      d="M43.61 20.08H42V20H24v8h11.3c-1.65 4.66-6.08 8-11.3 8-6.63 0-12-5.37-12-12s5.37-12 12-12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66C34.05 6.05 29.27 4 24 4 12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20c0-1.34-.14-2.65-.39-3.92Z"
-    />
-    <path
-      fill="#FF3D00"
-      d="m6.31 14.69 6.57 4.82C14.65 15.11 18.96 12 24 12c3.06 0 5.84 1.15 7.96 3.04l5.66-5.66C34.05 6.05 29.27 4 24 4 16.32 4 9.66 8.34 6.31 14.69Z"
-    />
-    <path
-      fill="#4CAF50"
-      d="M24 44c5.17 0 9.86-1.98 13.41-5.19l-6.19-5.24C29.21 35.09 26.72 36 24 36c-5.2 0-9.62-3.32-11.28-7.95L6.2 33.08C9.5 39.56 16.23 44 24 44Z"
-    />
-    <path
-      fill="#1976D2"
-      d="M43.61 20.08H42V20H24v8h11.3a12.02 12.02 0 0 1-4.09 5.57l6.19 5.24C42.02 35.03 44 30.04 44 24c0-1.34-.14-2.65-.39-3.92Z"
-    />
-  </svg>
 );
 
 const TestimonialCard = ({
@@ -104,12 +77,17 @@ export function SignInPage({
   onSignIn,
   onGoogleSignIn,
   onResetPassword,
+  initialError = "",
+  googleLinkEmail,
+  initialRememberMe = false,
 }: SignInPageProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState(initialError);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(initialRememberMe);
 
-  const handleSignIn = (event: FormEvent<HTMLFormElement>) => {
+  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     if (onSignIn) {
       onSignIn(event);
       return;
@@ -118,17 +96,42 @@ export function SignInPage({
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const email = String(formData.get("email") ?? "")
+      .trim()
+      .toLowerCase();
     const password = String(formData.get("password") ?? "");
-    const route = demoAccounts[email];
-
-    if (!route || password !== "123456") {
-      setErrorMessage("Use a valid demo email and password.");
-      return;
-    }
-
+    const rememberMe = formData.get("rememberMe") === "on";
+    setIsSubmitting(true);
     setErrorMessage("");
-    router.push(route);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          rememberMe,
+          linkGoogle: Boolean(googleLinkEmail),
+        }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        redirectTo?: string;
+      };
+
+      if (!response.ok || !payload.redirectTo) {
+        setErrorMessage(payload.error ?? "Unable to sign in.");
+        return;
+      }
+
+      router.push(payload.redirectTo);
+      router.refresh();
+    } catch {
+      setErrorMessage("Unable to reach the server. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -138,12 +141,7 @@ export function SignInPage({
           <Link href="/">
             <BrandLogo />
           </Link>
-          <Link
-            href="/"
-            className="rounded-full px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-red-50 hover:text-red-700"
-          >
-            Back to Home
-          </Link>
+          <BackButton href="/" />
         </nav>
       </header>
 
@@ -160,6 +158,20 @@ export function SignInPage({
                 </p>
               </div>
 
+              {googleLinkEmail ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-700">
+                  An account already exists for{" "}
+                  <strong>{googleLinkEmail}</strong>. Enter your G4 Builders
+                  password once to connect Google and sign in.
+                  <Link
+                    href="/login"
+                    className="mt-2 block font-semibold text-red-700 hover:underline"
+                  >
+                    Use another sign-in method
+                  </Link>
+                </div>
+              ) : null}
+
               <form className="space-y-5" onSubmit={handleSignIn}>
                 <div className="animate-element animate-delay-300 space-y-2">
                   <label
@@ -173,8 +185,10 @@ export function SignInPage({
                       id="email"
                       name="email"
                       type="email"
-                      placeholder="customer@gmail.com"
+                      placeholder="name@example.com"
                       autoComplete="email"
+                      defaultValue={googleLinkEmail ?? ""}
+                      readOnly={Boolean(googleLinkEmail)}
                       required
                       className="w-full rounded-xl bg-transparent p-4 text-sm text-stone-950 outline-none placeholder:text-stone-400"
                     />
@@ -222,51 +236,71 @@ export function SignInPage({
                     <input
                       type="checkbox"
                       name="rememberMe"
+                      checked={rememberMe}
+                      onChange={(event) => setRememberMe(event.target.checked)}
                       className="h-4 w-4 rounded border-stone-300 accent-red-700"
                     />
                     Keep me signed in
                   </label>
-                  <button
-                    type="button"
-                    onClick={onResetPassword}
-                    className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
-                  >
-                    Reset password
-                  </button>
+                  {onResetPassword ? (
+                    <button
+                      type="button"
+                      onClick={onResetPassword}
+                      className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
+                    >
+                      Reset password
+                    </button>
+                  ) : null}
                 </div>
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="animate-element animate-delay-600 w-full rounded-xl bg-red-700 py-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
                 >
-                  Sign In
+                  {isSubmitting
+                    ? "Signing in…"
+                    : googleLinkEmail
+                      ? "Connect Google and sign in"
+                      : "Sign In"}
                 </button>
 
                 {errorMessage ? (
-                  <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                  >
                     {errorMessage}
                   </p>
                 ) : null}
               </form>
 
-              <div className="animate-element animate-delay-700 relative flex items-center justify-center">
-                <span className="w-full border-t border-stone-200" />
-                <span className="absolute bg-white px-4 text-sm text-stone-500">
-                  Or continue with
-                </span>
-              </div>
+              {!googleLinkEmail ? (
+                <>
+                  <div className="animate-element animate-delay-700 relative flex items-center justify-center">
+                    <span className="w-full border-t border-stone-200" />
+                    <span className="absolute bg-white px-4 text-sm text-stone-500">
+                      Or
+                    </span>
+                  </div>
 
-              <button
-                type="button"
-                onClick={onGoogleSignIn}
-                className="animate-element animate-delay-800 flex w-full items-center justify-center gap-3 rounded-xl border border-stone-200 bg-white py-4 text-sm font-medium text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
-              >
-                <GoogleIcon />
-                Continue with Google
-              </button>
+                  <GoogleAuthButton
+                    mode="login"
+                    rememberMe={rememberMe}
+                    disabled={isSubmitting}
+                    onClick={onGoogleSignIn}
+                  />
+                </>
+              ) : null}
 
               <p className="animate-element animate-delay-1000 text-center text-sm text-stone-500">
-                Need access? Contact your project administrator.
+                New client?{" "}
+                <Link
+                  href="/register"
+                  className="font-semibold text-red-700 hover:underline"
+                >
+                  Create an account
+                </Link>
               </p>
             </div>
           </div>
@@ -308,4 +342,3 @@ export function SignInPage({
     </div>
   );
 }
-

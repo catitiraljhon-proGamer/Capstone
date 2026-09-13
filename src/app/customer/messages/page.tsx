@@ -6,12 +6,20 @@ export const metadata: Metadata = {
   description: "Customer message module for contacting G4 Builders Inc staff.",
 };
 
-export default function CustomerMessagesPage() {
+export default async function CustomerMessagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ recipientRole?: string }>;
+}) {
+  const { recipientRole } = await searchParams;
+  const initialRecipientRole =
+    recipientRole === "billing-clerk" ? "billing-clerk" : "admin";
+
   return (
     <MessageModulePage
       role="Customer"
-      name="John Doe"
       dashboardHref="/customer"
+      initialRecipientRole={initialRecipientRole}
     />
   );
 }

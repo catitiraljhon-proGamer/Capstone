@@ -6,12 +6,18 @@ export const metadata: Metadata = {
   description: "Billing clerk message module for reviewing customer messages.",
 };
 
-export default function BillingClerkMessagesPage() {
+export default async function BillingClerkMessagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customerId?: string }>;
+}) {
+  const { customerId } = await searchParams;
+
   return (
     <MessageModulePage
       role="Billing Clerk"
-      name="Billing Clerk"
       dashboardHref="/billing-clerk"
+      initialCustomerId={customerId}
     />
   );
 }

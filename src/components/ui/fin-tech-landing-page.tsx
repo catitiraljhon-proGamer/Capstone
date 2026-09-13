@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { useHouseDesigns } from "@/lib/house-design-store";
 
 type StatProps = {
   label: string;
@@ -43,13 +44,6 @@ const SoftButton = ({ children, className = "", ...props }: SoftButtonProps) => 
     {children}
   </button>
 );
-
-const projectImages = [
-  "/House/image.png",
-  "/House/Screenshot%202026-07-29%20003940.png",
-  "/House/Screenshot%202026-07-29%20003957.png",
-  "/House/Screenshot%202026-07-29%20011237.png",
-];
 
 const footerColumns = [
   {
@@ -106,17 +100,30 @@ function BlueprintMark() {
 }
 
 function SwappingHouseShowcase() {
+  const { designs, isLoading } = useHouseDesigns();
+  const projectImages = Array.from(
+    new Set(designs.flatMap((design) => design.images)),
+  ).slice(0, 4);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
+    if (projectImages.length < 2) return;
     const interval = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % projectImages.length);
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [projectImages.length]);
 
-  const activeImage = projectImages[activeIndex];
+  const activeImage = projectImages[activeIndex % projectImages.length];
+
+  if (!activeImage) {
+    return (
+      <div className="grid aspect-[1.42/1] place-items-center rounded-xl border border-dashed border-stone-200 bg-stone-50 text-sm text-stone-500">
+        {isLoading ? "Loading published designs…" : "No published designs yet."}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -130,7 +137,7 @@ function SwappingHouseShowcase() {
         <div
           className="h-full w-full bg-cover bg-center"
           style={{
-            backgroundImage: `url(${activeImage}), url(/House/image.png)`,
+            backgroundImage: `url(${activeImage})`,
           }}
           aria-label={`House design ${activeIndex + 1}`}
           role="img"
@@ -154,7 +161,7 @@ function SwappingHouseShowcase() {
             <span
               className="block h-full w-full bg-cover bg-center"
               style={{
-                backgroundImage: `url(${imageSrc}), url(/House/image.png)`,
+                backgroundImage: `url(${imageSrc})`,
               }}
             />
           </button>
@@ -296,6 +303,25 @@ function LandingFooter() {
 }
 
 export default function MoneyflowLandingPage() {
+  const [stats, setStats] = useState({
+    activeProjects: 0,
+    publishedDesigns: 0,
+    completedProjects: 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/public/stats", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (active && payload) setStats(payload);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen w-full bg-white text-stone-950">
       <header className="sticky top-0 z-50 border-b border-stone-200/70 bg-white/90 backdrop-blur">
@@ -319,6 +345,12 @@ export default function MoneyflowLandingPage() {
             >
               Log in
             </Link>
+            <Link
+              href="/register"
+              className="rounded-full bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800"
+            >
+              Register
+            </Link>
           </div>
         </nav>
       </header>
@@ -339,8 +371,8 @@ export default function MoneyflowLandingPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-8 pt-2 md:max-w-sm">
-            <Stat label="Estimate Accuracy" value="98%" />
-            <Stat label="Active Projects" value="24+" />
+            <Stat label="Published Designs" value={String(stats.publishedDesigns)} />
+            <Stat label="Active Projects" value={String(stats.activeProjects)} />
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-5 opacity-75">
@@ -412,17 +444,17 @@ export default function MoneyflowLandingPage() {
           >
             <div className="flex items-center gap-2 text-sm text-stone-500">
               <Calculator className="h-4 w-4" />
-              Current Billing
+              Completed Projects
             </div>
             <div className="mt-2 text-3xl font-semibold tracking-tight">
-              PHP 8.4M{" "}
+              {stats.completedProjects}{" "}
               <span className="align-middle text-sm font-medium text-stone-400">
-                approved
+                 recorded
               </span>
             </div>
             <div className="mt-1 flex items-center gap-1 text-xs text-red-500">
               <ClipboardCheck className="h-3.5 w-3.5" />
-              12 package items reconciled
+              Live project data from MongoDB
             </div>
             <MiniBars />
           </motion.div>
@@ -460,4 +492,3 @@ export default function MoneyflowLandingPage() {
     </div>
   );
 }
-
