@@ -8,7 +8,6 @@ import { LogoutButton } from "@/components/ui/logout-button";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
 import { useBillingDashboardData } from "@/lib/billing-dashboard-data";
-import { useUnreadStaffMessages } from "@/lib/staff-message-notifications";
 import { formatPeso } from "@/components/ui/house-design-data";
 import {
   CalendarDays,
@@ -18,7 +17,6 @@ import {
   FolderKanban,
   Gauge,
   House,
-  Mail,
   Menu,
   ReceiptText,
   ShieldCheck,
@@ -42,7 +40,6 @@ type StaffDashboardProps = {
     icon: IconType;
     href: string;
     active?: boolean;
-    badge?: number;
   }[];
   metrics: { label: string; value: string; note: string; icon: IconType }[];
   primaryPanel: ReactNode;
@@ -55,7 +52,6 @@ type StaffDashboardProps = {
 
 const clerkNav = [
   { label: "Dashboard", icon: Gauge, href: "/billing-clerk" },
-  { label: "Messages", icon: Mail, href: "/billing-clerk/messages" },
   { label: "Progress Billings", icon: ReceiptText, href: "/billing-clerk/progress-billings" },
   { label: "Payments", icon: WalletCards, href: "/billing-clerk/payments" },
   { label: "Invoices", icon: FileText, href: "/billing-clerk/invoices" },
@@ -70,7 +66,6 @@ const adminNav = [
   { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
   { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
   { label: "Billing", icon: ReceiptText, href: "/admin/billing-control" },
-  { label: "Messages", icon: Mail, href: "/admin/messages" },
   { label: "Scheduling", icon: CalendarDays, href: "/admin/scheduling" },
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
@@ -117,17 +112,6 @@ function StaffSidebar({
           >
             <item.icon className="h-5 w-5" />
             <span className="min-w-0 flex-1">{item.label}</span>
-            {item.badge && item.badge > 0 ? (
-              <span
-                className={[
-                  "grid min-w-6 place-items-center rounded-full px-1.5 py-0.5 text-xs font-semibold",
-                  item.active ? "bg-white text-red-700" : "bg-red-700 text-white",
-                ].join(" ")}
-                aria-label={`${item.badge} unread messages`}
-              >
-                {item.badge > 99 ? "99+" : item.badge}
-              </span>
-            ) : null}
           </Link>
         ))}
       </nav>
@@ -154,20 +138,15 @@ function StaffDashboard({
 }: StaffDashboardProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useSessionUser();
-  const { unreadCount } = useUnreadStaffMessages(true);
-  const messagesHref = role === "Admin" ? "/admin/messages" : "/billing-clerk/messages";
-  const navItemsWithMessageCount = navItems.map((item) =>
-    item.href === messagesHref ? { ...item, badge: unreadCount } : item,
-  );
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-950">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white lg:flex lg:flex-col">
-        <StaffSidebar navItems={navItemsWithMessageCount} />
+        <StaffSidebar navItems={navItems} />
       </aside>
 
       <MobileNavigation open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-        <StaffSidebar navItems={navItemsWithMessageCount} onNavigate={() => setIsSidebarOpen(false)} />
+        <StaffSidebar navItems={navItems} onNavigate={() => setIsSidebarOpen(false)} />
       </MobileNavigation>
 
       <div className="lg:pl-72">

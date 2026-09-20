@@ -8,6 +8,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { readSession } from "@/lib/server/session";
+import { visibleNotificationsFor } from "@/lib/server/notification-filter";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
@@ -45,12 +46,12 @@ export async function GET() {
           .toArray(),
         db
           .collection<NotificationDocument>(collections.notifications)
-          .find({ userId: customerId })
+          .find(visibleNotificationsFor(customerId))
           .sort({ createdAt: -1 })
           .limit(10)
           .toArray(),
-        db.collection(collections.notifications).countDocuments({
-          userId: customerId,
+        db.collection<NotificationDocument>(collections.notifications).countDocuments({
+          ...visibleNotificationsFor(customerId),
           readAt: { $exists: false },
         }),
       ]);

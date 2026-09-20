@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { staffMessageStatusEvent } from "@/lib/staff-message-notifications";
 
 export type SystemNotification = {
   id: string;
@@ -28,7 +27,6 @@ export async function markNotificationsRead(input: MarkReadInput) {
 
   if (response.ok) {
     window.dispatchEvent(new Event(notificationStatusEvent));
-    window.dispatchEvent(new Event(staffMessageStatusEvent));
   }
 
   return response.ok;

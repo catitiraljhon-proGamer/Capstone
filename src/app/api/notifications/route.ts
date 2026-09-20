@@ -1,11 +1,11 @@
 import {
   collections,
-  type MessageDocument,
   type NotificationDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, unauthorized } from "@/lib/server/api";
 import { readSession } from "@/lib/server/session";
+import { visibleNotificationsFor } from "@/lib/server/notification-filter";
 import { ObjectId, type Filter } from "mongodb";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -26,16 +26,17 @@ export async function GET() {
     if (!session) return unauthorized();
 
     const userId = new ObjectId(session.id);
+    const visibleFilter = visibleNotificationsFor(userId);
     const db = await getDatabase();
     const [notifications, unreadCount] = await Promise.all([
       db
         .collection<NotificationDocument>(collections.notifications)
-        .find({ userId })
+        .find(visibleFilter)
         .sort({ createdAt: -1 })
         .limit(50)
         .toArray(),
       db.collection<NotificationDocument>(collections.notifications).countDocuments({
-        userId,
+        ...visibleFilter,
         readAt: { $exists: false },
       }),
     ]);
@@ -70,59 +71,20 @@ export async function PATCH(request: Request) {
     }
 
     const filter: Filter<NotificationDocument> = {
-      userId: new ObjectId(session.id),
+      ...visibleNotificationsFor(new ObjectId(session.id)),
       readAt: { $exists: false },
     };
 
     if (input.notificationId) {
       filter._id = new ObjectId(input.notificationId);
     } else if (input.href) {
-      filter.href = input.href;
+      filter.$and = [{ href: input.href }];
     }
 
     const db = await getDatabase();
-    const selectedNotifications = await db
-      .collection<NotificationDocument>(collections.notifications)
-      .find(filter, { projection: { kind: 1, entityId: 1 } })
-      .toArray();
     const result = await db
       .collection<NotificationDocument>(collections.notifications)
       .updateMany(filter, { $set: { readAt: new Date() } });
-
-    if (session.role !== "customer") {
-      const customerIds = selectedNotifications
-        .filter(
-          (notification) =>
-            notification.kind === "message" && notification.entityId,
-        )
-        .map((notification) => notification.entityId as ObjectId);
-
-      if (input.all || customerIds.length > 0) {
-        const staffUserId = new ObjectId(session.id);
-        const messageFilter: Filter<MessageDocument> = {
-          ...(session.role === "admin"
-            ? {
-                $or: [
-                  { recipientRole: "admin" as const },
-                  { recipientRole: { $exists: false } },
-                ],
-              }
-            : { recipientRole: "billing-clerk" }),
-          authorRole: "customer",
-          readByStaffIds: { $ne: staffUserId },
-        };
-
-        if (!input.all) {
-          messageFilter.customerId = { $in: customerIds };
-        }
-
-        await db
-          .collection<MessageDocument>(collections.messages)
-          .updateMany(messageFilter, {
-            $addToSet: { readByStaffIds: staffUserId },
-          });
-      }
-    }
 
     return NextResponse.json({ markedRead: result.modifiedCount });
   } catch (error) {

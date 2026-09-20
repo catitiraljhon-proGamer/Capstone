@@ -1,23 +1,5 @@
-import { MessageModulePage } from "@/components/ui/message-module-page";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Messages | Billing Clerk | G4 Builders Inc",
-  description: "Billing clerk message module for reviewing customer messages.",
-};
-
-export default async function BillingClerkMessagesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ customerId?: string }>;
-}) {
-  const { customerId } = await searchParams;
-
-  return (
-    <MessageModulePage
-      role="Billing Clerk"
-      dashboardHref="/billing-clerk"
-      initialCustomerId={customerId}
-    />
-  );
+export default function BillingClerkMessagesPage() {
+  redirect("/billing-clerk");
 }

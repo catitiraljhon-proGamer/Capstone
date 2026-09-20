@@ -12,7 +12,7 @@ const benefits = [
   "Browse available house designs",
   "Request and track cost estimates",
   "Review project billing and payments",
-  "Message the G4 Builders team",
+  "Keep project documents in one place",
 ];
 
 export function RegisterAccountPage({
@@ -256,7 +256,7 @@ export function RegisterAccountPage({
             </h2>
             <p className="mt-3 text-sm leading-6 text-red-100">
               Your account connects estimates, design requests, project
-              progress, documents, invoices, and messages to one secure client
+              progress, documents, and invoices to one secure client
               profile.
             </p>
 

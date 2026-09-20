@@ -40,25 +40,3 @@ export const roleHomePaths: Record<UserRole, string> = {
   "billing-clerk": "/billing-clerk",
   admin: "/admin",
 };
-
-export type MessageDto = {
-  id: string;
-  customerId: string;
-  recipientRole: MessageRecipientRole;
-  authorId: string;
-  authorName: string;
-  authorRole: UserRole;
-  body: string;
-  createdAt: string;
-};
-
-export type MessageConversationDto = {
-  customerId: string;
-  customerName: string;
-  recipientRole: MessageRecipientRole;
-  lastMessageAt: string;
-  lastMessagePreview: string;
-  lastAuthorName: string;
-  lastAuthorRole: UserRole;
-  unreadCount: number;
-};

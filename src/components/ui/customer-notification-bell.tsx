@@ -229,7 +229,7 @@ export function NotificationBell() {
                   No notifications yet
                 </p>
                 <p className="mt-1 text-xs leading-5 text-stone-500">
-                  Message replies and system updates will appear here.
+                  Project, billing, and system updates will appear here.
                 </p>
               </div>
             )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { ContactDetails } from "@/components/ui/contact-us";
 import { ClientInformationReminder, ClientProfileForm } from "@/components/ui/client-profile";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
@@ -30,9 +31,7 @@ import {
   Gauge,
   HelpCircle,
   Home,
-  Mail,
   Menu,
-  MessageSquareText,
   ReceiptText,
   User,
   UserRound,
@@ -47,7 +46,6 @@ type CustomerSection =
   | "dashboard"
   | "design"
   | "requests"
-  | "messages"
   | "billing"
   | "documents"
   | "profile"
@@ -64,7 +62,6 @@ const customerNav: {
   { label: "Dashboard", icon: Gauge, href: "/customer", section: "dashboard" },
   { label: "My House Design", icon: Home, href: "/customer/house-design", section: "design" },
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
-  { label: "Messages", icon: Mail, href: "/customer/messages", section: "messages" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
   { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
   { label: "My Profile", icon: UserRound, href: "/customer/profile", section: "profile" },
@@ -268,7 +265,6 @@ export function CustomerDashboard() {
               {[
                 { title: "Compare house designs", href: "/customer/house-design", icon: Home },
                 { title: "Send design revision", href: "/customer/design-requests", icon: FilePlus2 },
-                { title: "Message the team", href: "/customer/messages", icon: MessageSquareText },
                 { title: "Review billing status", href: "/customer/billing", icon: CreditCard },
               ].map((action) => (
                 <Link
@@ -647,14 +643,7 @@ export function CustomerSupportPage() {
     <CustomerShell activeSection="support" title="Support" description="Ask for help with design, estimates, billing, or documents.">
       <Panel className="max-w-3xl p-5">
         <h1 className="text-xl font-semibold tracking-tight">Contact Support</h1>
-        <textarea
-          rows={6}
-          placeholder="Write your question or concern here."
-          className="mt-5 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm outline-none placeholder:text-stone-400 focus:border-red-600"
-        />
-        <button className="mt-4 rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800">
-          Send Support Request
-        </button>
+        <div className="mt-5"><ContactDetails /></div>
       </Panel>
     </CustomerShell>
   );
