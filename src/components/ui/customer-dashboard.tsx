@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { ClientInformationReminder, ClientProfileForm } from "@/components/ui/client-profile";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
 import ColorChangeCards from "@/components/ui/color-change-card";
@@ -200,6 +201,7 @@ export function CustomerDashboard() {
       title={user ? `Welcome back, ${user.name}` : "Welcome back"}
       description="A quick view of your design, request status, and billing."
     >
+      <ClientInformationReminder />
       {dashboard.error ? (
         <p role="alert" className="mb-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           {dashboard.error}
@@ -630,21 +632,11 @@ export function CustomerDocumentsPage() {
 }
 
 export function CustomerProfilePage() {
-  const { user } = useSessionUser();
   return (
     <CustomerShell activeSection="profile" title="My Profile" description="Manage customer account details.">
-      <Panel className="max-w-2xl p-5">
+      <Panel className="max-w-3xl p-4 sm:p-6">
         <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-sm font-semibold">Name</span>
-            <input className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" value={user?.name ?? ""} readOnly />
-          </label>
-          <label className="block">
-            <span className="text-sm font-semibold">Role</span>
-            <input className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" value="Customer" readOnly />
-          </label>
-        </div>
+        <div className="mt-5"><ClientProfileForm /></div>
       </Panel>
     </CustomerShell>
   );

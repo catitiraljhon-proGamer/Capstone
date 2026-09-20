@@ -1,4 +1,5 @@
 import { AdminSectionPage } from "@/components/ui/staff-dashboard";
+import { AdminClientManager } from "@/components/ui/admin-client-manager";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -11,7 +12,8 @@ export default function ClientsPage() {
     <AdminSectionPage
       activeLabel="Client"
       title="Client"
-      description="View registered clients and their connected project records."
+      description="Manage client names, ages, addresses, and contact information."
+      mainContent={<AdminClientManager />}
     />
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { SessionUser } from "@/types/domain";
+import { clientProfileUpdatedEvent } from "@/lib/client-information";
 import { useCallback, useEffect, useState } from "react";
 
 export function useSessionUser() {
@@ -24,6 +25,9 @@ export function useSessionUser() {
 
   useEffect(() => {
     void reload();
+    const refreshProfile = () => { void reload(); };
+    window.addEventListener(clientProfileUpdatedEvent, refreshProfile);
+    return () => window.removeEventListener(clientProfileUpdatedEvent, refreshProfile);
   }, [reload]);
 
   return { user, isLoading, reload };

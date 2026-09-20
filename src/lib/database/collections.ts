@@ -15,6 +15,7 @@ import type {
   ApprovalStatus,
 } from "@/types/approvals";
 import type { ObjectId } from "mongodb";
+import type { ClientDetails } from "@/types/clients";
 
 export const collections = {
   users: "users",
@@ -44,6 +45,7 @@ export type UserDocument = {
   role: UserRole;
   status: UserStatus;
   authVersion?: number;
+  clientDetails?: ClientDetails;
   createdAt: Date;
   updatedAt: Date;
 };
