@@ -31,6 +31,16 @@ appear automatically in the admin Client Module (`/admin/clients`) and the custo
 profile (`/customer/profile`). Both views use the same record, including later edits.
 Existing accounts and Google registrations can complete missing details in their profile.
 
+## Editable material prices
+
+In Admin → House Designs → Edit Design, each default exterior material has a type
+selector and an editable price in PHP per unit. Save Changes stores prices for
+that house design and recalculates the admin and customer material breakdowns.
+Prices are retained separately for each material option. Use the catalog-price
+reset beside a changed material to restore its shared default. Existing designs
+continue using catalog prices until an admin changes them. Saved estimates,
+contracts, and invoices are not rewritten by editing a design's material prices.
+
 ## Google login and signup
 
 For production hosting, follow the complete [Vercel and Google setup guide](docs/vercel-google-setup.md).
@@ -94,6 +104,7 @@ npm run lint
 npm run typecheck
 npm run test:auth
 npm run test:clients
+npm run test:pricing
 npm run build
 ```
 

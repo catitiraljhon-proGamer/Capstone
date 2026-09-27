@@ -11,6 +11,18 @@ const customExteriorItemSchema = z.object({
   unitPrice: z.number().finite().nonnegative(),
 });
 
+const materialPricesSchema = z.array(z.object({
+  item: z.string().trim().min(1).max(120),
+  material: z.string().trim().min(1).max(160),
+  unit: z.string().trim().min(1).max(30),
+  unitPrice: z.number().finite().positive("Enter a unit price greater than 0.")
+    .max(100_000_000, "Unit prices cannot exceed PHP 100,000,000.")
+    .multipleOf(0.01, "Use no more than two decimal places for unit prices."),
+}).strict()).max(300).refine((prices) => {
+  const keys = prices.map(({ item, material, unit }) => JSON.stringify([item, material, unit]));
+  return new Set(keys).size === keys.length;
+}, "Each material option can have only one price.");
+
 export const houseDesignInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   style: z.string().trim().max(80).optional(),
@@ -23,6 +35,7 @@ export const houseDesignInputSchema = z.object({
   notes: z.string().trim().max(4_000),
   status: z.enum(["Draft", "Published", "Archived"]),
   defaultSelections: z.array(z.number().int().nonnegative()).max(100),
+  materialPrices: materialPricesSchema.optional(),
   customItems: z.array(customExteriorItemSchema).max(100),
 });
 
@@ -46,6 +59,7 @@ export function toHouseDesignDto(document: HouseDesignDocument): HouseDesign {
     notes: document.notes,
     status: document.status,
     defaultSelections: document.defaultSelections,
+    materialPrices: document.materialPrices ?? [],
     customItems: document.customItems,
     createdAt: document.createdAt.toISOString(),
     createdBy: document.createdByName,

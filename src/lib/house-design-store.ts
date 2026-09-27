@@ -20,10 +20,10 @@ const emptyCatalog: HouseDesignCatalog = {
 };
 
 async function readJson<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & { error?: string };
+  const payload = (await response.json()) as T & { error?: string; issues?: { message?: string }[] };
 
   if (!response.ok) {
-    throw new Error(payload.error ?? "The server could not complete the request.");
+    throw new Error(payload.issues?.[0]?.message ?? payload.error ?? "The server could not complete the request.");
   }
 
   return payload;

@@ -4,6 +4,7 @@ import type {
   HouseDesignFinish,
   HouseDesignStatus,
   HouseType,
+  MaterialPriceOverride,
 } from "@/components/ui/house-design-data";
 import type {
   MessageRecipientRole,
@@ -63,6 +64,7 @@ export type HouseDesignDocument = {
   notes: string;
   status: HouseDesignStatus;
   defaultSelections: number[];
+  materialPrices?: MaterialPriceOverride[];
   customItems: CustomExteriorItem[];
   createdAt: Date;
   createdBy: ObjectId;

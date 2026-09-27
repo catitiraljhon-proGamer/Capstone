@@ -239,7 +239,8 @@ test("duplicate account emails are rejected without another client record", asyn
 test("client writes reject cross-origin requests and non-JSON forms", () => {
   const url = "https://app.example/api/profile";
   assert.doesNotThrow(() => assertClientMutation(new Request(url, { method: "PATCH", headers: { origin: "https://app.example", "Content-Type": "application/json" } })));
-  for (const headers of [{ origin: "https://attacker.example", "Content-Type": "application/json" }, { "sec-fetch-site": "cross-site", "Content-Type": "application/json" }, { "Content-Type": "text/plain" }]) {
+  const invalidHeaders: Record<string, string>[] = [{ origin: "https://attacker.example", "Content-Type": "application/json" }, { "sec-fetch-site": "cross-site", "Content-Type": "application/json" }, { "Content-Type": "text/plain" }];
+  for (const headers of invalidHeaders) {
     assert.throws(() => assertClientMutation(new Request(url, { method: "PATCH", headers })));
   }
 });

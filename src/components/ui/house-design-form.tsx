@@ -14,6 +14,7 @@ import {
   type HouseDesignFinish,
   type HouseDesignStatus,
   type HouseType,
+  type MaterialPriceOverride,
 } from "@/components/ui/house-design-data";
 import {
   createCustomItemId,
@@ -39,6 +40,7 @@ type FieldName =
   | "rate"
   | "rooms"
   | "images"
+  | "materialPrices"
   | "customItems";
 
 type FieldErrors = Partial<Record<FieldName, string>>;
@@ -58,6 +60,7 @@ const fieldOrder: FieldName[] = [
   "rate",
   "rooms",
   "images",
+  "materialPrices",
   "customItems",
 ];
 
@@ -68,6 +71,7 @@ const fieldLabels: Record<FieldName, string> = {
   rate: "Cost rate",
   rooms: "Room setup",
   images: "Design images",
+  materialPrices: "Material prices",
   customItems: "Custom exterior items",
 };
 
@@ -78,6 +82,7 @@ const fieldIds: Record<FieldName, string> = {
   rate: "design-rate",
   rooms: "design-rooms",
   images: "design-images",
+  materialPrices: "design-material-prices",
   customItems: "design-custom-items",
 };
 
@@ -85,6 +90,15 @@ const inputClass =
   "w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
 
 const invalidInputClass = "border-red-600";
+
+type MaterialPriceDraft = Omit<MaterialPriceOverride, "unitPrice"> & { unitPrice: string };
+
+function isMaterialPriceValid(price: MaterialPriceDraft) {
+  const value = Number(price.unitPrice);
+  return price.unitPrice.trim() !== "" && Number.isFinite(value) &&
+    value > 0 && value <= 100_000_000 &&
+    Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
+}
 
 function isCustomItemComplete(item: CustomExteriorItem) {
   return (
@@ -261,20 +275,56 @@ export function HouseDesignForm({
   const [customItems, setCustomItems] = useState<CustomExteriorItem[]>(
     design?.customItems ?? [],
   );
+  const [materialPriceDrafts, setMaterialPriceDrafts] = useState<MaterialPriceDraft[]>(() =>
+    (design?.materialPrices ?? []).map((price) => ({ ...price, unitPrice: String(price.unitPrice) })),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showSummary, setShowSummary] = useState(false);
 
   const setValue = (field: keyof FormValues, value: string) =>
     setValues((current) => ({ ...current, [field]: value }));
 
-  const runValidation = () =>
-    validate(values, images, customItems, existingNames);
+  const runValidation = (): FieldErrors => ({
+    ...validate(values, images, customItems, existingNames),
+    ...(materialPriceDrafts.some((price) => !isMaterialPriceValid(price)) ? {
+      materialPrices: "Enter prices greater than 0 and no more than PHP 100,000,000, with up to two decimal places.",
+    } : {}),
+  });
+
+  const materialPrices: MaterialPriceOverride[] = materialPriceDrafts
+    .filter(isMaterialPriceValid)
+    .map((price) => ({ ...price, unitPrice: Number(price.unitPrice) }));
+
+  const updateMaterialPrice = (itemIndex: number, unitPrice: string) => {
+    const item = exteriorItems[itemIndex];
+    const option = item.options[selections[itemIndex]];
+    setMaterialPriceDrafts((current) => [
+      ...current.filter((price) => !(price.item === item.item && price.material === option.name && price.unit === option.unit)),
+      { item: item.item, material: option.name, unit: option.unit, unitPrice },
+    ]);
+  };
 
   /** Validate on blur so errors appear after the user finishes a field. */
   const handleBlur = (field: FieldName) =>
     setErrors((current) => ({ ...current, [field]: runValidation()[field] }));
 
   const focusField = (field: FieldName) => {
+    if (field === "materialPrices") {
+      const invalidPrice = materialPriceDrafts.find((price) => !isMaterialPriceValid(price));
+      const itemIndex = exteriorItems.findIndex((item) => item.item === invalidPrice?.item);
+      if (itemIndex >= 0 && invalidPrice) {
+        const optionIndex = exteriorItems[itemIndex].options.findIndex((option) =>
+          option.name === invalidPrice.material && option.unit === invalidPrice.unit,
+        );
+        if (optionIndex >= 0) {
+          setSelections((current) => current.map((value, index) => index === itemIndex ? optionIndex : value));
+          const input = document.getElementById(`material-${itemIndex}-price`);
+          input?.focus();
+          input?.scrollIntoView({ block: "center", behavior: "smooth" });
+          return;
+        }
+      }
+    }
     // Custom items have per-row ids, so aim at the first incomplete row.
     const targetId =
       field === "customItems"
@@ -295,6 +345,7 @@ export function HouseDesignForm({
       area: Number.isFinite(areaValue) ? areaValue : 0,
       rate: Number.isFinite(rateValue) ? rateValue : 0,
       customItems: customItems.filter(isCustomItemComplete),
+      materialPrices,
     },
     selections,
     exteriorItems,
@@ -409,6 +460,7 @@ export function HouseDesignForm({
       notes: notes.trim(),
       status,
       defaultSelections: selections,
+      materialPrices,
       customItems: customItems.map((item) => ({
         ...item,
         item: item.item.trim(),
@@ -677,25 +729,26 @@ export function HouseDesignForm({
             </div>
           </fieldset>
 
-          <fieldset className="rounded-xl border border-stone-200 p-5">
+          <fieldset id={fieldIds.materialPrices} tabIndex={-1} className="min-w-0 rounded-xl border border-stone-200 p-5">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
               Default Exterior Materials
             </legend>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              These become the starting material set whenever this design is
-              opened.
+              Choose each material type and update its unit price as costs change.
+              Prices are saved for this house design when you save your changes.
             </p>
-            <div className="mt-4 grid gap-5 sm:grid-cols-2">
+            <div className="mt-4 space-y-5">
               {exteriorItems.map((item, itemIndex) => {
                 const id = `material-${itemIndex}`;
+                const option = item.options[selections[itemIndex]];
+                const priceDraft = materialPriceDrafts.find((price) =>
+                  price.item === item.item && price.material === option.name && price.unit === option.unit,
+                );
+                const invalidPrice = Boolean(errors.materialPrices && priceDraft && !isMaterialPriceValid(priceDraft));
 
                 return (
-                  <Field
-                    key={item.item}
-                    htmlFor={id}
-                    label={item.item}
-                    hint={item.detail}
-                  >
+                  <div key={item.item} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
+                    <Field htmlFor={id} label={`${item.item} type`} hint={item.detail}>
                     <select
                       id={id}
                       className={inputClass}
@@ -713,15 +766,42 @@ export function HouseDesignForm({
                     >
                       {item.options.map((option, optionIndex) => (
                         <option key={option.name} value={optionIndex}>
-                          {option.name} - {formatPeso(option.unitPrice)}/
-                          {option.unit}
+                          {option.name}
                         </option>
                       ))}
                     </select>
-                  </Field>
+                    </Field>
+                    <Field htmlFor={`${id}-price`} label={`Price (PHP / ${option.unit})`}>
+                      <input
+                        id={`${id}-price`}
+                        aria-label={`${item.item} unit price (PHP / ${option.unit})`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        max="100000000"
+                        step="0.01"
+                        required
+                        value={priceDraft?.unitPrice ?? String(option.unitPrice)}
+                        onChange={(event) => updateMaterialPrice(itemIndex, event.target.value)}
+                        onBlur={() => handleBlur("materialPrices")}
+                        aria-invalid={invalidPrice}
+                        aria-describedby={invalidPrice ? `${fieldIds.materialPrices}-error` : undefined}
+                        className={`${inputClass} tabular-nums ${invalidPrice ? invalidInputClass : ""}`}
+                      />
+                    </Field>
+                    {priceDraft && <button
+                      type="button"
+                      onClick={() => setMaterialPriceDrafts((current) => current.filter((price) =>
+                        !(price.item === item.item && price.material === option.name && price.unit === option.unit),
+                      ))}
+                      className="justify-self-start text-xs font-medium text-red-700 underline underline-offset-4 hover:text-red-800 sm:col-span-2"
+                      aria-label={`Reset ${item.item} price to catalog price`}
+                    >Use catalog price: {formatPeso(option.unitPrice)} / {option.unit}</button>}
+                  </div>
                 );
               })}
             </div>
+            {errors.materialPrices && <FieldError id={`${fieldIds.materialPrices}-error`} message={errors.materialPrices} />}
           </fieldset>
 
           <fieldset className="rounded-xl border border-stone-200 p-5">

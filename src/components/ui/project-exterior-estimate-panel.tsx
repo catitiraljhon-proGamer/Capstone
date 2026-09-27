@@ -31,7 +31,7 @@ export function ProjectExteriorEstimatePanel({
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
             {editorRole === "Admin"
-              ? "Use Edit Design to change materials, add custom exterior items, or update the design details. Changes recalculate the estimated project cost."
+              ? "Use Edit Design to change materials and unit prices, add custom exterior items, or update the design details. Changes recalculate the estimated project cost."
               : "Review the materials used for this project. Clients may request preferred changes, but material management stays with Admin."}
           </p>
         </div>

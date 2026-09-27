@@ -11,6 +11,7 @@
     "test:auth": "node --import tsx --test tests/google-auth.test.ts",
     "test:database": "node --import tsx --test tests/mongodb.test.ts",
     "test:clients": "node --import tsx --test tests/clients.test.ts",
+    "test:pricing": "node --import tsx --test tests/house-design-pricing.test.ts",
     "db:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-mongodb.ps1",
     "db:seed": "node scripts/seed-database.mjs"
   },
