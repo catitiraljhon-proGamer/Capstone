@@ -23,6 +23,14 @@ The application uses MongoDB. Runtime business records are no longer stored in b
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Client registration and records
+
+Email registration collects full name, email, age, contact number, complete address,
+and optional occupation. These details are saved with the customer account and
+appear automatically in the admin Client Module (`/admin/clients`) and the customer's
+profile (`/customer/profile`). Both views use the same record, including later edits.
+Existing accounts and Google registrations can complete missing details in their profile.
+
 ## Google login and signup
 
 For production hosting, follow the complete [Vercel and Google setup guide](docs/vercel-google-setup.md).
@@ -85,10 +93,12 @@ Indexes are created when the application first connects. Seed data lives under `
 npm run lint
 npm run typecheck
 npm run test:auth
+npm run test:clients
 npm run build
 ```
 
-`test:auth` uses a temporary MongoDB instance and signed test identities, without
+`test:clients` covers client permissions, registration details, and duplicate accounts
+using a temporary MongoDB instance. `test:auth` uses a temporary MongoDB instance and signed test identities, without
 reading `.env.local`, contacting Google, or changing your application database.
 The test MongoDB binary is downloaded automatically on first use. A real Google
 account round trip still requires the OAuth configuration above.

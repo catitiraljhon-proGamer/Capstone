@@ -8,25 +8,37 @@ import { type UserDocument } from "@/lib/database/collections";
 import { clientProfileSchema, ClientRequestError, createClient, getClient, listClients, toClientDto, updateClient } from "@/lib/server/clients";
 import { assertClientMutation, clientApiError } from "@/lib/server/client-api";
 import type { SessionUser } from "@/types/domain";
+import { POST as registerCustomer } from "@/app/api/auth/register/route";
+import { sessionCookieName } from "@/lib/server/session";
 
 let mongo: MongoMemoryServer;
 let db: Db;
 const admin: SessionUser = { id: new ObjectId().toHexString(), name: "Test Admin", email: "admin@example.test", role: "admin" };
 const details = { name: "Test Client", age: 35, contactNumber: "+63 917 123 4567", address: "123 Example Street, Sample City", occupation: "Engineer" };
 const password = "Test-password-2026";
+const registrationInput = { ...details, email: "new@example.test", password };
+
+function registrationRequest(input: unknown) {
+  return new Request("http://localhost:3000/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
 
 function legacyUser(overrides: Partial<UserDocument> = {}): UserDocument {
   return { _id: new ObjectId(), name: "Existing Client", email: "existing@example.test", role: "customer", status: "active", authVersion: 4, passwordHash: "existing-hash", googleSub: new ObjectId().toHexString(), createdAt: new Date(), updatedAt: new Date(), ...overrides };
 }
 
 before(async () => {
+  process.env.AUTH_SECRET = "isolated-client-test-secret-at-least-32-characters";
   mongo = await MongoMemoryServer.create();
   process.env.MONGODB_URI = mongo.getUri();
   process.env.MONGODB_DB = "isolated_client_tests";
   db = await getDatabase();
 });
 beforeEach(async () => {
-  await Promise.all(["users", "audit_logs"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["users", "audit_logs", "notifications"].map((name) => db.collection(name).deleteMany({})));
 });
 after(async () => {
   const cache = globalThis as typeof globalThis & { mongoClientPromise?: Promise<MongoClient> };
@@ -64,6 +76,97 @@ test("admin creates a customer account with hashed password and saved client inf
   const audit = await db.collection("audit_logs").findOne({ action: "client.created" });
   assert.ok(audit);
   assert.equal(JSON.stringify(audit).includes(password), false);
+});
+
+test("customer registration saves a complete record visible in the Client Module and customer profile", async () => {
+  await db.collection<UserDocument>("users").insertOne(legacyUser({
+    _id: new ObjectId(admin.id), name: admin.name, email: admin.email, role: "admin",
+  }));
+  const response = await registerCustomer(registrationRequest({
+    ...registrationInput, name: `  ${details.name}  `, email: "  NEW@EXAMPLE.TEST  ",
+    contactNumber: `  ${details.contactNumber}  `, address: `  ${details.address}  `,
+    occupation: `  ${details.occupation}  `,
+  }));
+  assert.equal(response.status, 201);
+  const payload = await response.json();
+  assert.equal(payload.redirectTo, "/customer");
+  assert.ok(response.cookies.get(sessionCookieName)?.value);
+  const saved = await db.collection<UserDocument>("users").findOne({ email: registrationInput.email });
+  assert.ok(saved);
+  assert.equal(saved.role, "customer");
+  assert.equal(saved.status, "active");
+  assert.equal(await compare(password, saved.passwordHash!), true);
+  assert.deepEqual(saved.clientDetails, {
+    age: details.age, contactNumber: details.contactNumber, address: details.address, occupation: details.occupation,
+  });
+  const listed = await listClients(db, admin, { q: registrationInput.email });
+  assert.equal(listed.total, 1);
+  const [client] = listed.clients;
+  assert.equal(client.id, payload.user.id);
+  assert.equal(client.name, details.name);
+  assert.equal(client.email, registrationInput.email);
+  assert.equal(client.profileComplete, true);
+  assert.deepEqual(await getClient(db, payload.user, client.id), client);
+  for (const key of ["password", "passwordHash", "googleSub", "authVersion"]) {
+    assert.equal(key in client, false);
+    assert.equal(key in payload.user, false);
+  }
+  const notification = await db.collection("notifications").findOne({ userId: new ObjectId(admin.id) });
+  assert.equal(notification?.href, "/admin/clients");
+  assert.equal(notification?.entityId.toHexString(), client.id);
+  const audit = await db.collection("audit_logs").findOne({ action: "auth.registered" });
+  assert.ok(audit);
+  assert.equal(JSON.stringify(audit).includes(password), false);
+});
+
+test("registration permits an omitted occupation and keeps age zero", async () => {
+  const response = await registerCustomer(registrationRequest({ ...registrationInput, occupation: undefined, age: 0 }));
+  assert.equal(response.status, 201);
+  const { clients } = await listClients(db, admin, {});
+  assert.equal(clients[0].age, 0);
+  assert.equal(clients[0].occupation, "");
+  assert.equal(clients[0].profileComplete, true);
+});
+
+test("registration rejects incomplete or invalid client details and injected account fields before creating an account", async () => {
+  const invalidChanges = [
+    { age: undefined }, { age: null }, { age: "35" }, { age: -1 }, { age: 121 }, { age: 1.5 },
+    { contactNumber: undefined }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" },
+    { address: undefined }, { address: "   " }, { occupation: "a".repeat(101) },
+    { role: "admin" }, { status: "disabled" }, { passwordHash: "injected" },
+  ];
+  for (const change of invalidChanges) {
+    const response = await registerCustomer(registrationRequest({ ...registrationInput, ...change }));
+    assert.equal(response.status, 400, JSON.stringify(change));
+    assert.equal(response.cookies.get(sessionCookieName), undefined);
+    assert.ok((await response.json()).issues.length);
+  }
+  assert.equal(await db.collection("users").countDocuments(), 0);
+  assert.equal(await db.collection("notifications").countDocuments(), 0);
+  assert.equal(await db.collection("audit_logs").countDocuments(), 0);
+});
+
+test("duplicate registration cannot duplicate or overwrite a client record", async () => {
+  assert.equal((await registerCustomer(registrationRequest(registrationInput))).status, 201);
+  const response = await registerCustomer(registrationRequest({
+    ...registrationInput, email: "  NEW@EXAMPLE.TEST  ", name: "Replacement Name", address: "Replacement Address",
+  }));
+  assert.equal(response.status, 409);
+  assert.equal(response.cookies.get(sessionCookieName), undefined);
+  const listed = await listClients(db, admin, {});
+  assert.equal(listed.total, 1);
+  assert.equal(listed.clients[0].name, details.name);
+  assert.equal(listed.clients[0].address, details.address);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "auth.registered" }), 1);
+});
+
+test("simultaneous registrations with the same email create only one client", async () => {
+  const responses = await Promise.all([
+    registerCustomer(registrationRequest(registrationInput)),
+    registerCustomer(registrationRequest(registrationInput)),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+  assert.equal((await listClients(db, admin, {})).total, 1);
 });
 
 test("customer updates only their profile and the administrator reads the same saved record", async () => {

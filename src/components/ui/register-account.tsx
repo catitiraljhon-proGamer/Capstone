@@ -28,6 +28,7 @@ export function RegisterAccountPage({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage("");
     setGoogleError("");
 
@@ -38,6 +39,10 @@ export function RegisterAccountPage({
       .toLowerCase();
     const password = String(formData.get("password") ?? "");
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
+    const age = Number(formData.get("age"));
+    const contactNumber = String(formData.get("contactNumber") ?? "").trim();
+    const address = String(formData.get("address") ?? "").trim();
+    const occupation = String(formData.get("occupation") ?? "").trim();
 
     if (password !== confirmPassword) {
       setErrorMessage("The passwords do not match.");
@@ -50,15 +55,16 @@ export function RegisterAccountPage({
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, age, contactNumber, address, occupation }),
       });
       const payload = (await response.json()) as {
         error?: string;
+        issues?: { message?: string }[];
         redirectTo?: string;
       };
 
       if (!response.ok || !payload.redirectTo) {
-        setErrorMessage(payload.error ?? "Unable to create your account.");
+        setErrorMessage(payload.issues?.[0]?.message ?? payload.error ?? "Unable to create your account.");
         return;
       }
 
@@ -93,7 +99,8 @@ export function RegisterAccountPage({
             </h1>
             <p className="mt-3 text-sm leading-6 text-stone-600">
               Register to request estimates and follow your construction project
-              from design through billing.
+              from design through billing. Your registration details are saved
+              to your client profile for the G4 Builders team.
             </p>
           </div>
 
@@ -107,6 +114,10 @@ export function RegisterAccountPage({
               </p>
             ) : null}
             <GoogleAuthButton mode="register" disabled={isSubmitting} />
+            <p className="text-xs leading-5 text-stone-500">
+              Registering with Google? Add your age, contact number, and address
+              in your client profile after signing in.
+            </p>
             <div className="flex items-center gap-4 text-sm text-stone-500">
               <span className="flex-1 border-t border-stone-200" />
               Or register with email
@@ -147,8 +158,76 @@ export function RegisterAccountPage({
                 name="email"
                 type="email"
                 autoComplete="email"
+                maxLength={254}
                 required
                 placeholder="name@example.com"
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+              />
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="age" className="text-sm font-medium text-stone-700">
+                  Age (years)
+                </label>
+                <input
+                  id="age"
+                  name="age"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={120}
+                  step={1}
+                  required
+                  placeholder="Enter your age"
+                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
+                  Contact number
+                </label>
+                <input
+                  id="contactNumber"
+                  name="contactNumber"
+                  type="tel"
+                  autoComplete="tel"
+                  minLength={7}
+                  maxLength={25}
+                  required
+                  placeholder="0917 123 4567"
+                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="address" className="text-sm font-medium text-stone-700">
+                Complete address
+              </label>
+              <textarea
+                id="address"
+                name="address"
+                autoComplete="street-address"
+                minLength={5}
+                maxLength={500}
+                rows={3}
+                required
+                placeholder="House/unit number, street, barangay, city/municipality, province, and postal code"
+                className="w-full resize-y rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="occupation" className="text-sm font-medium text-stone-700">
+                Occupation (optional)
+              </label>
+              <input
+                id="occupation"
+                name="occupation"
+                type="text"
+                maxLength={100}
+                placeholder="Enter your occupation"
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
               />
             </div>

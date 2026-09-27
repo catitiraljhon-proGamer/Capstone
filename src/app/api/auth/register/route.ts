@@ -6,6 +6,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
+import { createClientSchema } from "@/lib/server/clients";
 import { createSessionToken, sessionCookieName } from "@/lib/server/session";
 import { roleHomePaths, type SessionUser } from "@/types/domain";
 import { hash } from "bcryptjs";
@@ -13,13 +14,12 @@ import { MongoServerError, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const registrationSchema = z.object({
+const registrationSchema = createClientSchema.extend({
   name: z
     .string()
     .trim()
     .min(2, "Enter your full name.")
     .max(100, "Your name must be 100 characters or fewer."),
-  email: z.email().trim().toLowerCase(),
   password: z
     .string()
     .min(8, "Your password must contain at least 8 characters.")
@@ -28,11 +28,11 @@ const registrationSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const input = registrationSchema.parse(await request.json());
+    const { name, email, password, ...clientDetails } = registrationSchema.parse(await request.json());
     const db = await getDatabase();
     const users = db.collection<UserDocument>(collections.users);
     const existingUser = await users.findOne(
-      { email: input.email },
+      { email },
       { projection: { _id: 1 } },
     );
 
@@ -47,9 +47,10 @@ export async function POST(request: Request) {
     const userId = new ObjectId();
     const user: UserDocument = {
       _id: userId,
-      name: input.name,
-      email: input.email,
-      passwordHash: await hash(input.password, 12),
+      name,
+      email,
+      passwordHash: await hash(password, 12),
+      clientDetails,
       role: "customer",
       status: "active",
       authVersion: 0,
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
             userId: admin._id,
             title: "New customer account",
             body: `${user.name} registered a customer account.`,
-            href: "/admin/users-roles",
+            href: "/admin/clients",
             kind: "account",
             entityId: user._id,
             createdAt: now,
