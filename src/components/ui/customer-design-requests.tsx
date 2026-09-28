@@ -259,6 +259,7 @@ export function CustomerDesignRequests() {
                 value={floorArea}
                 onChange={(event) => setFloorArea(event.target.value)}
                 required
+                placeholder="Enter floor area"
                 className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
               />
             </label>
@@ -273,6 +274,7 @@ export function CustomerDesignRequests() {
                 value={bedrooms}
                 onChange={(event) => setBedrooms(event.target.value)}
                 required
+                placeholder="Enter number of bedrooms"
                 className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
               />
             </label>
@@ -287,6 +289,7 @@ export function CustomerDesignRequests() {
                 value={bathrooms}
                 onChange={(event) => setBathrooms(event.target.value)}
                 required
+                placeholder="Enter number of bathrooms"
                 className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
               />
             </label>
