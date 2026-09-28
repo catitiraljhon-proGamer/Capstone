@@ -7,13 +7,9 @@ import {
 } from "@/lib/client-image-upload";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import {
-  Bath,
-  BedDouble,
   CheckCircle2,
   Download,
   ImagePlus,
-  Layers3,
-  Ruler,
   Send,
   X,
 } from "lucide-react";
@@ -252,8 +248,8 @@ export function CustomerDesignRequests() {
         <form onSubmit={submit}>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Ruler className="h-4 w-4 text-red-700" /> Floor Area (m²)
+              <span className="block text-sm font-semibold">
+                Floor Area (m²)
               </span>
               <input
                 type="number"
@@ -268,8 +264,8 @@ export function CustomerDesignRequests() {
               />
             </label>
             <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <BedDouble className="h-4 w-4 text-red-700" /> Number of Bedrooms
+              <span className="block text-sm font-semibold">
+                Number of Bedrooms
               </span>
               <input
                 type="number"
@@ -283,8 +279,8 @@ export function CustomerDesignRequests() {
               />
             </label>
             <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Bath className="h-4 w-4 text-red-700" /> Number of Bathrooms
+              <span className="block text-sm font-semibold">
+                Number of Bathrooms
               </span>
               <input
                 type="number"
@@ -298,8 +294,8 @@ export function CustomerDesignRequests() {
               />
             </label>
             <label className="block">
-              <span className="flex items-center gap-2 text-sm font-semibold">
-                <Layers3 className="h-4 w-4 text-red-700" /> Finish Level
+              <span className="block text-sm font-semibold">
+                Finish Level
               </span>
               <select
                 value={finish}
