@@ -18,7 +18,8 @@ import { z } from "zod";
 
 const inputSchema = z.object({
   floorArea: z.number().finite().positive().max(100_000),
-  rooms: z.string().trim().min(1).max(200),
+  bedrooms: z.number().int().nonnegative(),
+  bathrooms: z.number().int().nonnegative(),
   finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
   notes: z.string().trim().min(1).max(4_000),
   inspirationImages: embeddedImagesSchema,
@@ -28,6 +29,8 @@ function toDto(request: DesignRequestDocument) {
   return {
     id: request._id.toHexString(),
     floorArea: request.floorArea,
+    bedrooms: request.bedrooms,
+    bathrooms: request.bathrooms,
     rooms: request.rooms,
     finish: request.finish,
     notes: request.notes,
@@ -85,6 +88,7 @@ export async function POST(request: Request) {
       projectId: project?._id,
       houseDesignId: project?.houseDesignId,
       ...input,
+      rooms: `${input.bedrooms} bedroom${input.bedrooms === 1 ? "" : "s"}, ${input.bathrooms} bathroom${input.bathrooms === 1 ? "" : "s"}`,
       status: "Pending",
       createdAt: now,
       updatedAt: now,

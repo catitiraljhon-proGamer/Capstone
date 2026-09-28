@@ -15,7 +15,6 @@ export interface Testimonial {
 }
 
 interface SignInPageProps {
-  title?: ReactNode;
   description?: ReactNode;
   heroImageSrc?: string;
   testimonials?: Testimonial[];
@@ -70,7 +69,6 @@ const TestimonialCard = ({
 );
 
 export function SignInPage({
-  title = "Welcome back",
   description = "Sign in to manage estimates, billing approvals, project costs, and reports for G4 Builders Inc.",
   heroImageSrc = "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=2160&q=80",
   testimonials = defaultTestimonials,
@@ -147,13 +145,11 @@ export function SignInPage({
 
       <main className="mx-auto grid min-h-[calc(100dvh-5rem)] w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:px-8">
         <section className="flex min-w-0 items-center justify-center">
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
             <div className="flex flex-col gap-6">
               <div>
-                <h1 className="animate-element animate-delay-100 text-4xl font-semibold leading-tight tracking-tight text-stone-950 md:text-5xl">
-                  {title}
-                </h1>
-                <p className="animate-element animate-delay-200 mt-3 text-sm leading-6 text-stone-600">
+                <h1 className="sr-only">Sign in</h1>
+                <p className="animate-element animate-delay-200 text-sm leading-6 text-stone-600">
                   {description}
                 </p>
               </div>

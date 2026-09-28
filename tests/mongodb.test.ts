@@ -84,3 +84,21 @@ test("a failed index initialization retries without replacing the healthy connec
   await getDatabase();
   assert.equal(indexCalls, firstIndexCalls * 2);
 });
+
+test("a rejected connection cached before a development reload can recover", async () => {
+  const failure = new Error("cached connection failure");
+  cache.mongoClientPromise = Promise.reject(failure);
+  const connect = mock.method(
+    MongoClient.prototype,
+    "connect",
+    async function (this: MongoClient) { return this; },
+  );
+  const db = mockDatabase(async () => "index");
+
+  await assert.rejects(getDatabase(), (error) => error === failure);
+  assert.equal(cache.mongoClientPromise, undefined);
+  assert.equal(connect.mock.callCount(), 0);
+
+  assert.equal(await getDatabase(), db);
+  assert.equal(connect.mock.callCount(), 1);
+});

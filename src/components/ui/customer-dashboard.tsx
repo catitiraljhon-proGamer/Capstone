@@ -17,7 +17,6 @@ import { HouseDesignGallery } from "@/components/ui/house-design-gallery";
 import { CustomerDesignRequests } from "@/components/ui/customer-design-requests";
 import { CustomerNotificationBell } from "@/components/ui/customer-notification-bell";
 import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
@@ -166,7 +165,6 @@ function CustomerShell({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <ThemeToggle />
               <CustomerNotificationBell />
               <div className="hidden max-w-52 items-center gap-3 md:flex">
                 <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">

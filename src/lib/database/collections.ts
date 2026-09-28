@@ -129,6 +129,9 @@ export type DesignRequestDocument = {
   projectId?: ObjectId;
   houseDesignId?: ObjectId;
   floorArea: number;
+  /** Older requests only have a free-text rooms summary. */
+  bedrooms?: number;
+  bathrooms?: number;
   rooms: string;
   finish: HouseDesignFinish;
   notes: string;

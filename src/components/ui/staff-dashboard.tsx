@@ -3,7 +3,6 @@
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { NotificationBell } from "@/components/ui/customer-notification-bell";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
@@ -169,7 +168,6 @@ function StaffDashboard({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <ThemeToggle />
               <NotificationBell />
               <div className="hidden max-w-52 items-center gap-3 md:flex">
                 <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">

@@ -31,18 +31,20 @@ function getClientPromise() {
       },
     });
 
-    const connection = client.connect().catch(async (error: unknown) => {
-      // A failed first connection must not poison every request in a warm function.
-      if (globalForMongo.mongoClientPromise === connection) {
-        globalForMongo.mongoClientPromise = undefined;
-      }
+    globalForMongo.mongoClientPromise = client.connect().catch(async (error: unknown) => {
       await client.close().catch(() => undefined);
       throw error;
     });
-    globalForMongo.mongoClientPromise = connection;
   }
 
-  return globalForMongo.mongoClientPromise;
+  const connection = globalForMongo.mongoClientPromise;
+  return connection.catch((error: unknown) => {
+    // Also recover failed promises retained from an earlier development reload.
+    if (globalForMongo.mongoClientPromise === connection) {
+      globalForMongo.mongoClientPromise = undefined;
+    }
+    throw error;
+  });
 }
 
 async function ensureIndexes(db: Db) {

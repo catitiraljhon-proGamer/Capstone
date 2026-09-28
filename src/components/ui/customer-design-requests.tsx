@@ -7,11 +7,12 @@ import {
 } from "@/lib/client-image-upload";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import {
+  Bath,
+  BedDouble,
   CheckCircle2,
   Download,
   ImagePlus,
   Layers3,
-  PencilRuler,
   Ruler,
   Send,
   X,
@@ -29,6 +30,8 @@ type DesignRequestStatus =
 type DesignRequestDto = {
   id: string;
   floorArea: number;
+  bedrooms?: number;
+  bathrooms?: number;
   rooms: string;
   finish: HouseDesignFinish;
   notes: string;
@@ -74,7 +77,8 @@ export function CustomerDesignRequests() {
   const { catalog } = useHouseDesigns();
   const [requests, setRequests] = useState<DesignRequestDto[]>([]);
   const [floorArea, setFloorArea] = useState("");
-  const [rooms, setRooms] = useState("");
+  const [bedrooms, setBedrooms] = useState("");
+  const [bathrooms, setBathrooms] = useState("");
   const [finish, setFinish] = useState<HouseDesignFinish>("Standard");
   const [notes, setNotes] = useState("");
   const [inspirationImages, setInspirationImages] = useState<SelectedImage[]>([]);
@@ -173,7 +177,8 @@ export function CustomerDesignRequests() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           floorArea: Number(floorArea),
-          rooms,
+          bedrooms: Number(bedrooms),
+          bathrooms: Number(bathrooms),
           finish,
           notes,
           inspirationImages: inspirationImages.map((image) => image.src),
@@ -194,7 +199,8 @@ export function CustomerDesignRequests() {
 
       setRequests((current) => [payload.request as DesignRequestDto, ...current]);
       setFloorArea("");
-      setRooms("");
+      setBedrooms("");
+      setBathrooms("");
       setNotes("");
       setInspirationImages([]);
       setSuccessMessage(
@@ -244,14 +250,16 @@ export function CustomerDesignRequests() {
         ) : null}
 
         <form onSubmit={submit}>
-          <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <Ruler className="h-4 w-4 text-red-700" /> Floor Area
+                <Ruler className="h-4 w-4 text-red-700" /> Floor Area (m²)
               </span>
               <input
                 type="number"
                 min="1"
+                max="100000"
+                step="0.01"
                 value={floorArea}
                 onChange={(event) => setFloorArea(event.target.value)}
                 required
@@ -261,13 +269,31 @@ export function CustomerDesignRequests() {
             </label>
             <label className="block">
               <span className="flex items-center gap-2 text-sm font-semibold">
-                <PencilRuler className="h-4 w-4 text-red-700" /> Rooms
+                <BedDouble className="h-4 w-4 text-red-700" /> Number of Bedrooms
               </span>
               <input
-                value={rooms}
-                onChange={(event) => setRooms(event.target.value)}
+                type="number"
+                min="0"
+                step="1"
+                value={bedrooms}
+                onChange={(event) => setBedrooms(event.target.value)}
                 required
-                placeholder="3 bedrooms, 2 toilets"
+                placeholder="3"
+                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
+              />
+            </label>
+            <label className="block">
+              <span className="flex items-center gap-2 text-sm font-semibold">
+                <Bath className="h-4 w-4 text-red-700" /> Number of Bathrooms
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={bathrooms}
+                onChange={(event) => setBathrooms(event.target.value)}
+                required
+                placeholder="2"
                 className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
               />
             </label>
@@ -290,12 +316,13 @@ export function CustomerDesignRequests() {
           </div>
 
           <label className="mt-5 block text-sm font-semibold">
-            Design requirements
+            Description
             <textarea
               rows={5}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               required
+              maxLength={4000}
               placeholder="Describe the style, layout, preferred materials, colors, and budget concerns."
               className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600"
             />
@@ -437,7 +464,20 @@ export function CustomerDesignRequests() {
                 <p className="mt-3 text-xs font-semibold text-stone-700">
                   {statusLabel[request.status]}
                 </p>
-                <p className="mt-2 text-sm text-stone-600">{request.rooms}</p>
+                {request.bedrooms !== undefined && request.bathrooms !== undefined ? (
+                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg bg-stone-50 px-3 py-2">
+                      <dt className="text-xs text-stone-500">Bedrooms</dt>
+                      <dd className="mt-1 font-semibold text-stone-950">{request.bedrooms}</dd>
+                    </div>
+                    <div className="rounded-lg bg-stone-50 px-3 py-2">
+                      <dt className="text-xs text-stone-500">Bathrooms</dt>
+                      <dd className="mt-1 font-semibold text-stone-950">{request.bathrooms}</dd>
+                    </div>
+                  </dl>
+                ) : (
+                  <p className="mt-2 text-sm text-stone-600">{request.rooms}</p>
+                )}
                 <p className="mt-2 line-clamp-3 text-xs leading-5 text-stone-500">
                   {request.notes}
                 </p>
