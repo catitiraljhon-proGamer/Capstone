@@ -150,7 +150,7 @@ function StaffDashboard({
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
-          <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_auto] lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -167,19 +167,19 @@ function StaffDashboard({
                 <p className="mt-1 hidden text-sm text-stone-600 sm:block">{description}</p>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div className="shrink-0">
               <NotificationBell />
-              <div className="hidden max-w-52 items-center gap-3 md:flex">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">
-                  <User className="h-6 w-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold" title={user?.name ?? name}>{user?.name ?? name}</p>
-                  <p className="text-xs text-stone-500">{role}</p>
-                </div>
-              </div>
             </div>
             <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
+            <div role="group" aria-label="Signed-in user" className="col-span-2 flex min-w-0 items-center gap-3 border-t border-stone-200 pt-3 md:col-span-1 md:max-w-52 md:border-0 md:pt-0">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-stone-200 text-stone-500 md:h-12 md:w-12">
+                <User className="h-5 w-5 md:h-6 md:w-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold break-words md:truncate" title={user?.name ?? name}>{user?.name ?? name}</p>
+                <p className="text-xs text-stone-500">{role}</p>
+              </div>
+            </div>
           </div>
         </header>
 
