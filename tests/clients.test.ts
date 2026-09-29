@@ -5,7 +5,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { type Db, type MongoClient, ObjectId } from "mongodb";
 import { getDatabase } from "@/lib/database/mongodb";
 import { type UserDocument } from "@/lib/database/collections";
-import { clientProfileSchema, ClientRequestError, createClient, getClient, listClients, toClientDto, updateClient } from "@/lib/server/clients";
+import { clientProfileSchema, ClientRequestError, createClient, getClient, listClients, setClientArchived, toClientDto, updateClient } from "@/lib/server/clients";
 import { assertClientMutation, clientApiError } from "@/lib/server/client-api";
 import type { SessionUser } from "@/types/domain";
 import { POST as registerCustomer } from "@/app/api/auth/register/route";
@@ -38,7 +38,7 @@ before(async () => {
   db = await getDatabase();
 });
 beforeEach(async () => {
-  await Promise.all(["users", "audit_logs", "notifications"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["users", "audit_logs", "notifications", "projects", "invoices"].map((name) => db.collection(name).deleteMany({})));
 });
 after(async () => {
   const cache = globalThis as typeof globalThis & { mongoClientPromise?: Promise<MongoClient> };
@@ -243,4 +243,109 @@ test("client writes reject cross-origin requests and non-JSON forms", () => {
   for (const headers of invalidHeaders) {
     assert.throws(() => assertClientMutation(new Request(url, { method: "PATCH", headers })));
   }
+});
+
+test("archiving and unarchiving preserve client identity, account access, and project and billing records", async () => {
+  const original = legacyUser({ clientDetails: { age: details.age, contactNumber: details.contactNumber, address: details.address, occupation: details.occupation } });
+  await db.collection<UserDocument>("users").insertOne(original);
+  const project = { _id: new ObjectId(), customerId: original._id, reference: "TEST-PROJECT" };
+  const invoice = { _id: new ObjectId(), customerId: original._id, projectId: project._id, invoiceNumber: "TEST-INVOICE" };
+  await db.collection("projects").insertOne(project);
+  await db.collection("invoices").insertOne(invoice);
+  const id = original._id.toHexString();
+
+  const archived = await setClientArchived(db, admin, id, { archived: true });
+  assert.ok(archived.archivedAt);
+  assert.equal(archived.id, id);
+  assert.equal((await listClients(db, admin, {})).total, 0);
+  assert.equal((await listClients(db, admin, { view: "archived" })).clients[0].id, id);
+  const customer: SessionUser = { id, name: original.name, email: original.email, role: "customer" };
+  assert.equal((await getClient(db, customer, id)).id, id);
+  await updateClient(db, customer, id, details);
+  assert.equal((await getClient(db, admin, id)).archivedAt, archived.archivedAt);
+
+  const restored = await setClientArchived(db, admin, id, { archived: false });
+  assert.equal(restored.archivedAt, null);
+  assert.equal((await listClients(db, admin, {})).clients[0].id, id);
+  assert.equal((await listClients(db, admin, { view: "archived" })).total, 0);
+  const saved = await db.collection<UserDocument>("users").findOne({ _id: original._id });
+  for (const field of ["email", "role", "status", "googleSub", "passwordHash", "authVersion"] as const) assert.equal(saved?.[field], original[field]);
+  assert.deepEqual(saved?.clientDetails, original.clientDetails);
+  assert.deepEqual(await db.collection("projects").findOne({ _id: project._id }), project);
+  assert.deepEqual(await db.collection("invoices").findOne({ _id: invoice._id }), invoice);
+  assert.equal(await db.collection("users").countDocuments(), 1);
+  for (const action of ["client.archived", "client.unarchived"]) {
+    const audit = await db.collection("audit_logs").findOne({ action });
+    assert.equal(audit?.actorId.toHexString(), admin.id);
+    assert.equal(audit?.entityId.toHexString(), id);
+    assert.equal(JSON.stringify(audit).includes(original.passwordHash!), false);
+  }
+});
+
+test("archive filtering includes legacy clients and keeps search and pagination within the selected view", async () => {
+  await db.collection<UserDocument>("users").insertMany([
+    legacyUser({ name: "Current Client", email: "current@example.test" }),
+    legacyUser({ name: "Null Archive Client", email: "null@example.test", clientArchivedAt: null }),
+    legacyUser({ name: "Archived [.*]", email: "archived@example.test", clientArchivedAt: new Date() }),
+    legacyUser({ name: "Other Archived", email: "other@example.test", clientArchivedAt: new Date() }),
+    legacyUser({ email: "staff@example.test", role: "admin", clientArchivedAt: new Date() }),
+  ]);
+  assert.equal((await listClients(db, admin, {})).total, 2);
+  assert.equal((await listClients(db, admin, { q: "Archived" })).total, 0);
+  const searched = await listClients(db, admin, { view: "archived", q: "[.*]" });
+  assert.equal(searched.total, 1);
+  assert.equal(searched.clients[0].name, "Archived [.*]");
+  const lastPage = await listClients(db, admin, { view: "archived", page: 50, pageSize: 1 });
+  assert.equal(lastPage.total, 2);
+  assert.equal(lastPage.page, 2);
+  assert.equal(lastPage.clients.length, 1);
+  await setClientArchived(db, admin, lastPage.clients[0].id, { archived: false });
+  assert.equal((await listClients(db, admin, { view: "archived", page: 2, pageSize: 1 })).page, 1);
+  await assert.rejects(listClients(db, admin, { view: "invalid" }));
+});
+
+test("repeated and concurrent archive actions are idempotent and do not enable disabled accounts", async () => {
+  const original = legacyUser({ status: "disabled" });
+  await db.collection<UserDocument>("users").insertOne(original);
+  const id = original._id.toHexString();
+  const results = await Promise.all([
+    setClientArchived(db, admin, id, { archived: true }),
+    setClientArchived(db, admin, id, { archived: true }),
+  ]);
+  assert.equal(results[0].archivedAt, results[1].archivedAt);
+  assert.equal((await setClientArchived(db, admin, id, { archived: true })).archivedAt, results[0].archivedAt);
+  await Promise.all([
+    setClientArchived(db, admin, id, { archived: false }),
+    setClientArchived(db, admin, id, { archived: false }),
+  ]);
+  assert.equal((await getClient(db, admin, id)).status, "disabled");
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "client.archived" }), 1);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "client.unarchived" }), 1);
+});
+
+test("only administrators can archive or unarchive customer records", async () => {
+  const record = legacyUser();
+  const staff = legacyUser({ role: "billing-clerk", email: "staff@example.test" });
+  await db.collection<UserDocument>("users").insertMany([record, staff]);
+  const id = record._id.toHexString();
+  for (const role of ["customer", "billing-clerk"] as const) {
+    for (const archived of [true, false]) {
+      await assert.rejects(setClientArchived(db, { ...admin, id, role }, id, { archived }),
+        (error: unknown) => error instanceof ClientRequestError && error.status === 403);
+    }
+  }
+  for (const archived of [true, false]) {
+    for (const invalidId of [staff._id.toHexString(), new ObjectId().toHexString()]) {
+      await assert.rejects(setClientArchived(db, admin, invalidId, { archived }),
+        (error: unknown) => error instanceof ClientRequestError && error.status === 404);
+    }
+  }
+  await assert.rejects(setClientArchived(db, admin, "invalid-id", { archived: true }),
+    (error: unknown) => error instanceof ClientRequestError && error.status === 400);
+  for (const input of [{}, { archived: "true" }, { archived: true, status: "disabled" }]) {
+    await assert.rejects(setClientArchived(db, admin, id, input));
+  }
+  await assert.rejects(updateClient(db, admin, id, { ...details, clientArchivedAt: new Date() }));
+  assert.equal((await getClient(db, admin, id)).archivedAt, null);
+  assert.equal(await db.collection("audit_logs").countDocuments(), 0);
 });

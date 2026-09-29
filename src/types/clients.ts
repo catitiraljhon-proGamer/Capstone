@@ -16,6 +16,7 @@ export type ClientDto = {
   address: string;
   occupation: string;
   status: UserStatus;
+  archivedAt: string | null;
   profileComplete: boolean;
   createdAt: string;
   updatedAt: string;

@@ -47,6 +47,7 @@ export type UserDocument = {
   status: UserStatus;
   authVersion?: number;
   clientDetails?: ClientDetails;
+  clientArchivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };

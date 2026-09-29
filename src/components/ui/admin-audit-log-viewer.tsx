@@ -71,6 +71,8 @@ const actionLabels: Record<string, string> = {
   "auth.registered": "Registered an account",
   "user.created": "Created a user",
   "user.updated": "Updated a user",
+  "client.archived": "Archived a client",
+  "client.unarchived": "Unarchived a client",
   "house-design.created": "Created a house design",
   "house-design.updated": "Updated a house design",
   "schedule.created": "Created a schedule",

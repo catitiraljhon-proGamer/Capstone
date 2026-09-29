@@ -26,9 +26,12 @@ export const createClientSchema = clientProfileSchema.extend({
 
 export const clientListSchema = z.object({
   q: z.string().trim().max(100).default(""),
+  view: z.enum(["current", "archived"]).default("current"),
   page: z.coerce.number().int().min(1).max(100000).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(12),
 });
+
+const clientArchiveSchema = z.object({ archived: z.boolean() }).strict();
 
 export class ClientRequestError extends Error {
   constructor(message: string, public status: number) {
@@ -56,6 +59,7 @@ export function toClientDto(user: UserDocument): ClientDto {
     address: details?.address ?? "",
     occupation: details?.occupation ?? "",
     status: user.status,
+    archivedAt: user.clientArchivedAt?.toISOString() ?? null,
     profileComplete: clientProfileSchema.safeParse({ name: user.name, ...details }).success,
     createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString(),
   };
@@ -63,8 +67,11 @@ export function toClientDto(user: UserDocument): ClientDto {
 
 export async function listClients(db: Db, actor: SessionUser, rawInput: unknown): Promise<ClientListPayload> {
   requireClientAccess(actor);
-  const { q, page, pageSize } = clientListSchema.parse(rawInput);
-  const filter: Filter<UserDocument> = { role: "customer" };
+  const { q, view, page, pageSize } = clientListSchema.parse(rawInput);
+  const filter: Filter<UserDocument> = {
+    role: "customer",
+    clientArchivedAt: view === "archived" ? { $ne: null } : null,
+  };
   if (q) {
     const literalQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.$or = ["name", "email", "clientDetails.contactNumber", "clientDetails.address"]
@@ -111,4 +118,28 @@ export async function createClient(db: Db, actor: SessionUser, rawInput: unknown
   await recordAuditLog({ db, actor, action: "client.created", entityType: "user", entityId: user._id,
     details: { role: "customer" } });
   return toClientDto(user);
+}
+
+export async function setClientArchived(db: Db, actor: SessionUser, id: string, rawInput: unknown) {
+  requireClientAccess(actor);
+  const { archived } = clientArchiveSchema.parse(rawInput);
+  const clientId = objectId(id);
+  const users = db.collection<UserDocument>(collections.users);
+  const now = new Date();
+  const updated = await users.findOneAndUpdate(
+    { _id: clientId, role: "customer", clientArchivedAt: archived ? null : { $ne: null } },
+    archived
+      ? { $set: { clientArchivedAt: now, updatedAt: now } }
+      : { $unset: { clientArchivedAt: "" }, $set: { updatedAt: now } },
+    { returnDocument: "after" },
+  );
+  if (!updated) {
+    // Repeated requests keep the original archive date and do not duplicate audit events.
+    const existing = await users.findOne({ _id: clientId, role: "customer" });
+    if (!existing) throw new ClientRequestError("Client record not found.", 404);
+    return toClientDto(existing);
+  }
+  await recordAuditLog({ db, actor, action: archived ? "client.archived" : "client.unarchived",
+    entityType: "user", entityId: updated._id });
+  return toClientDto(updated);
 }

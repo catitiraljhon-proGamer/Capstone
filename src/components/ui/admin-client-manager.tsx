@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Pencil, Plus, Search, Users } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus, Search, Users } from "lucide-react";
 import { ClientInformationForm } from "@/components/ui/client-information-form";
 import { readClientResponse } from "@/lib/client-information";
 import type { ClientDto, ClientListPayload } from "@/types/clients";
@@ -13,36 +13,75 @@ export function AdminClientManager() {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<"current" | "archived">("current");
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [editing, setEditing] = useState<ClientDto | null>(null);
   const [creating, setCreating] = useState(false);
+  const [confirmingArchiveId, setConfirmingArchiveId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    const params = new URLSearchParams({ q: query, page: String(page) });
+    const params = new URLSearchParams({ q: query, page: String(page), view });
     fetch(`/api/clients?${params}`, { cache: "no-store", signal: controller.signal })
       .then(readClientResponse<ClientListPayload>)
       .then((data) => { if (!controller.signal.aborted) { setPayload(data); setError(""); } })
-      .catch((failure: unknown) => { if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Unable to load clients."); })
+      .catch((failure: unknown) => {
+        if (!controller.signal.aborted) {
+          setPayload({ clients: [], total: 0, page: 1, pageSize: 12 });
+          setError(failure instanceof Error ? failure.message : "Unable to load clients.");
+        }
+      })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [query, page, revision]);
+  }, [query, page, view, revision]);
 
   const refresh = () => { setLoading(true); setRevision((value) => value + 1); };
   const closeForm = () => { setCreating(false); setEditing(null); setSuccess(""); };
   const searchClients = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setConfirmingArchiveId(null);
     setLoading(true); setQuery(search.trim()); setPage(1); setRevision((value) => value + 1);
+  };
+  const changeView = (nextView: "current" | "archived") => {
+    if (nextView === view) return;
+    setLoading(true);
+    setView(nextView);
+    setPage(1);
+    setConfirmingArchiveId(null);
+    setSuccess("");
+    setError("");
+  };
+  const changeArchiveStatus = async (client: ClientDto, archived: boolean) => {
+    setSavingId(client.id);
+    setError("");
+    setSuccess("");
+    try {
+      await readClientResponse<{ client: ClientDto }>(await fetch(`/api/clients/${client.id}/archive`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      }));
+      setConfirmingArchiveId(null);
+      setSuccess(archived
+        ? `${client.name} was archived. Open Archived to unarchive this client.`
+        : `${client.name} was unarchived and returned to Clients.`);
+      refresh();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Unable to update the client archive.");
+    } finally {
+      setSavingId(null);
+    }
   };
   const pageCount = Math.max(1, Math.ceil(payload.total / payload.pageSize));
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div><h1 className="text-xl font-semibold tracking-tight">{creating ? "Add client" : editing ? "Edit client information" : "Client records"}</h1><p className="mt-1 text-sm leading-6 text-stone-600">Personal and contact details for registered clients.</p></div>
-      {!creating && !editing && <button type="button" onClick={() => { setCreating(true); setSuccess(""); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"><Plus className="h-4 w-4" />Add client</button>}
+      {!creating && !editing && <button type="button" disabled={savingId !== null} onClick={() => { setCreating(true); setSuccess(""); setConfirmingArchiveId(null); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"><Plus className="h-4 w-4" />Add client</button>}
     </div>
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-white p-4 text-sm">{success}</p>}
     {creating || editing ? <section className="max-w-3xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6">
@@ -52,22 +91,37 @@ export function AdminClientManager() {
         });
         const result = await readClientResponse<{ client: ClientDto }>(response);
         setSuccess(creating ? "Client account and information created." : "Client information saved.");
-        if (creating) { setCreating(false); setSearch(""); setQuery(""); setPage(1); }
+        if (creating) { setCreating(false); setSearch(""); setQuery(""); setPage(1); setView("current"); }
         else setEditing(result.client);
         refresh();
       }} />
     </section> : <>
+      <div className="space-y-3">
+        <div role="group" aria-label="Client record views" className="flex flex-wrap gap-2">
+          {(["current", "archived"] as const).map((option) => (
+            <button key={option} type="button" aria-pressed={view === option} disabled={savingId !== null}
+              onClick={() => changeView(option)}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50 ${view === option ? "border-red-700 bg-red-700 text-white hover:bg-red-800" : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50"}`}>
+              {option === "current" ? <Users className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+              {option === "current" ? "Clients" : "Archived"}
+            </button>
+          ))}
+        </div>
+        <p className="text-sm text-stone-600">{view === "archived"
+          ? "Unarchive a client to return them to the Clients list. Account access, project records, and billing history are preserved."
+          : "Archive clients to move them out of this list. You can unarchive them from Archived."}</p>
+      </div>
       <form onSubmit={searchClients} className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:flex-row">
         <label className="min-w-0 flex-1"><span className="sr-only">Search clients</span><input type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, contact number, or address" className="min-h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-base outline-none focus:border-red-600 sm:text-sm" /></label>
-        <button type="submit" disabled={loading} className={actionClass}><Search className="h-4 w-4" />Search</button>
-        <button type="button" disabled={loading} onClick={refresh} className={actionClass}>Refresh</button>
+        <button type="submit" disabled={loading || savingId !== null} className={actionClass}><Search className="h-4 w-4" />Search</button>
+        <button type="button" disabled={loading || savingId !== null} onClick={refresh} className={actionClass}>Refresh</button>
       </form>
       {error && <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-      {loading ? <p role="status" className="text-sm text-stone-500">Loading clients…</p> : !error && payload.clients.length === 0 ?
-        <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center"><Users className="mx-auto h-8 w-8 text-stone-400" /><h2 className="mt-3 font-semibold">{query ? "No matching clients" : "No clients yet"}</h2><p className="mt-2 text-sm text-stone-600">{query ? "Try a different name or contact detail." : "Add a client or have them register for an account."}</p></div> :
+      {loading ? <p role="status" className="text-sm text-stone-500">Loading clients…</p> : payload.clients.length === 0 ?
+        !error && <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center"><Users className="mx-auto h-8 w-8 text-stone-400" /><h2 className="mt-3 font-semibold">{query ? "No matching clients" : view === "archived" ? "No archived clients" : "No clients yet"}</h2><p className="mt-2 text-sm text-stone-600">{query ? "Try a different name or contact detail." : view === "archived" ? "Clients you archive will appear here and can be unarchived anytime." : "Add a client or have them register for an account."}</p></div> :
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {payload.clients.map((client) => <article key={client.id} className="min-w-0 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2><span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.status === "active" ? "Active" : "Disabled"}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2><span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.archivedAt ? "Archived" : client.status === "active" ? "Active" : "Disabled"}</span></div>
             <p className="mt-1 text-sm break-all text-stone-500">{client.email}</p>
             <dl className="mt-5 space-y-3 text-sm">
               <div><dt className="text-xs text-stone-500">Age</dt><dd className="mt-1">{client.age === null ? "Not provided" : `${client.age} years`}</dd></div>
@@ -76,12 +130,35 @@ export function AdminClientManager() {
               <div><dt className="text-xs text-stone-500">Occupation</dt><dd className="mt-1 break-words">{client.occupation || "Not provided"}</dd></div>
             </dl>
             {!client.profileComplete && <p className="mt-4 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">Client information is incomplete.</p>}
-            <button type="button" onClick={() => { setEditing(client); setSuccess(""); }} className={`${actionClass} mt-5 w-full`}><Pencil className="h-4 w-4" />Edit information<span className="sr-only"> for {client.name}</span></button>
+            {client.archivedAt && <p className="mt-4 text-xs text-stone-500">Archived on {new Date(client.archivedAt).toLocaleDateString("en-PH", { dateStyle: "medium" })}</p>}
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button type="button" disabled={savingId !== null} onClick={() => { setEditing(client); setSuccess(""); setConfirmingArchiveId(null); }} className={`${actionClass} flex-1`}><Pencil className="h-4 w-4" />Edit information<span className="sr-only"> for {client.name}</span></button>
+              {client.archivedAt ? (
+                <button type="button" disabled={savingId !== null} onClick={() => void changeArchiveStatus(client, false)} className={`${actionClass} flex-1`}>
+                  <ArchiveRestore className="h-4 w-4" />{savingId === client.id ? "Unarchiving…" : "Unarchive"}<span className="sr-only"> {client.name}</span>
+                </button>
+              ) : confirmingArchiveId !== client.id && (
+                <button type="button" disabled={savingId !== null} onClick={() => { setConfirmingArchiveId(client.id); setSuccess(""); }} className={`${actionClass} flex-1`}>
+                  <Archive className="h-4 w-4" />Archive<span className="sr-only"> {client.name}</span>
+                </button>
+              )}
+            </div>
+            {confirmingArchiveId === client.id && (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                <p className="text-sm text-stone-700">Archive {client.name}? You can unarchive this client from Archived.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" disabled={savingId !== null} onClick={() => void changeArchiveStatus(client, true)} className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">
+                    {savingId === client.id ? "Archiving…" : "Confirm archive"}
+                  </button>
+                  <button type="button" disabled={savingId !== null} onClick={() => setConfirmingArchiveId(null)} className={actionClass}>Cancel</button>
+                </div>
+              </div>
+            )}
           </article>)}
         </div>}
       {!error && !loading && <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-stone-600">
-        <p>{payload.total} {payload.total === 1 ? "client" : "clients"} · Page {payload.page} of {pageCount}</p>
-        <div className="flex gap-2"><button disabled={payload.page <= 1} onClick={() => { setLoading(true); setPage(payload.page - 1); }} className={actionClass}>Previous</button><button disabled={payload.page >= pageCount} onClick={() => { setLoading(true); setPage(payload.page + 1); }} className={actionClass}>Next</button></div>
+        <p>{payload.total} {view === "archived" ? "archived " : ""}{payload.total === 1 ? "client" : "clients"} · Page {payload.page} of {pageCount}</p>
+        <div className="flex gap-2"><button disabled={payload.page <= 1 || savingId !== null} onClick={() => { setLoading(true); setPage(payload.page - 1); setConfirmingArchiveId(null); }} className={actionClass}>Previous</button><button disabled={payload.page >= pageCount || savingId !== null} onClick={() => { setLoading(true); setPage(payload.page + 1); setConfirmingArchiveId(null); }} className={actionClass}>Next</button></div>
       </div>}
     </>}
   </div>;
