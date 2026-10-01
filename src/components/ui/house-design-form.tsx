@@ -2,6 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
+import { PesoInput } from "@/components/ui/peso-input";
 import {
   createDefaultSelections,
   formatPeso,
@@ -643,14 +644,12 @@ export function HouseDesignForm({
                 required
                 error={errors.rate}
               >
-                <input
+                <PesoInput
                   id={fieldIds.rate}
                   name="rate"
-                  type="number"
                   inputMode="numeric"
                   min="1"
                   step="500"
-                  className={`${inputClass} tabular-nums ${errors.rate ? invalidInputClass : ""}`}
                   value={values.rate}
                   onChange={(event) => setValue("rate", event.target.value)}
                   onBlur={() => handleBlur("rate")}
@@ -772,10 +771,9 @@ export function HouseDesignForm({
                     </select>
                     </Field>
                     <Field htmlFor={`${id}-price`} label={`Price (PHP / ${option.unit})`}>
-                      <input
+                      <PesoInput
                         id={`${id}-price`}
                         aria-label={`${item.item} unit price (PHP / ${option.unit})`}
-                        type="number"
                         inputMode="decimal"
                         min="0.01"
                         max="100000000"
@@ -786,7 +784,6 @@ export function HouseDesignForm({
                         onBlur={() => handleBlur("materialPrices")}
                         aria-invalid={invalidPrice}
                         aria-describedby={invalidPrice ? `${fieldIds.materialPrices}-error` : undefined}
-                        className={`${inputClass} tabular-nums ${invalidPrice ? invalidInputClass : ""}`}
                       />
                     </Field>
                     {priceDraft && <button
@@ -917,13 +914,11 @@ export function HouseDesignForm({
                           label="Unit price (PHP)"
                           required
                         >
-                          <input
+                          <PesoInput
                             id={`${item.id}-price`}
-                            type="number"
                             inputMode="numeric"
                             min="1"
                             step="100"
-                            className={`${inputClass} tabular-nums`}
                             value={item.unitPrice}
                             onChange={(event) =>
                               updateCustomItem(item.id, {

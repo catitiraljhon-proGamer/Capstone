@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { PesoInput } from "@/components/ui/peso-input";
 import { formatPeso } from "@/components/ui/house-design-data";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field } from "@/components/ui/billing-primitives";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
@@ -60,7 +61,7 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         <textarea required minLength={5} maxLength={2000} rows={3} className={field} placeholder="Reference the signed payment schedule or approved accomplishment report and describe the work covered." value={form.basis} onChange={(event) => setForm({ ...form, basis: event.target.value })} />
       </label>
       <div className="grid gap-4 sm:grid-cols-3">
-        <label className="text-sm font-medium">Amount (PHP)<input required type="number" min="0.01" max="1000000000" step="0.01" className={field} value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
+        <label className="text-sm font-medium">Amount (PHP)<PesoInput required min="0.01" max="1000000000" step="0.01" wrapperClassName="mt-1.5" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
         {!form.designRequestId && <label className="text-sm font-medium">Project progress (%)<input required type="number" min="0" max="100" step="0.01" className={field} value={form.progressPercentage} onChange={(event) => setForm({ ...form, progressPercentage: event.target.value })} /></label>}
         <label className="text-sm font-medium">Due date<input required type="date" className={field} value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label>
       </div>
@@ -98,7 +99,7 @@ export function PaymentForm({ invoices, selectedInvoice, customer, mutate, onClo
       </select></label>
       {invoice && <p className="rounded-lg bg-rose-50 p-3 text-sm">Remaining invoice balance: <strong>{formatPeso(invoice.balance)}</strong></p>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium">Amount paid (PHP)<input required type="number" min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} className={field} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
+        <label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} wrapperClassName="mt-1.5" onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
         <label className="text-sm font-medium">Payment method<select value={form.method} className={field} onChange={(event) => setForm({ ...form, method: event.target.value as PaymentMethod })}>
           {paymentMethods.filter((method) => !customer || method !== "Cash").map((method) => <option key={method}>{method}</option>)}
         </select></label>
