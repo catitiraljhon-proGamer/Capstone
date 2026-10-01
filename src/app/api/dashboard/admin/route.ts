@@ -18,18 +18,15 @@ export async function GET() {
 
     const db = await getDatabase();
     await syncPendingWorkflowApprovals(db);
-    const [activeProjects, pendingApprovals, pendingBilling, totalClients, totalUsers, approvals] =
+    const [activeProjects, pendingApprovals, totalClients, totalUsers, approvals] =
       await Promise.all([
         db.collection(collections.projects).countDocuments({ status: "Active" }),
-        db.collection(collections.approvals).countDocuments({ status: "Pending" }),
-        db.collection(collections.invoices).countDocuments({
-          status: { $in: ["Draft", "Ready", "Sent", "Overdue"] },
-        }),
+        db.collection(collections.approvals).countDocuments({ status: "Pending", recordType: { $ne: "Billing" } }),
         db.collection(collections.users).countDocuments({ role: "customer", status: "active" }),
         db.collection(collections.users).countDocuments({ status: "active" }),
         db
           .collection<ApprovalDocument>(collections.approvals)
-          .find({ status: "Pending" })
+          .find({ status: "Pending", recordType: { $ne: "Billing" } })
           .sort({ createdAt: 1 })
           .limit(5)
           .toArray(),
@@ -47,7 +44,7 @@ export async function GET() {
     );
 
     return NextResponse.json({
-      summary: { activeProjects, pendingApprovals, pendingBilling, totalClients, totalUsers },
+      summary: { activeProjects, pendingApprovals, totalClients, totalUsers },
       pendingApprovals: approvals.map((approval) => ({
         reference: approval.reference,
         client: customerNames.get(approval.customerId.toHexString()) ?? "Unknown client",

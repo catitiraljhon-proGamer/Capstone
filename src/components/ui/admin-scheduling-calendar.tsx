@@ -1,13 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { formatPeso } from "@/components/ui/house-design-data";
 import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
-  CreditCard,
   MapPin,
   Plus,
   Users,
@@ -15,17 +13,8 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-type ScheduleEventType =
-  | "Client meeting"
-  | "Payment follow-up"
-  | "Payment due";
+type ScheduleEventType = "Client meeting";
 type ScheduleStatus = "Scheduled" | "Completed" | "Cancelled";
-type PaymentStatus =
-  | "Not applicable"
-  | "Expected"
-  | "Pending"
-  | "Paid"
-  | "Overdue";
 
 type ScheduleDto = {
   id: string;
@@ -40,8 +29,6 @@ type ScheduleDto = {
   location?: string;
   notes?: string;
   status: ScheduleStatus;
-  paymentStatus: PaymentStatus;
-  expectedAmount?: number;
   createdByName: string;
   createdAt: string;
   updatedAt: string;
@@ -65,14 +52,10 @@ type ScheduleForm = {
   location: string;
   notes: string;
   status: ScheduleStatus;
-  paymentStatus: PaymentStatus;
-  expectedAmount: string;
 };
 
 const eventTypeClass: Record<ScheduleEventType, string> = {
   "Client meeting": "border-red-200 bg-red-50 text-red-800",
-  "Payment follow-up": "border-amber-200 bg-amber-50 text-amber-800",
-  "Payment due": "border-blue-200 bg-blue-50 text-blue-800",
 };
 
 const statusClass: Record<ScheduleStatus, string> = {
@@ -81,13 +64,6 @@ const statusClass: Record<ScheduleStatus, string> = {
   Cancelled: "bg-stone-100 text-stone-600",
 };
 
-const paymentStatusClass: Record<PaymentStatus, string> = {
-  "Not applicable": "bg-stone-100 text-stone-600",
-  Expected: "bg-blue-50 text-blue-700",
-  Pending: "bg-amber-50 text-amber-700",
-  Paid: "bg-emerald-50 text-emerald-700",
-  Overdue: "bg-red-50 text-red-700",
-};
 
 const fieldClass =
   "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
@@ -132,8 +108,6 @@ function emptyForm(day: string): ScheduleForm {
     location: "",
     notes: "",
     status: "Scheduled",
-    paymentStatus: "Not applicable",
-    expectedAmount: "",
   };
 }
 
@@ -239,14 +213,8 @@ export function AdminSchedulingCalendar() {
     (schedule) =>
       schedule.eventType === "Client meeting" && schedule.status === "Scheduled",
   ).length;
-  const upcomingPayments = currentMonthSchedules.filter(
-    (schedule) =>
-      schedule.eventType !== "Client meeting" &&
-      ["Expected", "Pending"].includes(schedule.paymentStatus),
-  ).length;
-  const overduePayments = currentMonthSchedules.filter(
-    (schedule) => schedule.paymentStatus === "Overdue",
-  ).length;
+  const completedMeetings = currentMonthSchedules.filter((schedule) => schedule.status === "Completed").length;
+  const cancelledMeetings = currentMonthSchedules.filter((schedule) => schedule.status === "Cancelled").length;
 
   const openForm = () => {
     setForm(emptyForm(selectedDate));
@@ -293,10 +261,7 @@ export function AdminSchedulingCalendar() {
         ...form,
         scheduledFor: localScheduleDate.toISOString(),
         durationMinutes: Number(form.durationMinutes),
-        expectedAmount:
-          form.eventType === "Client meeting" || !form.expectedAmount
-            ? undefined
-            : Number(form.expectedAmount),
+        paymentStatus: "Not applicable",
       };
       const response = await fetch("/api/schedules", {
         method: "POST",
@@ -323,7 +288,7 @@ export function AdminSchedulingCalendar() {
 
   const updateSchedule = async (
     id: string,
-    changes: Partial<Pick<ScheduleDto, "status" | "paymentStatus">>,
+    changes: Partial<Pick<ScheduleDto, "status">>,
   ) => {
     setUpdatingId(id);
     setError(null);
@@ -361,8 +326,8 @@ export function AdminSchedulingCalendar() {
             icon: CalendarDays,
           },
           { label: "Scheduled meetings", value: scheduledMeetings, icon: Users },
-          { label: "Upcoming payments", value: upcomingPayments, icon: CreditCard },
-          { label: "Overdue payments", value: overduePayments, icon: Clock3 },
+          { label: "Completed meetings", value: completedMeetings, icon: CalendarDays },
+          { label: "Cancelled meetings", value: cancelledMeetings, icon: Clock3 },
         ].map((item) => (
           <section
             key={item.label}
@@ -403,7 +368,7 @@ export function AdminSchedulingCalendar() {
             <div>
               <h2 className="text-lg font-semibold tracking-tight">New schedule</h2>
               <p className="mt-1 text-sm text-stone-600">
-                Add a client meeting, payment follow-up, or next payment date.
+                Arrange a client meeting and record its agenda.
               </p>
             </div>
             <button
@@ -437,17 +402,11 @@ export function AdminSchedulingCalendar() {
                   setForm({
                     ...form,
                     eventType,
-                    paymentStatus:
-                      eventType === "Client meeting" ? "Not applicable" : "Expected",
-                    expectedAmount:
-                      eventType === "Client meeting" ? "" : form.expectedAmount,
                   });
                 }}
                 className={fieldClass}
               >
                 <option>Client meeting</option>
-                <option>Payment follow-up</option>
-                <option>Payment due</option>
               </select>
             </label>
 
@@ -541,49 +500,13 @@ export function AdminSchedulingCalendar() {
               </select>
             </label>
 
-            {form.eventType !== "Client meeting" ? (
-              <>
-                <label className="text-sm font-medium text-stone-700">
-                  Payment status
-                  <select
-                    value={form.paymentStatus}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        paymentStatus: event.target.value as PaymentStatus,
-                      })
-                    }
-                    className={fieldClass}
-                  >
-                    <option>Expected</option>
-                    <option>Pending</option>
-                    <option>Paid</option>
-                    <option>Overdue</option>
-                  </select>
-                </label>
-                <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-                  Expected amount (optional)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={form.expectedAmount}
-                    onChange={(event) =>
-                      setForm({ ...form, expectedAmount: event.target.value })
-                    }
-                    placeholder="0.00"
-                    className={fieldClass}
-                  />
-                </label>
-              </>
-            ) : null}
 
             <label className="text-sm font-medium text-stone-700 md:col-span-2 xl:col-span-4">
               Notes (optional)
               <textarea
                 value={form.notes}
                 onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                placeholder="Agenda, payment commitment, reminders, or preparation notes"
+                placeholder="Agenda, reminders, or preparation notes"
                 className={textareaClass}
               />
             </label>
@@ -611,7 +534,7 @@ export function AdminSchedulingCalendar() {
                 })}
               </h1>
               <p className="mt-1 text-sm text-stone-500">
-                Meetings and payment commitments in one calendar.
+                Client meetings and project discussions in one calendar.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -777,17 +700,6 @@ export function AdminSchedulingCalendar() {
                         <span className="break-all">{schedule.location}</span>
                       </p>
                     ) : null}
-                    {schedule.eventType !== "Client meeting" ? (
-                      <p className="flex flex-wrap items-center gap-2">
-                        <CreditCard className="h-4 w-4 shrink-0" />
-                        <span className={`rounded px-2 py-1 text-xs font-semibold ${paymentStatusClass[schedule.paymentStatus]}`}>
-                          {schedule.paymentStatus}
-                        </span>
-                        {schedule.expectedAmount !== undefined
-                          ? formatPeso(schedule.expectedAmount)
-                          : null}
-                      </p>
-                    ) : null}
                     {schedule.notes ? (
                       <p className="rounded-lg bg-stone-50 p-3 text-xs leading-5">
                         {schedule.notes}
@@ -813,26 +725,6 @@ export function AdminSchedulingCalendar() {
                         <option>Cancelled</option>
                       </select>
                     </label>
-                    {schedule.eventType !== "Client meeting" ? (
-                      <label className="text-xs font-semibold text-stone-600">
-                        Payment status
-                        <select
-                          value={schedule.paymentStatus}
-                          disabled={updatingId === schedule.id}
-                          onChange={(event) =>
-                            void updateSchedule(schedule.id, {
-                              paymentStatus: event.target.value as PaymentStatus,
-                            })
-                          }
-                          className={`${fieldClass} mt-1 h-9`}
-                        >
-                          <option>Expected</option>
-                          <option>Pending</option>
-                          <option>Paid</option>
-                          <option>Overdue</option>
-                        </select>
-                      </label>
-                    ) : null}
                   </div>
                 </article>
               ))}
@@ -842,7 +734,7 @@ export function AdminSchedulingCalendar() {
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
               <p className="mt-3 text-sm font-medium text-stone-700">No schedules for this day</p>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Add a client meeting or record the next expected payment date.
+                Add a client meeting to this date.
               </p>
               <Button type="button" size="sm" className="mt-4" onClick={openForm}>
                 Add schedule

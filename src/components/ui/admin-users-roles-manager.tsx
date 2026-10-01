@@ -76,13 +76,13 @@ const roleGuide = [
   {
     role: "billing-clerk" as const,
     title: "Billing Clerk",
-    description: "Can manage invoices, payments, billings, and customer accounts.",
+    description: "Manages billings, invoices, payment verification, receipts, and customer balances.",
     icon: ReceiptText,
   },
   {
     role: "admin" as const,
     title: "Admin",
-    description: "Has full operational access, including users, roles, and approvals.",
+    description: "Manages projects, designs, users, roles, and project approvals.",
     icon: ShieldCheck,
   },
 ];

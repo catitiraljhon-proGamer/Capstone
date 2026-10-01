@@ -415,7 +415,7 @@ function ApprovalReviewDialog({
                     </p>
                     <h3 className="mt-1 font-semibold">Upload the completed house designs</h3>
                     <p className="mt-1 text-sm leading-6 text-stone-600">
-                      Once design work is finished, upload up to 6 final images here. Sending them will mark the request completed and notify the client.
+                      Once design work is finished, upload up to 6 final images here. Sending them will notify the client and Billing Clerk. The client can view and download the images only after full payment of the design fee is verified.
                     </p>
 
                     {imageError ? (
@@ -673,12 +673,11 @@ export function AdminApprovalsManager() {
       await readJson<{
         request: {
           status: "Completed";
-          completedDesignImages: string[];
           completedAt: string;
         };
       }>(response);
       setSuccessMessage(
-        `${images.length} completed design image${images.length === 1 ? " was" : "s were"} sent to ${selectedApproval.customer.name} for ${selectedApproval.reference}.`,
+        `${images.length} completed design image${images.length === 1 ? " was" : "s were"} sent to ${selectedApproval.customer.name} for ${selectedApproval.reference}. Client viewing unlocks after verified full payment.`,
       );
       setSelectedApproval(null);
       await loadApprovals(true);

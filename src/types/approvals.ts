@@ -1,11 +1,10 @@
 export const approvalRecordTypes = [
   "Design request",
   "Cost estimate",
-  "Billing",
   "Document",
 ] as const;
 
-export type ApprovalRecordType = (typeof approvalRecordTypes)[number];
+export type ApprovalRecordType = (typeof approvalRecordTypes)[number] | "Billing"; // Legacy billing approvals remain stored but are no longer actionable.
 
 export const approvalStatuses = ["Pending", "Approved", "Rejected"] as const;
 

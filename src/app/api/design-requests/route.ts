@@ -11,6 +11,8 @@ import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { embeddedImagesSchema } from "@/lib/server/embedded-images";
+import { customerDesignDto, listCustomerDesigns } from "@/lib/server/design-requests";
+import { designRequestApi } from "@/lib/server/design-request-api";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -25,45 +27,8 @@ const inputSchema = z.object({
   inspirationImages: embeddedImagesSchema,
 });
 
-function toDto(request: DesignRequestDocument) {
-  return {
-    id: request._id.toHexString(),
-    floorArea: request.floorArea,
-    bedrooms: request.bedrooms,
-    bathrooms: request.bathrooms,
-    rooms: request.rooms,
-    finish: request.finish,
-    notes: request.notes,
-    inspirationImages:
-      request.inspirationImages ??
-      (request.inspirationImage ? [request.inspirationImage] : []),
-    completedDesignImages:
-      request.completedDesignImages ??
-      (request.completedDesignImage ? [request.completedDesignImage] : []),
-    status: request.status,
-    completedAt: request.completedAt?.toISOString(),
-    createdAt: request.createdAt.toISOString(),
-  };
-}
-
-export async function GET() {
-  try {
-    const session = await readSession();
-    if (!session) return unauthorized();
-    if (session.role !== "customer") return forbidden();
-
-    const db = await getDatabase();
-    const requests = await db
-      .collection<DesignRequestDocument>(collections.designRequests)
-      .find({ customerId: new ObjectId(session.id) })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .toArray();
-
-    return NextResponse.json({ requests: requests.map(toDto) });
-  } catch (error) {
-    return apiError(error);
-  }
+export async function GET(request: Request) {
+  return designRequestApi(request, "customer", async (db, actor) => NextResponse.json({ requests: await listCustomerDesigns(db, actor) }));
 }
 
 export async function POST(request: Request) {
@@ -147,7 +112,7 @@ export async function POST(request: Request) {
       createdAt: now,
     });
 
-    return NextResponse.json({ request: toDto(document) }, { status: 201 });
+    return NextResponse.json({ request: await customerDesignDto(db, document) }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

@@ -17,6 +17,7 @@ import type {
 } from "@/types/approvals";
 import type { ObjectId } from "mongodb";
 import type { ClientDetails } from "@/types/clients";
+import type { ReceiptSnapshot } from "@/types/billing";
 
 export const collections = {
   users: "users",
@@ -118,6 +119,7 @@ export type ProjectDocument = {
   name: string;
   status: ProjectStatus;
   contractPrice: number;
+  billingVersion?: number;
   startDate?: Date;
   targetCompletionDate?: Date;
   createdAt: Date;
@@ -146,6 +148,7 @@ export type DesignRequestDocument = {
   completedAt?: Date;
   completedBy?: ObjectId;
   completedByName?: string;
+  billingVersion?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -177,18 +180,27 @@ export type ApprovalDocument = {
   reviewNote?: string;
 };
 
-export type InvoiceStatus = "Draft" | "Ready" | "Sent" | "Paid" | "Overdue";
+export type InvoiceStatus = "Draft" | "Ready" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Void";
 
 export type InvoiceDocument = {
   _id: ObjectId;
   invoiceNumber: string;
   customerId: ObjectId;
-  projectId: ObjectId;
+  projectId?: ObjectId;
+  /** Design fees are separate from the construction contract. */
+  designRequestId?: ObjectId;
   label: string;
   progressPercentage: number;
   amount: number;
   dueDate: Date;
   status: InvoiceStatus;
+  basis?: string;
+  issuedAt?: Date;
+  issuedBy?: ObjectId;
+  voidReason?: string;
+  voidedAt?: Date;
+  billingVersion?: number;
+  lastReminderAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -197,15 +209,27 @@ export type PaymentDocument = {
   _id: ObjectId;
   reference: string;
   customerId: ObjectId;
-  projectId: ObjectId;
+  projectId?: ObjectId;
   invoiceId?: ObjectId;
   amount: number;
   method: "Cash" | "Bank transfer" | "Card" | "E-wallet" | "Check";
-  status: "Pending" | "Verified" | "Rejected";
+  status: "Pending" | "Verified" | "Rejected" | "Reversed";
   paidAt: Date;
   createdAt: Date;
   verifiedAt?: Date;
   verifiedBy?: ObjectId;
+  transactionReference?: string;
+  duplicateKey?: string;
+  submissionKey?: string;
+  proofImage?: string;
+  notes?: string;
+  reviewNote?: string;
+  reviewedAt?: Date;
+  reviewedByName?: string;
+  reversedAt?: Date;
+  reversedByName?: string;
+  reversalReason?: string;
+  receipt?: ReceiptSnapshot;
 };
 
 export type DocumentRecord = {

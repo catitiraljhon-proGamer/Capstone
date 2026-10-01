@@ -1,7 +1,6 @@
 import {
   collections,
-  type HouseDesignDocument,
-  type InvoiceDocument,
+  type DesignRequestDocument,
   type NotificationDocument,
   type ProjectDocument,
 } from "@/lib/database/collections";
@@ -9,6 +8,8 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { readSession } from "@/lib/server/session";
 import { visibleNotificationsFor } from "@/lib/server/notification-filter";
+import { getBillingData } from "@/lib/server/billing";
+import { sumMoney } from "@/lib/billing";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
@@ -20,7 +21,7 @@ export async function GET() {
 
     const customerId = new ObjectId(session.id);
     const db = await getDatabase();
-    const [project, pendingRequests, paymentTotals, invoices, notifications, unreadNotifications] =
+    const [project, pendingRequests, billing, notifications, unreadNotifications, latestRequest] =
       await Promise.all([
         db
           .collection<ProjectDocument>(collections.projects)
@@ -32,18 +33,7 @@ export async function GET() {
           customerId,
           status: { $in: ["Pending", "In review"] },
         }),
-        db
-          .collection(collections.payments)
-          .aggregate<{ total: number }>([
-            { $match: { customerId, status: "Verified" } },
-            { $group: { _id: null, total: { $sum: "$amount" } } },
-          ])
-          .toArray(),
-        db
-          .collection<InvoiceDocument>(collections.invoices)
-          .find({ customerId })
-          .sort({ dueDate: 1 })
-          .toArray(),
+        getBillingData(db, session),
         db
           .collection<NotificationDocument>(collections.notifications)
           .find(visibleNotificationsFor(customerId))
@@ -54,25 +44,21 @@ export async function GET() {
           ...visibleNotificationsFor(customerId),
           readAt: { $exists: false },
         }),
+        db.collection<DesignRequestDocument>(collections.designRequests).findOne({ customerId }, { sort: { createdAt: -1 }, projection: { floorArea: 1, finish: 1 } }),
       ]);
 
-    const design = project?.houseDesignId
-      ? await db
-          .collection<HouseDesignDocument>(collections.houseDesigns)
-          .findOne({ _id: project.houseDesignId })
-      : null;
-    const totalPaid = paymentTotals[0]?.total ?? 0;
-    const totalContractPrice = project?.contractPrice ?? 0;
+    const totalPaid = sumMoney(billing.payments.filter((payment) => payment.status === "Verified").map((payment) => payment.amount));
+    const totalContractPrice = sumMoney(billing.projects.map((item) => item.contractPrice));
 
     return NextResponse.json({
-      currentDesign: design?.name ?? null,
-      estimatedBudget: totalContractPrice,
+      currentDesign: latestRequest ? `${latestRequest.floorArea} sqm · ${latestRequest.finish}` : null,
+      estimatedBudget: project?.contractPrice ?? 0,
       pendingRequests,
       totalContractPrice,
       totalPaid,
-      balanceDue: Math.max(0, totalContractPrice - totalPaid),
-      billingStages: invoices.map((invoice) => ({
-        id: invoice._id.toHexString(),
+      balanceDue: sumMoney(billing.invoices.filter((item) => !["Draft", "Ready", "Void"].includes(item.status)).map((item) => item.balance)),
+      billingStages: billing.invoices.map((invoice) => ({
+        id: invoice.id,
         label: invoice.label,
         percentage: invoice.progressPercentage,
         amount: invoice.amount,

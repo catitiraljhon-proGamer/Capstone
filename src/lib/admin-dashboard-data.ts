@@ -6,7 +6,6 @@ export type AdminDashboardData = {
   summary: {
     activeProjects: number;
     pendingApprovals: number;
-    pendingBilling: number;
     totalClients: number;
     totalUsers: number;
   };
@@ -23,7 +22,6 @@ const emptyData: AdminDashboardData = {
   summary: {
     activeProjects: 0,
     pendingApprovals: 0,
-    pendingBilling: 0,
     totalClients: 0,
     totalUsers: 0,
   },

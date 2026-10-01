@@ -6,9 +6,9 @@ import {
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
 import { useHouseDesigns } from "@/lib/house-design-store";
+import Link from "next/link";
+import type { DesignRequestDto } from "@/types/design-requests";
 import {
-  CheckCircle2,
-  Download,
   ImagePlus,
   Send,
   X,
@@ -22,21 +22,6 @@ type DesignRequestStatus =
   | "Approved"
   | "Rejected"
   | "Completed";
-
-type DesignRequestDto = {
-  id: string;
-  floorArea: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  rooms: string;
-  finish: HouseDesignFinish;
-  notes: string;
-  inspirationImages: string[];
-  completedDesignImages: string[];
-  status: DesignRequestStatus;
-  completedAt?: string;
-  createdAt: string;
-};
 
 type SelectedImage = {
   src: string;
@@ -58,7 +43,7 @@ const statusLabel: Record<DesignRequestStatus, string> = {
   "In review": "Under feasibility review",
   Approved: "Approved — design in progress",
   Rejected: "Not feasible",
-  Completed: "Design ready",
+  Completed: "Delivered — check My House Design for access",
 };
 
 function formatDate(value: string) {
@@ -212,10 +197,6 @@ export function CustomerDesignRequests() {
       setIsSubmitting(false);
     }
   };
-
-  const approvedDesigns = requests.filter(
-    (request) => request.completedDesignImages.length > 0,
-  );
 
   return (
     <div className="space-y-6">
@@ -423,7 +404,7 @@ export function CustomerDesignRequests() {
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold tracking-tight">Request History</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Track feasibility review and design-work status. Finished designs appear in the separate gallery below.
+          Track approval and design work. Delivered designs are kept in My House Design and unlock after full payment is verified.
         </p>
         <div className="mt-4 space-y-4">
           {requests.map((request) => (
@@ -479,7 +460,7 @@ export function CustomerDesignRequests() {
                 </p>
                 {request.completedAt ? (
                   <p className="mt-3 text-xs font-semibold text-emerald-700">
-                    Delivered {formatDate(request.completedAt)} · View in Approved Designs
+                    Delivered {formatDate(request.completedAt)} · Open My House Design for payment and viewing
                   </p>
                 ) : null}
               </div>
@@ -497,72 +478,7 @@ export function CustomerDesignRequests() {
       </section>
       </div>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              Completed work
-            </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight">Approved Designs</h2>
-            <p className="mt-1 text-sm text-stone-600">
-              Final house-design images delivered by the admin are kept separately from request history.
-            </p>
-          </div>
-          <span className="text-sm font-semibold text-stone-500">
-            {approvedDesigns.length} completed request{approvedDesigns.length === 1 ? "" : "s"}
-          </span>
-        </div>
-
-        {approvedDesigns.length > 0 ? (
-          <div className="mt-5 space-y-6">
-            {approvedDesigns.map((request) => (
-              <article key={request.id} className="overflow-hidden rounded-xl border border-emerald-200">
-                <div className="flex flex-col gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
-                    <CheckCircle2 className="h-4 w-4" />
-                    {request.floorArea} sqm · {request.finish} design
-                  </div>
-                  <p className="text-xs text-emerald-700">
-                    Delivered {request.completedAt ? formatDate(request.completedAt) : "by admin"}
-                  </p>
-                </div>
-                <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {request.completedDesignImages.map((image, index) => (
-                    <div key={`${request.id}-${index}`} className="overflow-hidden rounded-lg border border-stone-200 bg-stone-50">
-                      <div className="relative aspect-[4/3]">
-                        <Image
-                          src={image}
-                          alt={`Approved house design ${index + 1}`}
-                          fill
-                          unoptimized
-                          className="object-contain"
-                        />
-                      </div>
-                      <div className="border-t border-stone-200 p-3">
-                        <a
-                          href={image}
-                          download={`approved-house-design-${request.id}-${index + 1}`}
-                          className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
-                        >
-                          <Download className="h-4 w-4" /> Download image {index + 1}
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-8 text-center">
-            <CheckCircle2 className="mx-auto h-9 w-9 text-stone-300" />
-            <p className="mt-3 text-sm font-semibold">No approved designs delivered yet</p>
-            <p className="mt-1 text-xs text-stone-500">
-              Completed images will appear here after an approved request is designed and sent by the admin.
-            </p>
-          </div>
-        )}
-      </section>
+      <Link href="/customer/house-design" className="inline-flex rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800">Open My House Design</Link>
     </div>
   );
 }

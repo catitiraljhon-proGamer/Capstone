@@ -4,7 +4,6 @@ import {
   type DesignRequestDocument,
   type DocumentRecord,
   type EstimateDocument,
-  type InvoiceDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
@@ -54,13 +53,13 @@ export async function GET() {
     );
     const [approvals, pending, approved, rejected] = await Promise.all([
       approvalCollection
-        .find()
+        .find({ recordType: { $ne: "Billing" } })
         .sort({ createdAt: -1, _id: -1 })
         .limit(500)
         .toArray(),
-      approvalCollection.countDocuments({ status: "Pending" }),
-      approvalCollection.countDocuments({ status: "Approved" }),
-      approvalCollection.countDocuments({ status: "Rejected" }),
+      approvalCollection.countDocuments({ status: "Pending", recordType: { $ne: "Billing" } }),
+      approvalCollection.countDocuments({ status: "Approved", recordType: { $ne: "Billing" } }),
+      approvalCollection.countDocuments({ status: "Rejected", recordType: { $ne: "Billing" } }),
     ]);
 
     const customerIds = approvals.map((approval) => approval.customerId);
@@ -73,7 +72,7 @@ export async function GET() {
       ),
     ].map((id) => new ObjectId(id));
 
-    const [users, designRequests, estimates, invoices, documents] =
+    const [users, designRequests, estimates, documents] =
       await Promise.all([
         userIds.length
           ? db
@@ -93,10 +92,6 @@ export async function GET() {
         db
           .collection<EstimateDocument>(collections.estimates)
           .find({ _id: { $in: uniqueIds(approvals, "Cost estimate") } })
-          .toArray(),
-        db
-          .collection<InvoiceDocument>(collections.invoices)
-          .find({ _id: { $in: uniqueIds(approvals, "Billing") } })
           .toArray(),
         db
           .collection<DocumentRecord>(collections.documents)
@@ -133,15 +128,6 @@ export async function GET() {
         sourceStatus: source.status,
         sourceAvailable: true,
         amount: source.total,
-      });
-    }
-    for (const source of invoices) {
-      sourcesByKey.set(sourceKey("Billing", source._id), {
-        subject: source.invoiceNumber,
-        description: `${source.label} — ${source.progressPercentage}% project progress`,
-        sourceStatus: source.status,
-        sourceAvailable: true,
-        amount: source.amount,
       });
     }
     for (const source of documents) {

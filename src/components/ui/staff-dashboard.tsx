@@ -6,8 +6,8 @@ import { NotificationBell } from "@/components/ui/customer-notification-bell";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
-import { useBillingDashboardData } from "@/lib/billing-dashboard-data";
-import { formatPeso } from "@/components/ui/house-design-data";
+import { BillingWorkspace } from "@/components/ui/billing-workspace";
+import type { BillingSection } from "@/types/billing";
 import {
   CalendarDays,
   CheckCircle2,
@@ -64,7 +64,6 @@ const adminNav = [
   { label: "House Design", icon: House, href: "/admin/house-designs" },
   { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
   { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
-  { label: "Billing", icon: ReceiptText, href: "/admin/billing-control" },
   { label: "Scheduling", icon: CalendarDays, href: "/admin/scheduling" },
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
@@ -351,17 +350,7 @@ function AdminDashboardOverview() {
           href="/admin/approvals"
           icon={ShieldCheck}
         />
-        <AdminOverviewCard
-          label="Pending Billing"
-          value={summary.pendingBilling}
-          note={
-            summary.pendingBilling === 0
-              ? "No pending billing records"
-              : `${summary.pendingBilling} billing records pending`
-          }
-          href="/admin/billing-control"
-          icon={ReceiptText}
-        />
+        <AdminOverviewCard label="Active Users" value={summary.totalUsers} note="Active system users" href="/admin/users-roles" icon={Users} />
         <AdminOverviewCard
           label="Total Clients"
           value={summary.totalClients}
@@ -451,54 +440,7 @@ function AdminDashboardOverview() {
 }
 
 export function BillingClerkDashboard() {
-  const dashboard = useBillingDashboardData();
-  return (
-    <StaffDashboard
-      role="Billing Clerk"
-      name="Billing Clerk"
-      title="Billing Clerk Dashboard"
-      description="Monitor customer balances, progress billings, receipts, and invoice follow-ups."
-      navItems={setActiveNav(clerkNav, "Dashboard")}
-      metrics={[
-        { label: "Pending Billings", value: String(dashboard.pendingBillings), note: "Ready, sent, or overdue invoices", icon: ReceiptText },
-        { label: "Collected This Month", value: formatPeso(dashboard.collectedThisMonth), note: "Verified payments", icon: WalletCards },
-        { label: "Overdue Accounts", value: String(dashboard.overdueAccounts), note: "Overdue invoice records", icon: Users },
-        { label: "Invoices Ready", value: String(dashboard.invoicesReady), note: "Ready for release", icon: FileText },
-      ]}
-      primaryPanel={
-        <Panel className="p-6">
-          {dashboard.error ? (
-            <p role="alert" className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
-              {dashboard.error}
-            </p>
-          ) : null}
-          <p className="text-sm font-semibold text-red-700">Billing Control</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">
-            Prioritize collections and progress billing reviews.
-          </h1>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {["Validate Payment", "Prepare Invoice", "Send Reminder"].map((action) => (
-              <button
-                key={action}
-                className="rounded-lg border border-stone-200 bg-white px-4 py-4 text-left text-sm font-semibold shadow-sm hover:border-red-200 hover:bg-red-50"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-        </Panel>
-      }
-      queueTitle="Billing Queue"
-      queueItems={dashboard.queueItems.map((item) => ({
-        ...item,
-        amount: formatPeso(item.amount),
-      }))}
-      activityItems={dashboard.activityItems.map((item) => ({
-        ...item,
-        date: new Date(item.date).toLocaleString("en-PH"),
-      }))}
-    />
-  );
+  return <BillingClerkSectionPage activeLabel="Dashboard" title="Billing Clerk Dashboard" description="Manage progress billings, payments, invoices, and receipts." />;
 }
 
 export function AdminDashboard() {
@@ -507,7 +449,7 @@ export function AdminDashboard() {
       role="Admin"
       name="Admin"
       title="Admin Dashboard"
-      description="Quick overview of projects, approvals, billing, clients, and recent system activity."
+      description="Quick overview of projects, approvals, clients, and recent system activity."
       navItems={setActiveNav(adminNav, "Dashboard")}
       metrics={[]}
       primaryPanel={null}
@@ -519,44 +461,8 @@ export function AdminDashboard() {
   );
 }
 
-export function BillingClerkSectionPage({
-  activeLabel,
-  title,
-  description,
-}: {
-  activeLabel: string;
-  title: string;
-  description: string;
-}) {
-  const dashboard = useBillingDashboardData();
-  return (
-    <StaffDashboard
-      role="Billing Clerk"
-      name="Billing Clerk"
-      title={title}
-      description={description}
-      navItems={setActiveNav(clerkNav, activeLabel)}
-      metrics={[
-        { label: "Open Records", value: String(dashboard.pendingBillings), note: "Active billing records", icon: ReceiptText },
-        { label: "Pending Review", value: String(dashboard.invoicesReady), note: "Invoices ready", icon: ClipboardCheck },
-        { label: "Overdue Accounts", value: String(dashboard.overdueAccounts), note: "Needs follow-up", icon: Users },
-        { label: "Collected This Month", value: formatPeso(dashboard.collectedThisMonth), note: "Verified payments", icon: FileText },
-      ]}
-      primaryPanel={
-        <Panel className="p-6">
-          <p className="text-sm font-semibold text-red-700">{activeLabel}</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-            This screen is ready for {activeLabel.toLowerCase()} records once the
-            system has connected data.
-          </p>
-        </Panel>
-      }
-      queueTitle={`${activeLabel} Queue`}
-      queueItems={[]}
-      activityItems={[]}
-    />
-  );
+export function BillingClerkSectionPage({ activeLabel, title, description }: { activeLabel: BillingSection; title: string; description: string }) {
+  return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={<BillingWorkspace section={activeLabel} />} />;
 }
 
 export function AdminSectionPage({
@@ -584,7 +490,7 @@ export function AdminSectionPage({
         { label: "Active Projects", value: String(summary.activeProjects), note: "Open project records", icon: FolderKanban },
         { label: "Pending Review", value: String(summary.pendingApprovals), note: "Approval records", icon: ShieldCheck },
         { label: "Users", value: String(summary.totalUsers), note: "Active accounts", icon: Users },
-        { label: "Pending Billing", value: String(summary.pendingBilling), note: "Open billing records", icon: ClipboardCheck },
+        { label: "Clients", value: String(summary.totalClients), note: "Active customer accounts", icon: Users },
       ]}
       primaryPanel={
         <Panel className="p-6">

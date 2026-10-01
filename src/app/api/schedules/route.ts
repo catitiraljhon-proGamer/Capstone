@@ -31,7 +31,7 @@ export async function GET() {
     const [documents, clients, projects] = await Promise.all([
       db
         .collection<ScheduleDocument>(collections.schedules)
-        .find()
+        .find({ eventType: "Client meeting" })
         .sort({ scheduledFor: 1 })
         .limit(500)
         .toArray(),
@@ -73,6 +73,7 @@ export async function POST(request: Request) {
     if (session.role !== "admin") return forbidden();
 
     const input = scheduleInputSchema.parse(await request.json());
+    if (input.eventType !== "Client meeting" || input.paymentStatus !== "Not applicable") return forbidden();
     const db = await getDatabase();
     const clientId = new ObjectId(input.clientId);
     const projectId = input.projectId ? new ObjectId(input.projectId) : undefined;

@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "My House Design | G4 Builders Inc",
-  description: "Customer house design comparison and estimate preview.",
+  robots: { index: false, follow: false },
+  description: "View your requested house designs after verified payment.",
 };
 
 export default function HouseDesignPage() {

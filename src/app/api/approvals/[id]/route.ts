@@ -4,7 +4,6 @@ import {
   type DesignRequestDocument,
   type DocumentRecord,
   type EstimateDocument,
-  type InvoiceDocument,
   type NotificationDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
@@ -56,11 +55,7 @@ async function sourceExists(
           .findOne(filter, { projection: { _id: 1 } }),
       );
     case "Billing":
-      return Boolean(
-        await db
-          .collection<InvoiceDocument>(collections.invoices)
-          .findOne(filter, { projection: { _id: 1 } }),
-      );
+      return false;
     case "Document":
       return Boolean(
         await db
@@ -93,14 +88,6 @@ async function updateConnectedSource(
         .updateOne(filter, { $set: { status: decision, updatedAt: now } });
       return;
     case "Billing":
-      await db
-        .collection<InvoiceDocument>(collections.invoices)
-        .updateOne(filter, {
-          $set: {
-            status: decision === "Approved" ? "Ready" : "Draft",
-            updatedAt: now,
-          },
-        });
       return;
     case "Document":
       return;
@@ -136,6 +123,7 @@ export async function PATCH(
         { status: 404 },
       );
     }
+    if (existing.recordType === "Billing") return forbidden();
     if (existing.status !== "Pending") {
       return NextResponse.json(
         { error: `This approval was already ${existing.status.toLowerCase()}.` },

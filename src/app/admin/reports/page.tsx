@@ -11,7 +11,7 @@ export default function AdminReportsPage() {
     <AdminSectionPage
       activeLabel="Reports"
       title="Reports"
-      description="Generate project, estimate, billing, approval, and user reports."
+      description="Generate project, estimate, approval, and user reports."
     />
   );
 }

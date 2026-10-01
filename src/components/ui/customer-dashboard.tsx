@@ -1,5 +1,6 @@
 "use client";
 
+import { BillingWorkspace } from "@/components/ui/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ContactDetails } from "@/components/ui/contact-us";
 import { ClientInformationReminder, ClientProfileForm } from "@/components/ui/client-profile";
@@ -14,6 +15,7 @@ import {
   type HouseDesign,
 } from "@/components/ui/house-design-data";
 import { HouseDesignGallery } from "@/components/ui/house-design-gallery";
+import { CustomerRequestedDesigns } from "@/components/ui/customer-requested-designs";
 import { CustomerDesignRequests } from "@/components/ui/customer-design-requests";
 import { CustomerNotificationBell } from "@/components/ui/customer-notification-bell";
 import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
@@ -226,7 +228,7 @@ export function CustomerDashboard() {
                   href="/customer/house-design"
                   className="rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800"
                 >
-                  View Design
+                  My Requested Designs
                 </Link>
                 <Link
                   href="/customer/design-requests"
@@ -234,15 +236,16 @@ export function CustomerDashboard() {
                 >
                   New Request
                 </Link>
+                <Link href="/customer/finished-designs" className="rounded-lg border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 hover:bg-rose-50">View Finished Designs</Link>
               </div>
             </div>
           </Panel>
 
           <div className="grid gap-4 md:grid-cols-3">
             <Panel className="p-5">
-              <p className="text-sm text-stone-500">Current Design</p>
+              <p className="text-sm text-stone-500">Latest Design Request</p>
               <p className="mt-2 text-xl font-semibold">
-                {dashboard.currentDesign ?? "Not yet selected"}
+                {dashboard.currentDesign ?? "No request yet"}
               </p>
             </Panel>
             <Panel className="p-5">
@@ -261,8 +264,8 @@ export function CustomerDashboard() {
             <h2 className="text-lg font-semibold tracking-tight">Next Steps</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {[
-                { title: "Compare house designs", href: "/customer/house-design", icon: Home },
-                { title: "Send design revision", href: "/customer/design-requests", icon: FilePlus2 },
+                { title: "View Finished Designs", href: "/customer/finished-designs", icon: Home },
+                { title: "Request a house design", href: "/customer/design-requests", icon: FilePlus2 },
                 { title: "Review billing status", href: "/customer/billing", icon: CreditCard },
               ].map((action) => (
                 <Link
@@ -328,6 +331,10 @@ export function CustomerDashboard() {
 }
 
 export function CustomerHouseDesignPage() {
+  return <CustomerShell activeSection="design" title="My House Design" description="Your requested designs, delivery status, and payment access."><CustomerRequestedDesigns /></CustomerShell>;
+}
+
+export function CustomerFinishedDesignsPage() {
   const { designs, catalog, isLoading, error } = useHouseDesigns();
   const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
   const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
@@ -352,10 +359,11 @@ export function CustomerHouseDesignPage() {
 
   return (
     <CustomerShell
-      activeSection="design"
-      title="My House Design"
-      description="Select a house type, choose a design, review details, and edit exterior materials."
+      activeSection="dashboard"
+      title="Finished Designs"
+      description="Explore published G4 Builders designs for inspiration before submitting your own request."
     >
+      <Link href="/customer" className="mb-5 inline-flex text-sm font-semibold text-red-700 hover:underline">← Back to Dashboard</Link>
       <div className="space-y-6">
         <Panel className="p-5">
           {error ? (
@@ -546,7 +554,7 @@ export function CustomerDesignRequestsPage() {
     <CustomerShell
       activeSection="requests"
       title="Design Requests"
-      description="Share inspiration, request a feasibility review, and receive the completed design from the admin."
+      description="Submit your requirements for admin approval and track the design work. Delivered designs are in My House Design."
     >
       <CustomerDesignRequests />
     </CustomerShell>
@@ -554,62 +562,7 @@ export function CustomerDesignRequestsPage() {
 }
 
 export function CustomerBillingPage() {
-  const dashboard = useCustomerDashboardData();
-
-  return (
-    <CustomerShell
-      activeSection="billing"
-      title="Billing Status"
-      description="Review progress billing and the status of your payments."
-    >
-      <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <Panel className="p-5">
-          <h1 className="text-lg font-semibold tracking-tight">Billing Summary</h1>
-          <div className="mt-5 space-y-4 text-sm">
-            <div>
-              <p className="text-stone-500">Total Contract Price</p>
-              <p className="mt-1 text-2xl font-semibold text-red-700">
-                {formatPeso(dashboard.totalContractPrice)}
-              </p>
-            </div>
-            <div>
-              <p className="text-stone-500">Total Paid</p>
-              <p className="mt-1 text-xl font-semibold">{formatPeso(dashboard.totalPaid)}</p>
-            </div>
-            <div>
-              <p className="text-stone-500">Balance Due</p>
-              <p className="mt-1 text-xl font-semibold">{formatPeso(dashboard.balanceDue)}</p>
-            </div>
-          </div>
-        </Panel>
-        <Panel className="p-5">
-          <h2 className="text-lg font-semibold tracking-tight">Progress Billing Preview</h2>
-          <p className="mt-2 text-sm text-stone-600">
-            Billing stages are based on approved site accomplishment and stored invoice records.
-          </p>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {dashboard.billingStages.map((stage) => (
-              <div key={stage.id} className="rounded-lg border border-stone-200 p-4">
-                <div className="flex justify-between gap-3 text-sm">
-                  <p className="font-semibold">{stage.label}</p>
-                  <p className="text-red-700">{stage.percentage}%</p>
-                </div>
-                <p className="mt-2 text-sm text-stone-500">
-                  {formatPeso(stage.amount)} · {stage.status}
-                </p>
-              </div>
-            ))}
-            {!dashboard.isLoading && dashboard.billingStages.length === 0 ? (
-              <EmptyState
-                title="No billing stages yet."
-                body="Approved invoices will appear here."
-              />
-            ) : null}
-          </div>
-        </Panel>
-      </div>
-    </CustomerShell>
-  );
+  return <CustomerShell activeSection="billing" title="Billing & Payments" description="View invoices, submit payment details, and download your receipts."><BillingWorkspace customer section="Invoices" /></CustomerShell>;
 }
 
 export function CustomerDocumentsPage() {

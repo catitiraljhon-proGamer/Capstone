@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Scheduling | G4 Builders Inc",
-  description: "Admin calendar for client meetings and payment schedules.",
+  description: "Admin calendar for client meetings.",
 };
 
 export default function SchedulingPage() {
@@ -12,7 +12,7 @@ export default function SchedulingPage() {
     <AdminSectionPage
       activeLabel="Scheduling"
       title="Scheduling"
-      description="Plan client meetings and track upcoming payment commitments."
+      description="Plan client meetings and project discussions."
       mainContent={<AdminSchedulingCalendar />}
     />
   );

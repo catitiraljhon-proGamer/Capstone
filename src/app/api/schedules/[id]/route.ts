@@ -26,12 +26,13 @@ export async function PATCH(
     }
 
     const changes = scheduleStatusSchema.parse(await request.json());
+    if (changes.paymentStatus) return forbidden();
     const db = await getDatabase();
     const now = new Date();
     const document = await db
       .collection<ScheduleDocument>(collections.schedules)
       .findOneAndUpdate(
-        { _id: new ObjectId(id) },
+        { _id: new ObjectId(id), eventType: "Client meeting" },
         { $set: { ...changes, updatedAt: now } },
         { returnDocument: "after" },
       );
@@ -51,9 +52,6 @@ export async function PATCH(
         entityId: document._id,
         details: {
           ...(changes.status ? { status: changes.status } : {}),
-          ...(changes.paymentStatus
-            ? { paymentStatus: changes.paymentStatus }
-            : {}),
         },
         createdAt: now,
       }),
@@ -61,7 +59,7 @@ export async function PATCH(
         _id: new ObjectId(),
         userId: document.clientId,
         title: "Schedule status updated",
-        body: `${document.title}: ${changes.paymentStatus ?? changes.status}.`,
+        body: `${document.title}: ${changes.status}.`,
         href: "/customer/notifications",
         createdAt: now,
       }),

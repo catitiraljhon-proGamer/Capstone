@@ -23,6 +23,40 @@ The application uses MongoDB. Runtime business records are no longer stored in b
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Billing Clerk workflow
+
+Billing and payment management belongs to the Billing Clerk. Admin manages
+projects and operational approvals; legacy billing approval records remain
+stored but are hidden and cannot be approved through the admin API. Admin
+scheduling handles client meetings only.
+
+- Prepare a draft for an active/completed customer project, referencing the
+  agreed contract milestone or approved accomplishment. Contract allocations
+  include existing drafts. The project-progress percentage is informational.
+- Review and issue the invoice from the clerk account. Customers see issued
+  invoices and can submit payment details and optional image proof.
+- Record and verify payments through Cash, Bank transfer, Card, E-wallet or Check.
+  These record actual payments; they are not payment-gateway integrations.
+- Only verified payments reduce balances. Partial payments generate individual
+  receipts. Reversals preserve the original receipt snapshot and mark it void.
+- Download printable HTML or use **Print / Save PDF**. Reports export verified
+  collections by payment date and outstanding invoices by due date as CSV.
+- Existing payments without invoice links remain visible as legacy/unallocated
+  records; no invoice allocation or receipt is fabricated for them.
+
+Billing writes use MongoDB transactions to keep balances, receipts, audit history,
+and notifications consistent under concurrent requests. Use MongoDB Atlas or a
+replica set. For the bundled local MongoDB, stop a previously running standalone
+process and run `npm run db:local`; it initializes a single-node `g4-local` replica
+set using the existing local data directory. The local URI can be
+`mongodb://127.0.0.1:27017/?replicaSet=g4-local`. The launcher never stops an unrelated
+process already using the port. A standalone server returns a setup error rather
+than partially saving a billing transaction.
+
+Run `npm run test:billing` for isolated replica-set tests covering payment races,
+role/customer isolation, partial receipts, reversals, duplicate submissions, and
+contract limits. No production records are used by these tests.
+
 ## Client registration and records
 
 Email registration collects full name, email, age, contact number, complete address,
@@ -113,3 +147,32 @@ using a temporary MongoDB instance. `test:auth` uses a temporary MongoDB instanc
 reading `.env.local`, contacting Google, or changing your application database.
 The test MongoDB binary is downloaded automatically on first use. A real Google
 account round trip still requires the OAuth configuration above.
+
+## Requested designs and payment access
+
+Customer Dashboard links to **Finished Designs** at /customer/finished-designs,
+which contains the published inspiration catalog. **My House Design** contains
+only the signed-in customer's requests and delivery/payment status.
+
+1. The customer submits requirements and inspiration images in Design Requests.
+2. Admin approves feasibility in Approvals, then uploads the finished images from
+   the approved request. Delivery notifies the customer and Billing Clerk.
+3. Billing Clerk opens Progress Billings and chooses **Prepare design fee** for
+   a delivered request. Enter the agreed fee, billing reference, and due date;
+   save the draft and issue it. The fee is separate from construction contracts
+   and can be billed even when the customer has no construction project.
+4. The customer submits payment details through Billing Status. Existing payment
+   verification, partial-payment handling, and per-payment receipts apply.
+5. Only full verified payment against that request's issued fee invoice unlocks
+   viewing and downloading in My House Design. Pending/rejected payments and
+   other invoices never unlock it. Reversal of payment restores the access lock.
+
+Delivered images are never embedded in customer list responses or copied to the
+published catalog. Authenticated image/download routes recheck ownership and
+verified payment, and return private, no-store responses. Already downloaded
+files cannot be recalled. Legacy delivered requests without a design-fee invoice
+remain locked until the Billing Clerk bills and verifies their actual payment.
+No fee amounts or historical payments are generated automatically.
+
+The billing test suite also exercises delivery approval, image access, ownership,
+full versus partial payments, reversals, legacy images, and concurrent fee drafts.
