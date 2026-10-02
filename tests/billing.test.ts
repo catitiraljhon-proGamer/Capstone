@@ -9,6 +9,9 @@ import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBilli
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
 import { deliverDesign, listCustomerDesigns, getCustomerDesignImage } from "@/lib/server/design-requests";
+import { acceptDesignRequestTerms, requireDesignRequestTerms } from "@/lib/server/design-request-terms";
+import { designRequestTerms, designRequestTermsText } from "@/lib/design-request-terms";
+import { ZodError } from "zod";
 import type { SessionUser } from "@/types/domain";
 
 let mongo: MongoMemoryReplSet;
@@ -22,6 +25,53 @@ const draft = { projectId: projectId.toHexString(), label: "Foundation work", ba
 const isError = (status: number) => (error: unknown) => error instanceof BillingError && error.status === status;
 
 const privateImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1cAAAAASUVORK5CYII=";
+
+test("design terms require an explicit customer agreement to the current version", async () => {
+  const input = { accepted: true, version: designRequestTerms.version };
+  await assert.rejects(acceptDesignRequestTerms(db, admin, input), isError(403));
+  await assert.rejects(acceptDesignRequestTerms(db, clerk, input), isError(403));
+  for (const invalid of [{}, { ...input, accepted: false }, { ...input, accepted: "true" }, { ...input, version: "old-version" }]) {
+    await assert.rejects(acceptDesignRequestTerms(db, customer, invalid), ZodError);
+  }
+  assert.equal(await db.collection("audit_logs").countDocuments(), 0);
+});
+
+test("design terms save the customer identity, server timestamp, and exact acknowledged terms", async () => {
+  const beforeAcceptance = Date.now();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const event = await db.collection("audit_logs").findOne({ _id: new ObjectId(acceptance.id) });
+  assert.ok(event);
+  assert.equal(event.actorId.toHexString(), customer.id);
+  assert.equal(event.actorRole, "customer");
+  assert.equal(event.details.accepted, true);
+  assert.equal(event.details.termsSnapshot, designRequestTermsText);
+  assert.ok(event.details.termsSnapshot.includes(designRequestTerms.paymentNotice));
+  for (const section of designRequestTerms.sections) assert.ok(event.details.termsSnapshot.includes(section.body));
+  assert.equal(event.createdAt.toISOString(), acceptance.acceptedAt);
+  assert.ok(event.createdAt.getTime() >= beforeAcceptance && event.createdAt.getTime() <= Date.now());
+  const snapshot = await requireDesignRequestTerms(db, customer, acceptance.id);
+  assert.equal(snapshot.auditLogId.toHexString(), acceptance.id);
+  assert.equal(snapshot.version, acceptance.version);
+  assert.equal(snapshot.acceptedAt.toISOString(), acceptance.acceptedAt);
+});
+
+test("design requests reject another customer's, missing, forged, or outdated agreement", async () => {
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  await assert.rejects(requireDesignRequestTerms(db, other, acceptance.id), isError(409));
+  await assert.rejects(requireDesignRequestTerms(db, customer, ""), isError(400));
+  await assert.rejects(requireDesignRequestTerms(db, customer, new ObjectId().toHexString()), isError(409));
+  await db.collection("audit_logs").updateOne({ _id: new ObjectId(acceptance.id) }, { $set: { "details.termsVersion": "old-version" } });
+  await assert.rejects(requireDesignRequestTerms(db, customer, acceptance.id), isError(409));
+});
+
+test("accepting design terms does not unlock unpaid designs or create a payment", async () => {
+  const { designId } = await deliveredFee();
+  await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  assert.equal((await listCustomerDesigns(db, customer))[0].access, "payment-required");
+  await assert.rejects(getCustomerDesignImage(db, customer, designId, 0), isError(403));
+  assert.equal(await db.collection("payments").countDocuments(), 0);
+});
+
 async function designFixture(status: DesignRequestDocument["status"] = "Approved") {
   const now = new Date();
   const id = new ObjectId();

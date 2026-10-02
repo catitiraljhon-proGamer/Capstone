@@ -78,6 +78,7 @@ const actionLabels: Record<string, string> = {
   "schedule.created": "Created a schedule",
   "schedule.status-updated": "Updated a schedule status",
   "design-request.created": "Submitted a design request",
+  "design-request.terms-accepted": "Accepted design request terms",
   "message.sent": "Sent a message",
 };
 
@@ -412,7 +413,12 @@ export function AdminAuditLogViewer() {
                                   {detailLabel(key)}
                                 </dt>
                                 <dd className="break-words text-xs text-stone-700">
-                                  {detailValue(value)}
+                                  {key === "termsSnapshot" ? (
+                                    <details>
+                                      <summary className="cursor-pointer rounded font-semibold text-red-700 focus-visible:outline-2 focus-visible:outline-red-600">View recorded terms</summary>
+                                      <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap leading-5">{detailValue(value)}</p>
+                                    </details>
+                                  ) : detailValue(value)}
                                 </dd>
                               </div>
                             ))}

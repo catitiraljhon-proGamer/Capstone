@@ -6,14 +6,12 @@ import {
   type ProjectDocument,
   type UserDocument,
 } from "@/lib/database/collections";
-import { getDatabase } from "@/lib/database/mongodb";
-import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { embeddedImagesSchema } from "@/lib/server/embedded-images";
 import { customerDesignDto, listCustomerDesigns } from "@/lib/server/design-requests";
 import { designRequestApi } from "@/lib/server/design-request-api";
-import { readSession } from "@/lib/server/session";
+import { requireDesignRequestTerms } from "@/lib/server/design-request-terms";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -25,6 +23,7 @@ const inputSchema = z.object({
   finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
   notes: z.string().trim().min(1).max(4_000),
   inspirationImages: embeddedImagesSchema,
+  termsAcceptanceId: z.string().regex(/^[a-f\d]{24}$/i, "Accept the Design Request Terms and Conditions first."),
 });
 
 export async function GET(request: Request) {
@@ -32,14 +31,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  try {
-    const session = await readSession();
-    if (!session) return unauthorized();
-    if (session.role !== "customer") return forbidden();
-
-    const input = inputSchema.parse(await request.json());
+  return designRequestApi(request, "customer", async (db, session) => {
+    const { termsAcceptanceId, ...input } = inputSchema.parse(await request.json());
+    const termsAcceptance = await requireDesignRequestTerms(db, session, termsAcceptanceId);
     const customerId = new ObjectId(session.id);
-    const db = await getDatabase();
     const project = await db
       .collection<ProjectDocument>(collections.projects)
       .findOne(
@@ -53,6 +48,7 @@ export async function POST(request: Request) {
       projectId: project?._id,
       houseDesignId: project?.houseDesignId,
       ...input,
+      termsAcceptance,
       rooms: `${input.bedrooms} bedroom${input.bedrooms === 1 ? "" : "s"}, ${input.bathrooms} bathroom${input.bathrooms === 1 ? "" : "s"}`,
       status: "Pending",
       createdAt: now,
@@ -108,12 +104,13 @@ export async function POST(request: Request) {
         finish: document.finish,
         status: document.status,
         inspirationImageCount: input.inspirationImages.length,
+        termsVersion: termsAcceptance.version,
+        termsAcceptedAt: termsAcceptance.acceptedAt.toISOString(),
+        termsAcceptanceId: termsAcceptance.auditLogId.toHexString(),
       },
       createdAt: now,
     });
 
     return NextResponse.json({ request: await customerDesignDto(db, document) }, { status: 201 });
-  } catch (error) {
-    return apiError(error);
-  }
+  });
 }

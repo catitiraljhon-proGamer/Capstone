@@ -148,6 +148,12 @@ export type DesignRequestDocument = {
   completedAt?: Date;
   completedBy?: ObjectId;
   completedByName?: string;
+  /** Recorded acknowledgment for new requests; legacy requests may not have one. */
+  termsAcceptance?: {
+    auditLogId: ObjectId;
+    version: string;
+    acceptedAt: Date;
+  };
   billingVersion?: number;
   createdAt: Date;
   updatedAt: Date;

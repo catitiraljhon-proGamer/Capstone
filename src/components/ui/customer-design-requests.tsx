@@ -1,12 +1,15 @@
 "use client";
 
 import type { HouseDesignFinish } from "@/components/ui/house-design-data";
+import { DesignRequestTermsDialog } from "@/components/ui/design-request-terms-dialog";
+import type { DesignTermsAcceptance } from "@/lib/design-request-terms";
 import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { DesignRequestDto } from "@/types/design-requests";
 import {
   ImagePlus,
@@ -14,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
 type DesignRequestStatus =
   | "Pending"
@@ -55,6 +58,26 @@ function formatDate(value: string) {
 }
 
 export function CustomerDesignRequests() {
+  const router = useRouter();
+  const [acceptance, setAcceptance] = useState<DesignTermsAcceptance | null>(null);
+  const [isReviewingTerms, setIsReviewingTerms] = useState(false);
+
+  return (
+    <>
+      {acceptance ? <DesignRequestForm acceptance={acceptance} onReviewTerms={() => setIsReviewingTerms(true)} /> : null}
+      {!acceptance || isReviewingTerms ? (
+        <DesignRequestTermsDialog
+          onAccept={setAcceptance}
+          onDecline={() => router.replace("/customer")}
+          onClose={acceptance ? () => setIsReviewingTerms(false) : undefined}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTermsAcceptance; onReviewTerms: () => void }) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const { catalog } = useHouseDesigns();
   const [requests, setRequests] = useState<DesignRequestDto[]>([]);
   const [floorArea, setFloorArea] = useState("");
@@ -70,6 +93,7 @@ export function CustomerDesignRequests() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    headingRef.current?.focus();
     let active = true;
     fetch("/api/design-requests", { cache: "no-store" })
       .then(async (response) => {
@@ -163,6 +187,7 @@ export function CustomerDesignRequests() {
           finish,
           notes,
           inspirationImages: inspirationImages.map((image) => image.src),
+          termsAcceptanceId: acceptance.id,
         }),
       });
       const payload = (await response.json()) as {
@@ -206,13 +231,21 @@ export function CustomerDesignRequests() {
           <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
             Step 1 of the design workflow
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">
+          <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-xl font-semibold tracking-tight outline-none">
             New Design Request
           </h1>
           <p className="mt-1 text-sm leading-6 text-stone-600">
             Share your requirements and reference images. The admin will first
             review whether the request is feasible before design work begins.
           </p>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+          <p className="font-semibold text-red-900">Terms accepted · Full payment required before viewing</p>
+          <p className="mt-1 leading-6 text-stone-600">Your delivered design unlocks after the Billing Clerk verifies the full design fee.</p>
+          <button type="button" onClick={onReviewTerms} aria-haspopup="dialog" className="mt-2 rounded text-sm font-semibold text-red-700 underline underline-offset-4 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-red-600">
+            Review Terms and Conditions
+          </button>
         </div>
 
         {error ? (
