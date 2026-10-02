@@ -3,6 +3,7 @@
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/ui/google-auth-button";
+import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { CheckCircle2, Eye, EyeOff, HardHat } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -126,12 +127,15 @@ export function RegisterAccountPage({
           </div>
 
           <form className="mt-6 max-w-xl space-y-5" onSubmit={handleSubmit}>
+            <p className="text-sm leading-6 text-stone-600">
+              Fields marked with a red asterisk (<RequiredIndicator />) are required. Occupation is optional.
+            </p>
             <div className="space-y-2">
               <label
                 htmlFor="name"
                 className="text-sm font-medium text-stone-700"
               >
-                Full name
+                Full name <RequiredIndicator />
               </label>
               <input
                 id="name"
@@ -151,7 +155,7 @@ export function RegisterAccountPage({
                 htmlFor="email"
                 className="text-sm font-medium text-stone-700"
               >
-                Email address
+                Email address <RequiredIndicator />
               </label>
               <input
                 id="email"
@@ -168,7 +172,7 @@ export function RegisterAccountPage({
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <label htmlFor="age" className="text-sm font-medium text-stone-700">
-                  Age (years)
+                  Age (years) <RequiredIndicator />
                 </label>
                 <input
                   id="age"
@@ -185,7 +189,7 @@ export function RegisterAccountPage({
               </div>
               <div className="space-y-2">
                 <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
-                  Contact number
+                  Contact number <RequiredIndicator />
                 </label>
                 <input
                   id="contactNumber"
@@ -203,7 +207,7 @@ export function RegisterAccountPage({
 
             <div className="space-y-2">
               <label htmlFor="address" className="text-sm font-medium text-stone-700">
-                Complete address
+                Complete address <RequiredIndicator />
               </label>
               <textarea
                 id="address"
@@ -238,7 +242,7 @@ export function RegisterAccountPage({
                   htmlFor="password"
                   className="text-sm font-medium text-stone-700"
                 >
-                  Password
+                  Password <RequiredIndicator />
                 </label>
                 <div className="relative">
                   <input
@@ -274,7 +278,7 @@ export function RegisterAccountPage({
                   htmlFor="confirmPassword"
                   className="text-sm font-medium text-stone-700"
                 >
-                  Confirm password
+                  Confirm password <RequiredIndicator />
                 </label>
                 <input
                   id="confirmPassword"

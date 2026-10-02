@@ -1,15 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { RequiredIndicator } from "@/components/ui/required-indicator";
 import type { ClientDetails, ClientDto } from "@/types/clients";
 
 export type ClientFormInput = ClientDetails & { name: string; email?: string; password?: string };
 
 const fieldClass = "mt-2 min-h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-base text-stone-950 outline-none placeholder:text-stone-500 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 read-only:bg-stone-50 sm:text-sm";
-
-function RequiredIndicator() {
-  return <span aria-hidden="true" className="text-red-700">*</span>;
-}
 
 export function ClientInformationForm({ client, creating = false, onSave, onCancel }: {
   client?: ClientDto;
