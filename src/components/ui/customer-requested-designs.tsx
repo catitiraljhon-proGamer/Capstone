@@ -63,7 +63,7 @@ export function CustomerRequestedDesigns() {
           <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-stone-200">
             {design.access === "unlocked" ? <CheckCircle2 className="h-7 w-7 text-red-700" /> : design.status === "Completed" ? <LockKeyhole className="h-7 w-7 text-stone-500" /> : <FileImage className="h-7 w-7 text-stone-400" />}
           </div>
-          <div><p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{design.floorArea} sqm · {design.finish}</h2><p className="mt-1 text-sm text-stone-600">{design.rooms}</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p><h2 className="mt-2 text-xl font-semibold tracking-tight">{design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.finish}`}</h2>{design.selectedDesign && <p className="mt-1 text-sm text-stone-600">{design.floorArea} sqm · {design.finish}</p>}<p className="mt-1 text-sm text-stone-600">{design.rooms}</p></div>
         </div>
         <div className="space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2"><span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800">{statusText[design.status]}</span><span className="text-xs text-stone-500">Requested {billingDate(design.createdAt)}</span></div>

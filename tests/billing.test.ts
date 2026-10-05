@@ -4,11 +4,12 @@ import { after, before, beforeEach, test } from "node:test";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
 import { getDatabase } from "@/lib/database/mongodb";
-import { type DesignRequestDocument, type ApprovalDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type UserDocument } from "@/lib/database/collections";
+import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type UserDocument } from "@/lib/database/collections";
 import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBillingData, getOwnedPayment, getReceipt, invoiceInputSchema, paymentInputSchema, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
 import { deliverDesign, listCustomerDesigns, getCustomerDesignImage } from "@/lib/server/design-requests";
+import { createDesignRequest } from "@/lib/server/create-design-request";
 import { acceptDesignRequestTerms, requireDesignRequestTerms } from "@/lib/server/design-request-terms";
 import { designRequestTerms, designRequestTermsText } from "@/lib/design-request-terms";
 import { ZodError } from "zod";
@@ -25,6 +26,101 @@ const draft = { projectId: projectId.toHexString(), label: "Foundation work", ba
 const isError = (status: number) => (error: unknown) => error instanceof BillingError && error.status === status;
 
 const privateImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1cAAAAASUVORK5CYII=";
+
+async function publishedHouseDesign() {
+  const now = new Date();
+  const design: HouseDesignDocument = {
+    _id: new ObjectId(), name: "Selected courtyard house", houseType: "Bungalow",
+    area: 95, rooms: "2 bedrooms, 1 bathroom", finish: "Standard", rate: 25000,
+    images: [privateImage], notes: "Published design", status: "Published",
+    defaultSelections: [], customItems: [], createdAt: now, updatedAt: now,
+    createdBy: new ObjectId(admin.id), createdByName: admin.name,
+  };
+  await db.collection<HouseDesignDocument>("house_designs").insertOne(design);
+  return design;
+}
+
+test("requesting a published design keeps its identity and specifications without duplicate uploads", async () => {
+  const design = await publishedHouseDesign();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id });
+  assert.equal(result.selectedDesign?.id, design._id.toHexString());
+  assert.equal(result.selectedDesign.name, design.name);
+  assert.equal(result.floorArea, design.area);
+  assert.equal(result.rooms, design.rooms);
+  assert.equal(result.finish, design.finish);
+  assert.equal(result.notes, "I would like to request this design as shown.");
+  assert.deepEqual(result.inspirationImages, []);
+  assert.equal(result.status, "Pending");
+  assert.equal(result.access, "in-progress");
+  const saved = await db.collection<DesignRequestDocument>("design_requests").findOne({ _id: new ObjectId(result.id) });
+  assert.equal(saved?.houseDesignId?.toHexString(), design._id.toHexString());
+  assert.equal(saved?.projectId, undefined);
+  assert.equal(saved?.termsAcceptance?.auditLogId.toHexString(), acceptance.id);
+  assert.equal(await db.collection("approvals").countDocuments({ recordId: new ObjectId(result.id), status: "Pending" }), 1);
+  const notification = await db.collection("notifications").findOne({ kind: "design-request" });
+  assert.ok(notification?.body.includes(design.name));
+  await db.collection("house_designs").updateOne({ _id: design._id }, { $set: { name: "Renamed design", area: 150, status: "Archived" } });
+  const history = await listCustomerDesigns(db, customer);
+  assert.equal(history[0].selectedDesign?.name, design.name);
+  assert.equal(history[0].floorArea, design.area);
+});
+
+test("selected designs reject unavailable records, forged specifications, unauthorized roles, and missing terms", async () => {
+  const design = await publishedHouseDesign();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const input = { houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id };
+  for (const actor of [admin, clerk]) await assert.rejects(createDesignRequest(db, actor, input), isError(403));
+  await assert.rejects(createDesignRequest(db, other, input), isError(409));
+  await assert.rejects(createDesignRequest(db, customer, { houseDesignId: input.houseDesignId }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, houseDesignId: "invalid" }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, floorArea: 1, finish: "Luxury" }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, selectedDesign: { name: "Forged design" } }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, houseDesignId: new ObjectId().toHexString() }), isError(404));
+  for (const status of ["Draft", "Archived"]) {
+    await db.collection("house_designs").updateOne({ _id: design._id }, { $set: { status } });
+    await assert.rejects(createDesignRequest(db, customer, input), isError(404));
+  }
+  assert.equal(await db.collection("design_requests").countDocuments(), 0);
+  assert.equal(await db.collection("approvals").countDocuments(), 0);
+  assert.equal(await db.collection("notifications").countDocuments(), 0);
+});
+
+test("custom design requests still require requirements and inspiration images", async () => {
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], termsAcceptanceId: acceptance.id };
+  await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
+  const request = await createDesignRequest(db, customer, input);
+  assert.equal(request.selectedDesign, undefined);
+  assert.equal(request.rooms, "2 bedrooms, 1 bathroom");
+  assert.deepEqual(request.inspirationImages, [privateImage]);
+});
+
+test("a selected design follows approval, delivery, and verified design-fee payment before unlocking", async () => {
+  const design = await publishedHouseDesign();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const request = await createDesignRequest(db, customer, {
+    houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id,
+    notes: "Please review a different gate finish.", inspirationImages: [privateImage],
+  });
+  assert.equal(request.notes, "Please review a different gate finish.");
+  assert.deepEqual(request.inspirationImages, [privateImage]);
+  await assert.rejects(getCustomerDesignImage(db, customer, request.id, 0), isError(403));
+  await db.collection("design_requests").updateOne({ _id: new ObjectId(request.id) }, { $set: { status: "Approved" } });
+  await db.collection("approvals").updateOne({ recordId: new ObjectId(request.id) }, { $set: { status: "Approved" } });
+  await deliverDesign(db, admin, request.id, { images: [privateImage] });
+  const invoiceId = await createInvoice(db, clerk, feeInput(request.id));
+  await changeInvoice(db, clerk, invoiceId, { action: "issue" });
+  const paymentId = await submitPayment(db, customer, payment(invoiceId, 5000));
+  assert.equal((await listCustomerDesigns(db, customer))[0].access, "payment-required");
+  await reviewPayment(db, clerk, paymentId, { action: "verify" });
+  const delivered = (await listCustomerDesigns(db, customer))[0];
+  assert.equal(delivered.selectedDesign?.id, design._id.toHexString());
+  assert.equal(delivered.access, "unlocked");
+  await getCustomerDesignImage(db, customer, request.id, 0);
+  assert.equal((await getBillingData(db, clerk)).projects[0].paid, 0);
+});
 
 test("design terms require an explicit customer agreement to the current version", async () => {
   const input = { accepted: true, version: designRequestTerms.version };
@@ -217,7 +313,7 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_billing_tests");
-  await Promise.all(["design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,

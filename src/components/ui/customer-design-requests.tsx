@@ -57,14 +57,14 @@ function formatDate(value: string) {
   });
 }
 
-export function CustomerDesignRequests() {
+export function CustomerDesignRequests({ houseDesignId }: { houseDesignId?: string }) {
   const router = useRouter();
   const [acceptance, setAcceptance] = useState<DesignTermsAcceptance | null>(null);
   const [isReviewingTerms, setIsReviewingTerms] = useState(false);
 
   return (
     <>
-      {acceptance ? <DesignRequestForm acceptance={acceptance} onReviewTerms={() => setIsReviewingTerms(true)} /> : null}
+      {acceptance ? <DesignRequestForm houseDesignId={houseDesignId} acceptance={acceptance} onReviewTerms={() => setIsReviewingTerms(true)} /> : null}
       {!acceptance || isReviewingTerms ? (
         <DesignRequestTermsDialog
           onAccept={setAcceptance}
@@ -76,9 +76,16 @@ export function CustomerDesignRequests() {
   );
 }
 
-function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTermsAcceptance; onReviewTerms: () => void }) {
+function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
+  acceptance: DesignTermsAcceptance;
+  onReviewTerms: () => void;
+  houseDesignId?: string;
+}) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { catalog } = useHouseDesigns();
+  const { catalog, designs, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
+  const hasDesignSelection = houseDesignId !== undefined;
+  const selectedDesign = designs.find((design) => design.id === houseDesignId);
+  const selectionUnavailable = hasDesignSelection && !isCatalogLoading && !selectedDesign;
   const [requests, setRequests] = useState<DesignRequestDto[]>([]);
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
@@ -167,7 +174,11 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (inspirationImages.length === 0) {
+    if (hasDesignSelection && !selectedDesign) {
+      setError("Choose an available design from Finished Designs before submitting your request.");
+      return;
+    }
+    if (!hasDesignSelection && inspirationImages.length === 0) {
       setError("Upload at least one inspiration image before submitting your request.");
       return;
     }
@@ -181,10 +192,12 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          floorArea: Number(floorArea),
-          bedrooms: Number(bedrooms),
-          bathrooms: Number(bathrooms),
-          finish,
+          ...(selectedDesign ? { houseDesignId: selectedDesign.id } : {
+            floorArea: Number(floorArea),
+            bedrooms: Number(bedrooms),
+            bathrooms: Number(bathrooms),
+            finish,
+          }),
           notes,
           inspirationImages: inspirationImages.map((image) => image.src),
           termsAcceptanceId: acceptance.id,
@@ -210,7 +223,9 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
       setNotes("");
       setInspirationImages([]);
       setSuccessMessage(
-        "Your request and inspiration images were sent directly to the admin for feasibility review.",
+        selectedDesign
+          ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in My House Design; the design fee will be billed separately.`
+          : "Your request and inspiration images were sent directly to the admin for feasibility review.",
       );
     } catch (submitError) {
       setError(
@@ -232,11 +247,12 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
             Step 1 of the design workflow
           </p>
           <h1 ref={headingRef} tabIndex={-1} className="mt-1 text-xl font-semibold tracking-tight outline-none">
-            New Design Request
+            {hasDesignSelection ? "Request This Design" : "New Design Request"}
           </h1>
           <p className="mt-1 text-sm leading-6 text-stone-600">
-            Share your requirements and reference images. The admin will first
-            review whether the request is feasible before design work begins.
+            {hasDesignSelection
+              ? "Request the selected house design as shown, or add notes about your preferred changes. The admin will review your request before preparing the design for delivery."
+              : "Share your requirements and reference images. The admin will first review whether the request is feasible before design work begins."}
           </p>
         </div>
 
@@ -260,6 +276,28 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
         ) : null}
 
         <form onSubmit={submit}>
+          {hasDesignSelection ? (
+            <div className="mt-5 rounded-lg border border-stone-200 bg-stone-50 p-4">
+              {isCatalogLoading ? <p role="status" className="text-sm text-stone-600">Loading your selected design…</p> : null}
+              {selectionUnavailable ? (
+                <div role="alert">
+                  <p className="text-sm text-red-700">{catalogError ?? "This design is no longer available. Please choose another published design."}</p>
+                  <Link href="/customer/finished-designs" className="mt-2 inline-block text-sm font-semibold text-red-700 underline">Choose another design</Link>
+                </div>
+              ) : selectedDesign ? (
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  {selectedDesign.images[0] ? <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-lg sm:w-40"><Image src={selectedDesign.images[0]} alt={selectedDesign.name} fill unoptimized className="object-cover" /></div> : null}
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected design</p>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
+                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType} · {selectedDesign.area} sqm · {selectedDesign.finish}</p>
+                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
+                    <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The construction estimate is not the design fee.</p>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="block text-sm font-semibold">
@@ -324,16 +362,17 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
               </select>
             </label>
           </div>
+          )}
 
           <label className="mt-5 block text-sm font-semibold">
-            Description
+            {hasDesignSelection ? "Additional notes or requested changes (optional)" : "Description"}
             <textarea
               rows={5}
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
-              required
+              required={!hasDesignSelection}
               maxLength={4000}
-              placeholder="Describe the style, layout, preferred materials, colors, and budget concerns."
+              placeholder={hasDesignSelection ? "Leave blank to request the design as shown, or describe the changes you would like the admin to review." : "Describe the style, layout, preferred materials, colors, and budget concerns."}
               className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600"
             />
           </label>
@@ -341,9 +380,9 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
           <div className="mt-5">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold">House inspiration images</p>
+                <p className="text-sm font-semibold">{hasDesignSelection ? "Additional reference images (optional)" : "House inspiration images"}</p>
                 <p className="mt-1 text-xs text-stone-500">
-                  1–6 images · JPG, PNG, or WebP · maximum 750 KB each
+                  {hasDesignSelection ? "Up to 6 optional images; your selected design is already included." : "1–6 images"} · JPG, PNG, or WebP · maximum 750 KB each
                 </p>
               </div>
               {inspirationImages.length > 0 ? (
@@ -406,10 +445,10 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
                 <span>
                   <ImagePlus className="mx-auto h-9 w-9 text-red-700" />
                   <span className="mt-3 block text-sm font-semibold">
-                    {isReadingImage ? "Reading images…" : "Upload inspiration images"}
+                    {isReadingImage ? "Reading images…" : hasDesignSelection ? "Add reference images (optional)" : "Upload inspiration images"}
                   </span>
                   <span className="mt-1 block text-xs text-stone-500">
-                    Choose a photo that represents the house you want.
+                    {hasDesignSelection ? "Add images only if you want to explain a change." : "Choose a photo that represents the house you want."}
                   </span>
                 </span>
                 <input
@@ -425,11 +464,11 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
 
           <button
             type="submit"
-            disabled={isSubmitting || isReadingImage}
+            disabled={isSubmitting || isReadingImage || (hasDesignSelection && (isCatalogLoading || !selectedDesign))}
             className="mt-5 inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
           >
             <Send className="h-4 w-4" />
-            {isSubmitting ? "Sending to admin…" : "Submit for Feasibility Review"}
+            {isSubmitting ? "Sending to admin…" : hasDesignSelection ? "Submit Design Request" : "Submit for Feasibility Review"}
           </button>
         </form>
       </section>
@@ -460,6 +499,7 @@ function DesignRequestForm({ acceptance, onReviewTerms }: { acceptance: DesignTe
               <div className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
+                    {request.selectedDesign ? <p className="mb-1 text-sm font-semibold text-red-800">{request.selectedDesign.name}</p> : null}
                     <p className="text-sm font-semibold">
                       {request.floorArea} sqm · {request.finish}
                     </p>

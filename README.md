@@ -150,6 +150,13 @@ account round trip still requires the OAuth configuration above.
 
 ## Requested designs and payment access
 
+From Finished Designs, **Request This Design** carries the selected published
+design into Design Requests. Its name and specifications are saved with the
+request and shown in admin Approvals and My House Design. Customers can request
+it as shown or add change notes and optional reference images. The construction
+estimate is not the design fee; the existing approval, delivery, invoicing, and
+verified-payment access rules still apply.
+
 Customer Dashboard links to **Finished Designs** at /customer/finished-designs,
 which contains the published inspiration catalog. **My House Design** contains
 only the signed-in customer's requests and delivery/payment status.

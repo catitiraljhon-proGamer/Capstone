@@ -283,10 +283,23 @@ function ApprovalReviewDialog({
             ) : null}
           </div>
 
+          {approval.selectedDesign ? (
+            <section className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected published design</p>
+              <h3 className="mt-2 font-semibold">{approval.selectedDesign.name}</h3>
+              <p className="mt-1 text-sm text-stone-600">{approval.selectedDesign.houseType} · {approval.selectedDesign.floorArea} sqm · {approval.selectedDesign.finish} · {approval.selectedDesign.rooms}</p>
+              {approval.selectedDesignImages?.[0] ? (
+                <div className="relative mt-3 aspect-[16/9] overflow-hidden rounded-lg bg-stone-100">
+                  <Image src={approval.selectedDesignImages[0]} alt={approval.selectedDesign.name} fill unoptimized className="object-contain" />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           {approval.recordType === "Design request" ? (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                Client inspiration
+                {approval.selectedDesign ? "Additional client references" : "Client inspiration"}
               </p>
               {inspirationImages.length > 0 ? (
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -310,7 +323,7 @@ function ApprovalReviewDialog({
                 </div>
               ) : (
                 <p className="mt-2 rounded-lg border border-dashed border-stone-200 p-4 text-sm text-stone-500">
-                  This legacy request does not include an inspiration image.
+                  {approval.selectedDesign ? "The customer selected an existing design and did not add extra reference images." : "This legacy request does not include an inspiration image."}
                 </p>
               )}
             </div>

@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   description: "Customer design request and revision page.",
 };
 
-export default function DesignRequestsPage() {
-  return <CustomerDesignRequestsPage />;
+export default async function DesignRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ design?: string | string[] }>;
+}) {
+  const { design } = await searchParams;
+  const houseDesignId = Array.isArray(design) ? design[0] : design;
+  return <CustomerDesignRequestsPage houseDesignId={houseDesignId} />;
 }

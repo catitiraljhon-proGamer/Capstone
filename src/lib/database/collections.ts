@@ -18,6 +18,7 @@ import type {
 import type { ObjectId } from "mongodb";
 import type { ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot } from "@/types/billing";
+import type { RequestedHouseDesign } from "@/types/design-requests";
 
 export const collections = {
   users: "users",
@@ -131,6 +132,8 @@ export type DesignRequestDocument = {
   customerId: ObjectId;
   projectId?: ObjectId;
   houseDesignId?: ObjectId;
+  /** Snapshot of the published design explicitly chosen by the customer. */
+  selectedDesign?: RequestedHouseDesign;
   floorArea: number;
   /** Older requests only have a free-text rooms summary. */
   bedrooms?: number;

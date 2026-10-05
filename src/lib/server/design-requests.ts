@@ -30,6 +30,7 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
   const unlocked = Boolean(invoice && Number.isFinite(invoice.amount) && invoice.amount > 0 && toCentavos(paid) >= toCentavos(invoice.amount));
   return {
     id: design._id.toHexString(), floorArea: design.floorArea, bedrooms: design.bedrooms, bathrooms: design.bathrooms,
+    selectedDesign: design.selectedDesign,
     rooms: design.rooms, finish: design.finish, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
     status: design.status, completedAt: design.completedAt?.toISOString(), createdAt: design.createdAt.toISOString(),

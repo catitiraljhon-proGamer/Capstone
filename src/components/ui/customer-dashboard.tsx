@@ -533,8 +533,12 @@ export function CustomerFinishedDesignsPage() {
                 />
               </div>
 
-              <div className="mt-6 flex justify-end border-t border-stone-200 pt-5">
-                <Link href="/customer/design-requests" className="rounded-lg bg-red-700 px-5 py-2 text-sm font-semibold text-white hover:bg-red-800">Request Material Changes</Link>
+              <div className="mt-6 flex flex-col gap-4 border-t border-stone-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-xl text-sm leading-6 text-stone-600">
+                  Request this design as shown or include your preferred changes.
+                  The design fee is billed separately from the construction estimate.
+                </p>
+                <Link href={`/customer/design-requests?design=${encodeURIComponent(selectedDesign.id)}`} className="inline-flex shrink-0 justify-center rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Request This Design</Link>
               </div>
             </div>
           ) : (
@@ -549,14 +553,14 @@ export function CustomerFinishedDesignsPage() {
     </CustomerShell>
   );
 }
-export function CustomerDesignRequestsPage() {
+export function CustomerDesignRequestsPage({ houseDesignId }: { houseDesignId?: string }) {
   return (
     <CustomerShell
       activeSection="requests"
       title="Design Requests"
       description="Submit your requirements for admin approval and track the design work. Delivered designs are in My House Design."
     >
-      <CustomerDesignRequests />
+      <CustomerDesignRequests key={houseDesignId ?? "custom"} houseDesignId={houseDesignId} />
     </CustomerShell>
   );
 }

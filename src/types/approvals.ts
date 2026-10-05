@@ -1,3 +1,5 @@
+import type { RequestedHouseDesign } from "@/types/design-requests";
+
 export const approvalRecordTypes = [
   "Design request",
   "Cost estimate",
@@ -25,6 +27,8 @@ export type ApprovalDto = {
   description: string;
   sourceStatus: string | null;
   sourceAvailable: boolean;
+  selectedDesign?: RequestedHouseDesign;
+  selectedDesignImages?: string[];
   inspirationImages?: string[];
   completedDesignImages?: string[];
   completedAt?: string;

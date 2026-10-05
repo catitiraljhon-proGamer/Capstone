@@ -1,7 +1,17 @@
 import type { HouseDesignFinish } from "@/components/ui/house-design-data";
 
+export type RequestedHouseDesign = {
+  id: string;
+  name: string;
+  houseType: string;
+  floorArea: number;
+  rooms: string;
+  finish: HouseDesignFinish;
+};
+
 export type DesignRequestDto = {
   id: string;
+  selectedDesign?: RequestedHouseDesign;
   floorArea: number;
   bedrooms?: number;
   bathrooms?: number;

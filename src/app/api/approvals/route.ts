@@ -4,6 +4,7 @@ import {
   type DesignRequestDocument,
   type DocumentRecord,
   type EstimateDocument,
+  type HouseDesignDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
@@ -20,6 +21,8 @@ type ApprovalSource = Pick<
   | "description"
   | "sourceStatus"
   | "sourceAvailable"
+  | "selectedDesign"
+  | "selectedDesignImages"
   | "inspirationImages"
   | "completedDesignImages"
   | "completedAt"
@@ -99,6 +102,17 @@ export async function GET() {
           .toArray(),
       ]);
 
+    const selectedDesignIds = designRequests.flatMap((request) =>
+      request.selectedDesign && request.houseDesignId ? [request.houseDesignId] : [],
+    );
+    const selectedDesigns = selectedDesignIds.length
+      ? await db.collection<HouseDesignDocument>(collections.houseDesigns)
+          .find({ _id: { $in: selectedDesignIds } }, { projection: { images: 1 } }).toArray()
+      : [];
+    const selectedDesignImages = new Map(
+      selectedDesigns.map((design) => [design._id.toHexString(), design.images.slice(0, 1)]),
+    );
+
     const usersById = new Map(
       users.map((user) => [user._id.toHexString(), user]),
     );
@@ -108,10 +122,16 @@ export async function GET() {
 
     for (const source of designRequests) {
       sourcesByKey.set(sourceKey("Design request", source._id), {
-        subject: `${source.floorArea.toLocaleString("en-PH")} sqm ${source.finish.toLowerCase()} design request`,
-        description: `${source.rooms} — ${source.notes}`,
+        subject: source.selectedDesign
+          ? `${source.selectedDesign.name} — design request`
+          : `${source.floorArea.toLocaleString("en-PH")} sqm ${source.finish.toLowerCase()} design request`,
+        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.finish} · ${source.rooms} — ${source.notes}`,
         sourceStatus: source.status,
         sourceAvailable: true,
+        selectedDesign: source.selectedDesign,
+        selectedDesignImages: source.selectedDesign
+          ? selectedDesignImages.get(source.selectedDesign.id) ?? []
+          : undefined,
         inspirationImages:
           source.inspirationImages ??
           (source.inspirationImage ? [source.inspirationImage] : []),
