@@ -5,6 +5,7 @@ import type { UserRole, SessionUser } from "@/types/domain";
 import { jwtVerify, SignJWT } from "jose";
 import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 
 export const sessionCookieName = "g4_session";
 
@@ -23,6 +24,37 @@ export async function createSessionToken(
     .setIssuedAt()
     .setExpirationTime(expiresIn)
     .sign(getAuthSecret());
+}
+
+export function toSessionUser(user: UserDocument): SessionUser {
+  return {
+    id: user._id.toHexString(),
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
+}
+
+/** Signs a session for a fully authenticated user and sets its cookie. */
+export async function startSession(
+  response: NextResponse,
+  user: UserDocument,
+  rememberMe: boolean,
+) {
+  const sessionUser = toSessionUser(user);
+  const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
+  const token = await createSessionToken(
+    { ...sessionUser, authVersion: user.authVersion ?? 0 },
+    `${maxAge}s`,
+  );
+  response.cookies.set(sessionCookieName, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge,
+  });
+  return sessionUser;
 }
 
 export async function readSession(): Promise<SessionUser | null> {

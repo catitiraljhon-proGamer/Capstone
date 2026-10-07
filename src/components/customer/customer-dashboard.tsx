@@ -1,5 +1,6 @@
 "use client";
 
+import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ContactDetails } from "@/components/landing/contact-us";
@@ -589,6 +590,7 @@ export function CustomerProfilePage() {
         <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
         <div className="mt-5"><ClientProfileForm /></div>
       </Panel>
+      <div className="mt-6 max-w-3xl"><TwoFactorSettings /></div>
     </CustomerShell>
   );
 }

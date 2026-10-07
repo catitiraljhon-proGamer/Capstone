@@ -37,6 +37,7 @@ export const collections = {
   notifications: "notifications",
   schedules: "schedules",
   auditLogs: "audit_logs",
+  rateLimits: "rate_limits",
 } as const;
 
 export type UserDocument = {
@@ -48,10 +49,32 @@ export type UserDocument = {
   role: UserRole;
   status: UserStatus;
   authVersion?: number;
+  twoFactor?: TwoFactorSettings;
+  /** Unconfirmed authenticator secret, replaced on each new setup attempt. */
+  twoFactorSetup?: { secret: string; createdAt: Date };
   clientDetails?: ClientDetails;
   clientArchivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type TwoFactorSettings = {
+  /** Authenticator secret, encrypted with a key derived from AUTH_SECRET. */
+  secret: string;
+  enabledAt: Date;
+  /** Last accepted 30-second time step, so a code cannot be replayed. */
+  lastUsedStep?: number;
+  recoveryCodes: { hash: string; usedAt?: Date }[];
+};
+
+/** Failed-attempt counters for login, 2FA, and registration throttling. */
+export type RateLimitDocument = {
+  _id: string;
+  failures: number;
+  windowStartedAt: Date;
+  lockouts: number;
+  lockedUntil?: Date | null;
+  expiresAt: Date;
 };
 
 export type HouseDesignDocument = {

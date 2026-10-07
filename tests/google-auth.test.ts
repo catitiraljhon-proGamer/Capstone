@@ -28,6 +28,12 @@ import {
 } from "@/lib/server/google-oauth";
 import { resolveGoogleAccount } from "@/lib/server/google-accounts";
 import { sessionCookieName } from "@/lib/server/session";
+import {
+  encryptTwoFactorSecret,
+  readTwoFactorChallenge,
+  twoFactorChallengeCookieName,
+} from "@/lib/server/two-factor";
+import { generateTotpSecret } from "@/lib/server/totp";
 import { GET as startGoogle } from "@/app/api/auth/google/route";
 import { GET as googleCallback } from "@/app/api/auth/google/callback/route";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
@@ -62,7 +68,7 @@ beforeEach(async () => {
   mock.restoreAll();
   // Only the isolated in-memory test database is modified.
   await Promise.all(
-    ["users", "notifications", "audit_logs"].map((name) =>
+    ["users", "notifications", "audit_logs", "rate_limits"].map((name) =>
       db.collection(name).deleteMany({}),
     ),
   );
@@ -450,6 +456,31 @@ test("returning Google users retain their role, profile and 30-day remember-me s
   assert.equal(
     await db.collection("audit_logs").countDocuments({ action: "auth.login" }),
     1,
+  );
+});
+
+test("Google sign-in for a 2FA account asks for a code before any session exists", async () => {
+  const account = user({
+    googleSub: profile.sub,
+    twoFactor: {
+      secret: encryptTwoFactorSecret(generateTotpSecret()),
+      enabledAt: new Date(),
+      recoveryCodes: [],
+    },
+  });
+  await db.collection<UserDocument>("users").insertOne(account);
+  const response = await googleCallback(await callbackRequest("login", true));
+  assert.equal(response.headers.get("location"), `${origin}/login?two_factor=1`);
+  assert.equal(response.cookies.get(sessionCookieName), undefined);
+  const challenge = await readTwoFactorChallenge(
+    response.cookies.get(twoFactorChallengeCookieName)?.value,
+  );
+  assert.equal(challenge?.userId, account._id.toHexString());
+  assert.equal(challenge?.provider, "google");
+  assert.equal(challenge?.rememberMe, true);
+  assert.equal(
+    await db.collection("audit_logs").countDocuments({ action: "auth.login" }),
+    0,
   );
 });
 

@@ -7,6 +7,7 @@ import { LogoutButton } from "@/components/ui/logout-button";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
+import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import type { BillingSection } from "@/types/billing";
 import {
   CalendarDays,
@@ -20,6 +21,7 @@ import {
   ReceiptText,
   ShieldCheck,
   User,
+  UserLock,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -56,6 +58,7 @@ const clerkNav = [
   { label: "Invoices", icon: FileText, href: "/billing-clerk/invoices" },
   { label: "Customer Accounts", icon: Users, href: "/billing-clerk/customer-accounts" },
   { label: "Reports", icon: ClipboardCheck, href: "/billing-clerk/reports" },
+  { label: "Security", icon: UserLock, href: "/billing-clerk/security" },
 ];
 
 const adminNav = [
@@ -68,6 +71,7 @@ const adminNav = [
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
   { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },
+  { label: "Security", icon: UserLock, href: "/admin/security" },
 ];
 
 const setActiveNav = (
@@ -463,6 +467,24 @@ export function AdminDashboard() {
 
 export function BillingClerkSectionPage({ activeLabel, title, description }: { activeLabel: BillingSection; title: string; description: string }) {
   return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={<BillingWorkspace section={activeLabel} />} />;
+}
+
+export function BillingClerkSecurityPage() {
+  return (
+    <StaffDashboard
+      role="Billing Clerk"
+      name="Billing Clerk"
+      title="Security"
+      description="Protect your account with two-factor authentication."
+      navItems={setActiveNav(clerkNav, "Security")}
+      metrics={[]}
+      primaryPanel={null}
+      queueTitle=""
+      queueItems={[]}
+      activityItems={[]}
+      mainContent={<div className="max-w-3xl"><TwoFactorSettings /></div>}
+    />
+  );
 }
 
 export function AdminSectionPage({

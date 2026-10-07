@@ -7,8 +7,16 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
 import { createClientSchema } from "@/lib/server/clients";
-import { createSessionToken, sessionCookieName } from "@/lib/server/session";
-import { roleHomePaths, type SessionUser } from "@/types/domain";
+import {
+  clientIp,
+  formatRetryAfter,
+  getRateLimitStatus,
+  rateLimitKeys,
+  rateLimitPolicies,
+  recordRateLimitFailure,
+} from "@/lib/server/rate-limit";
+import { startSession, toSessionUser } from "@/lib/server/session";
+import { roleHomePaths } from "@/types/domain";
 import { hash } from "bcryptjs";
 import { MongoServerError, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -30,6 +38,19 @@ export async function POST(request: Request) {
   try {
     const { name, email, password, ...clientDetails } = registrationSchema.parse(await request.json());
     const db = await getDatabase();
+    // Every attempt from a network address counts, which limits both
+    // automated sign-ups and probing which emails already have accounts.
+    const ipKey = rateLimitKeys.register(clientIp(request));
+    const limit = await getRateLimitStatus(db, ipKey, rateLimitPolicies.register);
+    if (limit.locked) {
+      return NextResponse.json(
+        {
+          error: `Too many registration attempts from this network. Try again in ${formatRetryAfter(limit.retryAfterSeconds)}.`,
+        },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+      );
+    }
+    await recordRateLimitFailure(db, ipKey, rateLimitPolicies.register);
     const users = db.collection<UserDocument>(collections.users);
     const existingUser = await users.findOne(
       { email },
@@ -93,17 +114,12 @@ export async function POST(request: Request) {
         );
     }
 
-    const sessionUser: SessionUser = {
-      id: userId.toHexString(),
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-    const maxAge = 60 * 60 * 8;
-    const token = await createSessionToken(
-      { ...sessionUser, authVersion: user.authVersion ?? 0 },
-      `${maxAge}s`,
+    const sessionUser = toSessionUser(user);
+    const response = NextResponse.json(
+      { user: sessionUser, redirectTo: roleHomePaths.customer },
+      { status: 201 },
     );
+    await startSession(response, user, false);
     await recordAuditLog({
       db,
       actor: sessionUser,
@@ -113,22 +129,6 @@ export async function POST(request: Request) {
       details: { email: user.email, role: user.role },
       createdAt: now,
     });
-    const response = NextResponse.json(
-      {
-        user: sessionUser,
-        redirectTo: roleHomePaths.customer,
-      },
-      { status: 201 },
-    );
-
-    response.cookies.set(sessionCookieName, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge,
-    });
-
     return response;
   } catch (error) {
     return apiError(error);

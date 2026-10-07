@@ -119,6 +119,34 @@ audit logs are reused. Google access/refresh tokens are not stored.
 Without these environment values, email/password authentication remains available
 and the Google button returns a friendly availability message.
 
+## Sign-in protection and two-factor authentication
+
+Password sign-in is throttled to stop guessing and brute-force attacks:
+
+- Five wrong passwords for one email within 15 minutes lock sign-in for that
+  email for 15 minutes. Each repeated lock doubles (30 minutes, 1 hour, …, up
+  to 24 hours). Unknown emails lock the same way, so lockouts do not reveal
+  which accounts exist.
+- Twenty failed attempts from one network address within 15 minutes lock that
+  address, which stops one source from trying many emails.
+- A locked account is refused before the password is checked, even if the
+  correct password is entered. Lockouts appear in Audit Logs.
+- Ten registration attempts per network address per hour are allowed.
+- Counters live in the `rate_limits` collection and expire automatically.
+
+Every account can turn on two-factor authentication (2FA) with an
+authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.):
+customers from **My Profile**, admins and billing clerks from **Security** in the
+sidebar. After the password or Google sign-in, the user must enter the current
+6-digit code or one of eight single-use recovery codes. Codes cannot be reused,
+five wrong codes lock the step for 15 minutes, and turning 2FA off or creating
+new recovery codes requires a current code.
+
+Authenticator secrets are encrypted with a key derived from `AUTH_SECRET`, and
+recovery codes are stored only as hashes. Changing `AUTH_SECRET` signs everyone
+out and makes existing 2FA setups unreadable; users would then need an admin to
+clear `twoFactor` on their user record and set 2FA up again.
+
 ## MongoDB collections
 
 - `users`: credentials, profile, role, and account status
@@ -128,6 +156,7 @@ and the Google button returns a friendly availability message.
 - `projects`, `design_requests`, `cost_estimates`, `approvals`: project and estimation workflow
 - `invoices`, `payments`: billing and multiple-payment records
 - `documents`, `notifications`, `audit_logs`: supporting records and traceability
+- `rate_limits`: temporary failed sign-in, 2FA, and registration counters
 
 Indexes are created when the application first connects. Seed data lives under `database/seeds` so it is bootstrap input, not a runtime fallback.
 
@@ -137,13 +166,15 @@ Indexes are created when the application first connects. Seed data lives under `
 npm run lint
 npm run typecheck
 npm run test:auth
+npm run test:security
 npm run test:clients
 npm run test:pricing
 npm run build
 ```
 
 `test:clients` covers client permissions, registration details, and duplicate accounts
-using a temporary MongoDB instance. `test:auth` uses a temporary MongoDB instance and signed test identities, without
+using a temporary MongoDB instance. `test:security` covers sign-in lockouts, the
+authenticator code algorithm, recovery codes, and the 2FA sign-in step. `test:auth` uses a temporary MongoDB instance and signed test identities, without
 reading `.env.local`, contacting Google, or changing your application database.
 The test MongoDB binary is downloaded automatically on first use. A real Google
 account round trip still requires the OAuth configuration above.

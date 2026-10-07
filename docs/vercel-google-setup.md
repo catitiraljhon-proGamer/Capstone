@@ -161,6 +161,8 @@ verified after the production configuration is complete.
 | Google sign-in is not available yet | All three `GOOGLE_*` values exist in the Production environment, and the app was redeployed. |
 | `redirect_uri_mismatch` | The Google client's authorized callback exactly matches `GOOGLE_REDIRECT_URI`. |
 | Returns to localhost or a different domain | Vercel still has the local callback or an old domain; update it and redeploy. |
+| Google seems to succeed but you are not signed in | Google always finishes on the domain in `GOOGLE_REDIRECT_URI`, and the session is saved there. Open the app from that same production domain (currently `https://capstone-eight-beta.vercel.app`), not a team or deployment URL such as `capstone-team-les1.vercel.app`. |
+| Customers see "Log in to Vercel" | That URL is covered by Vercel Deployment Protection. Share the public production domain instead, or adjust **Settings > Deployment Protection** in Vercel. |
 | Google succeeds but the application cannot finish login | Check Atlas database credentials, network access, database permissions, and Vercel runtime logs. |
 | Sign-in is temporarily unavailable because of a database problem | Open `/api/public/stats` on the production domain. A server error there confirms the database problem also affects other routes. Check Atlas Network Access for the Vercel server, not just your computer. |
 | Vercel logs show `MongoServerSelectionError`, `ReplicaSetNoPrimary`, or TLS alert 80 | Confirm the cluster is running and Atlas permits the deployment's outbound connections. Verify the URI and database credentials. Keep TLS and certificate verification enabled. After correcting Atlas access, retry; failed connection and index attempts are now cleared automatically. |

@@ -11,8 +11,13 @@ import {
   googleLinkCookieName,
   readGoogleFlow,
 } from "@/lib/server/google-oauth";
-import { createSessionToken, sessionCookieName } from "@/lib/server/session";
-import { roleHomePaths, type SessionUser } from "@/types/domain";
+import { startSession } from "@/lib/server/session";
+import {
+  createTwoFactorChallenge,
+  twoFactorChallengeCookieName,
+  twoFactorChallengeCookieOptions,
+} from "@/lib/server/two-factor";
+import { roleHomePaths } from "@/types/domain";
 import { MongoError, MongoNetworkError, MongoServerSelectionError } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -81,17 +86,28 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const sessionUser: SessionUser = {
-      id: user._id.toHexString(),
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    };
-    const maxAge = flow.rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 8;
-    const token = await createSessionToken(
-      { ...sessionUser, authVersion: user.authVersion ?? 0 },
-      `${maxAge}s`,
+    if (user.twoFactor) {
+      const response = redirectResponse(
+        new URL("/login?two_factor=1", origin),
+      );
+      response.cookies.set(
+        twoFactorChallengeCookieName,
+        await createTwoFactorChallenge({
+          userId: user._id.toHexString(),
+          authVersion: user.authVersion ?? 0,
+          rememberMe: flow.rememberMe,
+          provider: "google",
+          linkedGoogle: false,
+        }),
+        twoFactorChallengeCookieOptions,
+      );
+      return response;
+    }
+
+    const response = redirectResponse(
+      new URL(roleHomePaths[user.role], origin),
     );
+    const sessionUser = await startSession(response, user, flow.rememberMe);
     stage = "audit";
     await recordAuditLog({
       db,
@@ -105,16 +121,6 @@ export async function GET(request: NextRequest) {
         role: user.role,
         rememberMe: flow.rememberMe,
       },
-    });
-    const response = redirectResponse(
-      new URL(roleHomePaths[user.role], origin),
-    );
-    response.cookies.set(sessionCookieName, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge,
     });
     return response;
   } catch (error) {
