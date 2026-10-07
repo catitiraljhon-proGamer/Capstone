@@ -152,7 +152,7 @@ clear `twoFactor` on their user record and set 2FA up again.
 Published designs are G4 Builders Inc intellectual property. Before a customer
 can open **Finished Designs**, they must agree to the Finished Designs Terms and
 Conditions (`src/lib/finished-designs-terms.ts`), which cite RA 8293 (Intellectual
-Property Code of the Philippines) and RA 9266. Agreement is required once per
+Property Code of the Philippines) in plain language. Agreement is required once per
 terms version and is stored in Audit Logs with the full terms text. Change the
 `version` whenever the wording changes so every customer agrees again.
 
