@@ -322,6 +322,6 @@ test("full design galleries require staff access or accepted Finished Designs te
   assert.match(String(record?.details.termsSnapshot), /RA 8293/);
   assert.match(
     String(record?.details.termsSnapshot),
-    /Case 3: Building a design[^\n]*\nLaw: RA 8293, Section 186/,
+    /Case 3: Building a design[^\n]*\nLaw: RA 8293 \(Intellectual Property Code of the Philippines\), Section 186/,
   );
 });
