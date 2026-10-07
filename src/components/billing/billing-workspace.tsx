@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Download, FileText, Plus, RefreshCw, Search, WalletCards, Clock3, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPeso } from "@/components/ui/house-design-data";
-import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson } from "@/components/ui/billing-primitives";
-import { InvoiceActionDialog, InvoiceForm, PaymentForm, PaymentReview, type BillingMutation } from "@/components/ui/billing-forms";
-import { InvoiceTable, PaymentTable } from "@/components/ui/billing-tables";
+import { formatPeso } from "@/lib/house-design-data";
+import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
+import { InvoiceActionDialog, InvoiceForm, PaymentForm, PaymentReview, type BillingMutation } from "@/components/billing/billing-forms";
+import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 

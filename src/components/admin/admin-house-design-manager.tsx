@@ -2,9 +2,9 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
-import ColorChangeCards from "@/components/ui/color-change-card";
-import { HouseDesignForm } from "@/components/ui/house-design-form";
-import { HouseDesignGallery } from "@/components/ui/house-design-gallery";
+import HouseTypeCards from "@/components/house-designs/house-type-cards";
+import { HouseDesignForm } from "@/components/house-designs/house-design-form";
+import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import {
   formatPeso,
   getExteriorEstimate,
@@ -12,9 +12,9 @@ import {
   normalizeSelections,
   type HouseDesign,
   type HouseDesignStatus,
-} from "@/components/ui/house-design-data";
-import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
+} from "@/lib/house-design-data";
+import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import {
   AlertCircle,
@@ -253,7 +253,7 @@ export function AdminHouseDesignManager() {
               exterior materials under that category.
             </p>
           </div>
-          <ColorChangeCards
+          <HouseTypeCards
             houseTypes={catalog.houseTypes}
             onSelect={(houseType) => {
               setSelectedHouseType(houseType);

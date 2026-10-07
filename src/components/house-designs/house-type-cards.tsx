@@ -1,9 +1,9 @@
 "use client";
 
 import { ArrowRight } from "lucide-react";
-import type { HouseType } from "@/components/ui/house-design-data";
+import type { HouseType } from "@/lib/house-design-data";
 
-export default function ColorChangeCards({
+export default function HouseTypeCards({
   houseTypes,
   onSelect,
 }: {

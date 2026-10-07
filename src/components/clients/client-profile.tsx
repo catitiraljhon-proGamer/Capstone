@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ClientInformationForm } from "@/components/ui/client-information-form";
+import { ClientInformationForm } from "@/components/clients/client-information-form";
 import { clientProfileUpdatedEvent, readClientResponse } from "@/lib/client-information";
 import type { ClientDto } from "@/types/clients";
 

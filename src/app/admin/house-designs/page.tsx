@@ -1,4 +1,4 @@
-import { AdminHouseDesignManager } from "@/components/ui/admin-house-design-manager";
+import { AdminHouseDesignManager } from "@/components/admin/admin-house-design-manager";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

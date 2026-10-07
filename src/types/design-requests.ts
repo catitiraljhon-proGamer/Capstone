@@ -1,4 +1,4 @@
-import type { HouseDesignFinish } from "@/components/ui/house-design-data";
+import type { HouseDesignFinish } from "@/lib/house-design-data";
 
 export type RequestedHouseDesign = {
   id: string;

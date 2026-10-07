@@ -1,5 +1,5 @@
-import MoneyflowLandingPage from "@/components/ui/fin-tech-landing-page";
+import LandingPage from "@/components/landing/landing-page";
 
 export default function Home() {
-  return <MoneyflowLandingPage />;
+  return <LandingPage />;
 }

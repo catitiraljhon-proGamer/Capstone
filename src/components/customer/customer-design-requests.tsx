@@ -1,7 +1,7 @@
 "use client";
 
-import type { HouseDesignFinish } from "@/components/ui/house-design-data";
-import { DesignRequestTermsDialog } from "@/components/ui/design-request-terms-dialog";
+import type { HouseDesignFinish } from "@/lib/house-design-data";
+import { DesignRequestTermsDialog } from "@/components/customer/design-request-terms-dialog";
 import type { DesignTermsAcceptance } from "@/lib/design-request-terms";
 import {
   embeddedImageAccept,

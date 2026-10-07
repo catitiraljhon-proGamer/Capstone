@@ -1,6 +1,6 @@
 "use client";
 
-import { isDataImage } from "@/components/ui/house-design-data";
+import { isDataImage } from "@/lib/house-design-data";
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";

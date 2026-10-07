@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { Download, Printer, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPeso } from "@/components/ui/house-design-data";
-import { BillingErrorMessage, billingDate, billingJson } from "@/components/ui/billing-primitives";
+import { formatPeso } from "@/lib/house-design-data";
+import { BillingErrorMessage, billingDate, billingJson } from "@/components/billing/billing-primitives";
 import type { BillingInvoice, BillingReceipt } from "@/types/billing";
 
 export function BillingDocument({ id, customer, kind }: { id: string; customer: boolean; kind: "receipt" | "invoice" }) {

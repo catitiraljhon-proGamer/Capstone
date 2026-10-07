@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { formatPeso } from "@/components/ui/house-design-data";
+import { formatPeso } from "@/lib/house-design-data";
 import {
   embeddedImageAccept,
   readEmbeddedImage,

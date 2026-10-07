@@ -1,24 +1,24 @@
 "use client";
 
-import { BillingWorkspace } from "@/components/ui/billing-workspace";
+import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { ContactDetails } from "@/components/ui/contact-us";
-import { ClientInformationReminder, ClientProfileForm } from "@/components/ui/client-profile";
+import { ContactDetails } from "@/components/landing/contact-us";
+import { ClientInformationReminder, ClientProfileForm } from "@/components/clients/client-profile";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
-import ColorChangeCards from "@/components/ui/color-change-card";
+import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import {
   formatPeso,
   getExteriorEstimate,
   isDataImage,
   normalizeSelections,
   type HouseDesign,
-} from "@/components/ui/house-design-data";
-import { HouseDesignGallery } from "@/components/ui/house-design-gallery";
-import { CustomerRequestedDesigns } from "@/components/ui/customer-requested-designs";
-import { CustomerDesignRequests } from "@/components/ui/customer-design-requests";
-import { CustomerNotificationBell } from "@/components/ui/customer-notification-bell";
-import { ProjectExteriorEstimatePanel } from "@/components/ui/project-exterior-estimate-panel";
+} from "@/lib/house-design-data";
+import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
+import { CustomerRequestedDesigns } from "@/components/customer/customer-requested-designs";
+import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
+import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
+import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
@@ -384,7 +384,7 @@ export function CustomerFinishedDesignsPage() {
                   Start by choosing a house type. Design images appear after a type is selected.
                 </p>
               </div>
-              <ColorChangeCards
+              <HouseTypeCards
                 houseTypes={catalog.houseTypes}
                 onSelect={(houseType) => {
                   setSelectedHouseType(houseType);

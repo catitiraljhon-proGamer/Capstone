@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPeso } from "@/components/ui/house-design-data";
-import { BillingBadge, BillingEmpty, billingDate } from "@/components/ui/billing-primitives";
+import { formatPeso } from "@/lib/house-design-data";
+import { BillingBadge, BillingEmpty, billingDate } from "@/components/billing/billing-primitives";
 import type { BillingInvoice, BillingPayment } from "@/types/billing";
 
 const head = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500";

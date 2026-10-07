@@ -12,7 +12,7 @@ Before making code changes, check `.agents/skills` and apply the files that matc
 
 ## Brand And UI System
 
-Use the G4 Builders Inc visual system established in `src/components/ui/fin-tech-landing-page.tsx`.
+Use the G4 Builders Inc visual system established in `src/components/landing/landing-page.tsx`.
 
 - Brand name: `G4 Builders Inc`.
 - Product context: construction cost estimation, BOQ, progress billing, project cost tracking, approvals, invoices, reports, and margin control.
@@ -44,7 +44,9 @@ Do not introduce a new dominant palette without a clear reason. Keep the look gr
 
 ## Component Structure
 
-- Keep shared UI under `src/components/ui`.
+- Keep generic, reusable UI primitives (buttons, inputs, logo, navigation) under `src/components/ui`.
+- Keep feature components in the matching feature folder: `src/components/{admin,auth,billing,clients,customer,house-designs,landing,staff}`.
+- Keep non-UI data, domain helpers, and client hooks in `src/lib`; server-only code goes in `src/lib/server`, MongoDB setup in `src/lib/database`, and shared types in `src/types`.
 - Keep route-level code in `src/app`; colocate route-private components in `_components` folders when routes grow.
 - Prefer lucide-react icons for actions and domain signals.
 - Keep cards compact with `rounded-xl` or less unless matching existing UI requires otherwise.

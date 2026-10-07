@@ -1,5 +1,5 @@
-import { AdminSchedulingCalendar } from "@/components/ui/admin-scheduling-calendar";
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
+import { AdminSchedulingCalendar } from "@/components/admin/admin-scheduling-calendar";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

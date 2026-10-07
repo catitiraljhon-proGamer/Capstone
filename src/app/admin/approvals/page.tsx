@@ -1,5 +1,5 @@
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
-import { AdminApprovalsManager } from "@/components/ui/admin-approvals-manager";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
+import { AdminApprovalsManager } from "@/components/admin/admin-approvals-manager";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

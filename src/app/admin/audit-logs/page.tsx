@@ -1,5 +1,5 @@
-import { AdminAuditLogViewer } from "@/components/ui/admin-audit-log-viewer";
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
+import { AdminAuditLogViewer } from "@/components/admin/admin-audit-log-viewer";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

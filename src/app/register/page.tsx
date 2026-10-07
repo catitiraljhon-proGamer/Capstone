@@ -1,4 +1,4 @@
-import { RegisterAccountPage } from "@/components/ui/register-account";
+import { RegisterAccountPage } from "@/components/auth/register-account";
 import { googleAuthErrorMessage } from "@/lib/google-auth-errors";
 import { readSession } from "@/lib/server/session";
 import { roleHomePaths } from "@/types/domain";

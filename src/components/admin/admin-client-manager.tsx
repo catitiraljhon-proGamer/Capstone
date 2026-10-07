@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Archive, ArchiveRestore, Pencil, Plus, Search, Users } from "lucide-react";
-import { ClientInformationForm } from "@/components/ui/client-information-form";
+import { ClientInformationForm } from "@/components/clients/client-information-form";
 import { readClientResponse } from "@/lib/client-information";
 import type { ClientDto, ClientListPayload } from "@/types/clients";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatPeso } from "@/components/ui/house-design-data";
+import { formatPeso } from "@/lib/house-design-data";
 import { useEffect, useState } from "react";
 
 type ProjectDto = {

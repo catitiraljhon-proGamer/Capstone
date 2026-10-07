@@ -5,7 +5,7 @@ import type {
   HouseDesignStatus,
   HouseType,
   MaterialPriceOverride,
-} from "@/components/ui/house-design-data";
+} from "@/lib/house-design-data";
 import type {
   MessageRecipientRole,
   UserRole,

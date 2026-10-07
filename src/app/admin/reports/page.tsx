@@ -1,4 +1,4 @@
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

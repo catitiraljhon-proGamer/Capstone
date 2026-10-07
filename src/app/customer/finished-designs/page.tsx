@@ -1,4 +1,4 @@
-import { CustomerFinishedDesignsPage } from "@/components/ui/customer-dashboard";
+import { CustomerFinishedDesignsPage } from "@/components/customer/customer-dashboard";
 import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Finished Designs | G4 Builders Inc",

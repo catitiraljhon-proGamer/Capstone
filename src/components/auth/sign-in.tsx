@@ -2,7 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { GoogleAuthButton } from "@/components/ui/google-auth-button";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

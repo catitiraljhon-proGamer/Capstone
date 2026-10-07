@@ -1,4 +1,4 @@
-import { BillingClerkSectionPage } from "@/components/ui/staff-dashboard";
+import { BillingClerkSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

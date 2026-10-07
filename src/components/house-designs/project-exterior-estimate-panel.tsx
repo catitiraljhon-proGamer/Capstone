@@ -3,7 +3,7 @@ import {
   getExteriorEstimate,
   type ExteriorItemChoice,
   type HouseDesign,
-} from "@/components/ui/house-design-data";
+} from "@/lib/house-design-data";
 
 type ProjectExteriorEstimatePanelProps = {
   design: HouseDesign;

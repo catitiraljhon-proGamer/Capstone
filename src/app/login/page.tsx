@@ -1,4 +1,4 @@
-import { SignInPage } from "@/components/ui/sign-in";
+import { SignInPage } from "@/components/auth/sign-in";
 import { googleAuthErrorMessage } from "@/lib/google-auth-errors";
 import {
   googleLinkCookieName,

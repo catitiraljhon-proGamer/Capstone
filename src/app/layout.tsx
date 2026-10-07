@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContactUs } from "@/components/ui/contact-us";
+import { ContactUs } from "@/components/landing/contact-us";
 import "./globals.css";
 
 export const metadata: Metadata = {

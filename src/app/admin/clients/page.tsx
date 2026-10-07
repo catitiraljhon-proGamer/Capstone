@@ -1,5 +1,5 @@
-import { AdminSectionPage } from "@/components/ui/staff-dashboard";
-import { AdminClientManager } from "@/components/ui/admin-client-manager";
+import { AdminSectionPage } from "@/components/staff/staff-dashboard";
+import { AdminClientManager } from "@/components/admin/admin-client-manager";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {

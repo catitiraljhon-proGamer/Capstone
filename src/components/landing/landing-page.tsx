@@ -302,7 +302,7 @@ function LandingFooter() {
   );
 }
 
-export default function MoneyflowLandingPage() {
+export default function LandingPage() {
   const [stats, setStats] = useState({
     activeProjects: 0,
     publishedDesigns: 0,

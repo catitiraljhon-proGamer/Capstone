@@ -1,4 +1,4 @@
-import type { HouseDesign } from "@/components/ui/house-design-data";
+import type { HouseDesign } from "@/lib/house-design-data";
 import type { HouseDesignDocument } from "@/lib/database/collections";
 import { z } from "zod";
 

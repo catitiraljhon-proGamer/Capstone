@@ -16,7 +16,7 @@ import {
   type HouseDesignStatus,
   type HouseType,
   type MaterialPriceOverride,
-} from "@/components/ui/house-design-data";
+} from "@/lib/house-design-data";
 import {
   createCustomItemId,
   type NewHouseDesignInput,

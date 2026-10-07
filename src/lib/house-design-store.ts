@@ -5,7 +5,7 @@ import type {
   HouseDesign,
   HouseDesignCatalog,
   HouseDesignStatus,
-} from "@/components/ui/house-design-data";
+} from "@/lib/house-design-data";
 import { useCallback, useEffect, useState } from "react";
 
 export type NewHouseDesignInput = Omit<

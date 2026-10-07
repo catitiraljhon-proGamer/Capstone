@@ -5,8 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { CheckCircle2, Download, FileImage, LockKeyhole, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BillingDialog, BillingErrorMessage, billingDate, billingJson } from "@/components/ui/billing-primitives";
-import { formatPeso } from "@/components/ui/house-design-data";
+import { BillingDialog, BillingErrorMessage, billingDate, billingJson } from "@/components/billing/billing-primitives";
+import { formatPeso } from "@/lib/house-design-data";
 import type { DesignRequestDto } from "@/types/design-requests";
 
 const statusText: Record<DesignRequestDto["status"], string> = {

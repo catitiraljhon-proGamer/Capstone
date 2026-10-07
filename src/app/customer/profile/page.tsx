@@ -1,4 +1,4 @@
-import { CustomerProfilePage } from "@/components/ui/customer-dashboard";
+import { CustomerProfilePage } from "@/components/customer/customer-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
