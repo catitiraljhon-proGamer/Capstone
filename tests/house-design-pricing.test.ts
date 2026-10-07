@@ -6,7 +6,7 @@ import {
   getExteriorEstimate,
   type ExteriorItemChoice,
   type MaterialPriceOverride,
-} from "@/components/ui/house-design-data";
+} from "@/lib/house-design-data";
 import { houseDesignInputSchema, houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import type { HouseDesignDocument } from "@/lib/database/collections";
 
