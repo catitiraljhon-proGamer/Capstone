@@ -8,9 +8,10 @@ export type ClientFormInput = ClientDetails & { name: string; email?: string; pa
 
 const fieldClass = "mt-2 min-h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-base text-stone-950 outline-none placeholder:text-stone-500 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 read-only:bg-stone-50 sm:text-sm";
 
-export function ClientInformationForm({ client, creating = false, onSave, onCancel }: {
+export function ClientInformationForm({ client, creating = false, submitLabel, onSave, onCancel }: {
   client?: ClientDto;
   creating?: boolean;
+  submitLabel?: string;
   onSave: (input: ClientFormInput) => Promise<void>;
   onCancel?: () => void;
 }) {
@@ -77,7 +78,7 @@ export function ClientInformationForm({ client, creating = false, onSave, onCanc
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         {onCancel && <button type="button" disabled={saving} onClick={onCancel} className="min-h-11 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold disabled:opacity-50">Cancel</button>}
         <button type="submit" disabled={saving} className="min-h-11 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50">
-          {saving ? "Saving…" : creating ? "Create client" : "Save client information"}
+          {saving ? "Saving…" : submitLabel ?? (creating ? "Create client" : "Save client information")}
         </button>
       </div>
     </form>

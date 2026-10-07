@@ -2,6 +2,7 @@ import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
+import { signInDestination } from "@/lib/server/clients";
 import { startSession } from "@/lib/server/session";
 import {
   readTwoFactorChallenge,
@@ -13,7 +14,6 @@ import {
   checkTwoFactorCode,
   twoFactorCodeSchema,
 } from "@/lib/server/two-factor-api";
-import { roleHomePaths } from "@/types/domain";
 import { ObjectId } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const check = await checkTwoFactorCode(db, user, code);
     if (check.error) return check.error;
 
-    const response = NextResponse.json({ redirectTo: roleHomePaths[user.role] });
+    const response = NextResponse.json({ redirectTo: signInDestination(user) });
     const sessionUser = await startSession(response, user, challenge.rememberMe);
     response.cookies.set(twoFactorChallengeCookieName, "", {
       ...twoFactorChallengeCookieOptions,

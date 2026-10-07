@@ -1,7 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
 import type { ClientDto, ClientListPayload } from "@/types/clients";
-import type { SessionUser } from "@/types/domain";
+import { roleHomePaths, type SessionUser } from "@/types/domain";
 import { hash } from "bcryptjs";
 import { type Db, type Filter, ObjectId } from "mongodb";
 import { z } from "zod";
@@ -50,6 +50,19 @@ function objectId(id: string) {
   return new ObjectId(id);
 }
 
+export const completeProfilePath = "/customer/complete-profile";
+
+export function isClientProfileComplete(user: UserDocument) {
+  return clientProfileSchema.safeParse({ name: user.name, ...user.clientDetails }).success;
+}
+
+/** Customers missing required client details (e.g. new Google sign-ups) fill them in first. */
+export function signInDestination(user: UserDocument) {
+  return user.role === "customer" && !isClientProfileComplete(user)
+    ? completeProfilePath
+    : roleHomePaths[user.role];
+}
+
 export function toClientDto(user: UserDocument): ClientDto {
   const details = user.clientDetails;
   return {
@@ -60,7 +73,7 @@ export function toClientDto(user: UserDocument): ClientDto {
     occupation: details?.occupation ?? "",
     status: user.status,
     archivedAt: user.clientArchivedAt?.toISOString() ?? null,
-    profileComplete: clientProfileSchema.safeParse({ name: user.name, ...details }).success,
+    profileComplete: isClientProfileComplete(user),
     createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString(),
   };
 }

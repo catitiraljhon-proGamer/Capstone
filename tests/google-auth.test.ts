@@ -404,7 +404,8 @@ test("new Google signup creates a customer, session, admin notification and audi
   const admin = user({ email: "admin@example.com", role: "admin" });
   await db.collection<UserDocument>("users").insertOne(admin);
   const response = await googleCallback(await callbackRequest("register"));
-  assert.equal(response.headers.get("location"), `${origin}/customer`);
+  // New Google customers have no client details yet, so they fill them in first.
+  assert.equal(response.headers.get("location"), `${origin}/customer/complete-profile`);
   const created = await db
     .collection<UserDocument>("users")
     .findOne({ googleSub: profile.sub });
@@ -484,9 +485,25 @@ test("Google sign-in for a 2FA account asks for a code before any session exists
   );
 });
 
-test("Google login also registers a first-time customer", async () => {
+test("returning Google customers with complete client details go straight to the dashboard", async () => {
+  await db.collection<UserDocument>("users").insertOne(
+    user({
+      googleSub: profile.sub,
+      clientDetails: {
+        age: 34,
+        contactNumber: "0917 123 4567",
+        address: "12 Rizal Street, Barangay Uno, Quezon City, Metro Manila 1100",
+        occupation: "",
+      },
+    }),
+  );
   const response = await googleCallback(await callbackRequest());
   assert.equal(response.headers.get("location"), `${origin}/customer`);
+});
+
+test("Google login also registers a first-time customer", async () => {
+  const response = await googleCallback(await callbackRequest());
+  assert.equal(response.headers.get("location"), `${origin}/customer/complete-profile`);
   assert.equal(
     await db.collection("users").countDocuments({ role: "customer" }),
     1,
@@ -675,6 +692,6 @@ test("database failures return a useful error, log no secrets, and allow the nex
     cache.mongoClientPromise = healthyConnection;
   }
   const retry = await googleCallback(await callbackRequest("register"));
-  assert.equal(retry.headers.get("location"), `${origin}/customer`);
+  assert.equal(retry.headers.get("location"), `${origin}/customer/complete-profile`);
   assert.equal(retry.cookies.has(sessionCookieName), true);
 });

@@ -1,5 +1,6 @@
 import { getDatabase } from "@/lib/database/mongodb";
 import { recordAuditLog } from "@/lib/server/audit";
+import { signInDestination } from "@/lib/server/clients";
 import { resolveGoogleAccount } from "@/lib/server/google-accounts";
 import {
   createGoogleLink,
@@ -17,7 +18,6 @@ import {
   twoFactorChallengeCookieName,
   twoFactorChallengeCookieOptions,
 } from "@/lib/server/two-factor";
-import { roleHomePaths } from "@/types/domain";
 import { MongoError, MongoNetworkError, MongoServerSelectionError } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = redirectResponse(
-      new URL(roleHomePaths[user.role], origin),
+      new URL(signInDestination(user), origin),
     );
     const sessionUser = await startSession(response, user, flow.rememberMe);
     stage = "audit";

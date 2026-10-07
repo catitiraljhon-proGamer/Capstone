@@ -45,6 +45,6 @@ export function ClientInformationReminder() {
   if (!client || client.profileComplete) return null;
   return <section className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
     <div><h2 className="font-semibold text-stone-950">Complete your client information</h2><p className="mt-1 text-sm leading-6 text-stone-600">Add your age, contact number, and address so the G4 Builders team can coordinate your project.</p></div>
-    <Link href="/customer/profile" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Complete my profile</Link>
+    <Link href="/customer/complete-profile" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Complete my profile</Link>
   </section>;
 }

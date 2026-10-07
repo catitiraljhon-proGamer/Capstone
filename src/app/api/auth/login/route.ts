@@ -1,6 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
+import { signInDestination } from "@/lib/server/clients";
 import { recordAuditLog } from "@/lib/server/audit";
 import { linkGoogleAccount } from "@/lib/server/google-accounts";
 import {
@@ -27,7 +28,6 @@ import {
   twoFactorChallengeCookieName,
   twoFactorChallengeCookieOptions,
 } from "@/lib/server/two-factor";
-import { roleHomePaths } from "@/types/domain";
 import { compare } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
     const sessionUser = toSessionUser(user);
     const response = NextResponse.json({
       user: sessionUser,
-      redirectTo: roleHomePaths[user.role],
+      redirectTo: signInDestination(user),
     });
     await startSession(response, user, input.rememberMe);
     await recordAuditLog({
