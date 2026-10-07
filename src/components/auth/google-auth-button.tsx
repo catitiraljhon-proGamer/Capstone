@@ -26,7 +26,7 @@ export function GoogleAuthButton({
     if (onClick) return onClick();
     setIsRedirecting(true);
     const query = new URLSearchParams({ mode, rememberMe: String(rememberMe) });
-    window.location.assign(`/api/auth/google?${query}`);
+    window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
   };
 
   return (
