@@ -26,6 +26,12 @@ import {
   generateRecoveryCodes,
   twoFactorChallengeCookieName,
 } from "@/lib/server/two-factor";
+import { finishedDesignsTerms } from "@/lib/finished-designs-terms";
+import {
+  acceptFinishedDesignsTerms,
+  canViewFullDesignImages,
+  hasAcceptedFinishedDesignsTerms,
+} from "@/lib/server/finished-designs-terms";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
 import { POST as verifyTwoFactor } from "@/app/api/auth/two-factor/verify/route";
 
@@ -290,4 +296,28 @@ test("wrong 2FA codes are limited and expired challenges are refused", async () 
   await db.collection("rate_limits").deleteMany({});
   const stale = await verify("111111", challenge);
   assert.equal((await stale.json()).restart, true);
+});
+
+test("full design galleries require staff access or accepted Finished Designs terms", async () => {
+  const customer = await insertUser({ role: "customer", email: "viewer@example.com" });
+  const session = { id: customer._id.toHexString(), email: customer.email, name: customer.name, role: customer.role };
+  assert.equal(await canViewFullDesignImages(db, null), false);
+  assert.equal(await canViewFullDesignImages(db, session), false);
+  assert.equal(await canViewFullDesignImages(db, { ...session, role: "admin" }), true);
+  assert.equal(await canViewFullDesignImages(db, { ...session, role: "billing-clerk" }), true);
+
+  await assert.rejects(
+    acceptFinishedDesignsTerms(db, session, { accepted: true, version: "1999-01-01" }),
+  );
+  await assert.rejects(
+    acceptFinishedDesignsTerms(db, { ...session, role: "admin" }, { accepted: true, version: finishedDesignsTerms.version }),
+  );
+  assert.equal(await hasAcceptedFinishedDesignsTerms(db, session.id), false);
+
+  await acceptFinishedDesignsTerms(db, session, { accepted: true, version: finishedDesignsTerms.version });
+  assert.equal(await hasAcceptedFinishedDesignsTerms(db, session.id), true);
+  assert.equal(await canViewFullDesignImages(db, session), true);
+  const record = await db.collection("audit_logs").findOne({ action: "finished-designs.terms-accepted" });
+  assert.equal(record?.details.termsVersion, finishedDesignsTerms.version);
+  assert.match(String(record?.details.termsSnapshot), /RA 8293/);
 });

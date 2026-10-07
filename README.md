@@ -147,6 +147,22 @@ recovery codes are stored only as hashes. Changing `AUTH_SECRET` signs everyone
 out and makes existing 2FA setups unreadable; users would then need an admin to
 clear `twoFactor` on their user record and set 2FA up again.
 
+## Finished Designs protection
+
+Published designs are G4 Builders Inc intellectual property. Before a customer
+can open **Finished Designs**, they must agree to the Finished Designs Terms and
+Conditions (`src/lib/finished-designs-terms.ts`), which cite RA 8293 (Intellectual
+Property Code of the Philippines) and RA 9266. Agreement is required once per
+terms version and is stored in Audit Logs with the full terms text. Change the
+`version` whenever the wording changes so every customer agrees again.
+
+The rule is enforced on the server: `GET /api/house-designs` sends only each
+design's cover image unless the viewer is staff or a customer who accepted the
+current terms. The home page therefore shows cover photos only. Customer-facing
+design images carry a visible "© G4 Builders Inc" watermark, and right-click and
+drag saving are turned off on the gallery. No website can block screenshots, so
+the terms, watermark, and limited previews are the protection.
+
 ## MongoDB collections
 
 - `users`: credentials, profile, role, and account status

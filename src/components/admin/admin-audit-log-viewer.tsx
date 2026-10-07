@@ -83,6 +83,7 @@ const actionLabels: Record<string, string> = {
   "schedule.status-updated": "Updated a schedule status",
   "design-request.created": "Submitted a design request",
   "design-request.terms-accepted": "Accepted design request terms",
+  "finished-designs.terms-accepted": "Accepted Finished Designs terms",
   "message.sent": "Sent a message",
 };
 

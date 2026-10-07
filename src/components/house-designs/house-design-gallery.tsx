@@ -1,5 +1,6 @@
 "use client";
 
+import { DesignWatermark } from "@/components/ui/design-watermark";
 import { isDataImage } from "@/lib/house-design-data";
 import { ImageOff } from "lucide-react";
 import Image from "next/image";
@@ -12,9 +13,12 @@ import { useState } from "react";
 export function HouseDesignGallery({
   images,
   name,
+  protectedView = false,
 }: {
   images: string[];
   name: string;
+  /** Customer-facing view: watermark the image and block right-click/drag saving. */
+  protectedView?: boolean;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const safeIndex = activeIndex < images.length ? activeIndex : 0;
@@ -39,7 +43,11 @@ export function HouseDesignGallery({
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-        <div className="relative h-[320px] bg-stone-100 sm:h-[460px] xl:h-[560px]">
+        <div
+          className="relative h-[320px] bg-stone-100 sm:h-[460px] xl:h-[560px]"
+          onContextMenu={protectedView ? (event) => event.preventDefault() : undefined}
+        >
+          {protectedView ? <DesignWatermark /> : null}
           <Image
             key={activeImage}
             src={activeImage}
@@ -47,6 +55,7 @@ export function HouseDesignGallery({
             fill
             priority
             unoptimized={isDataImage(activeImage)}
+            draggable={!protectedView}
             className="object-cover"
             sizes="(min-width: 1024px) 72vw, 100vw"
           />

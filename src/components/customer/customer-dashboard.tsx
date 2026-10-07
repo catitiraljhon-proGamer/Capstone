@@ -1,6 +1,7 @@
 "use client";
 
 import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
+import { FinishedDesignsTermsGate } from "@/components/customer/finished-designs-terms-gate";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ContactDetails } from "@/components/landing/contact-us";
@@ -336,6 +337,22 @@ export function CustomerHouseDesignPage() {
 }
 
 export function CustomerFinishedDesignsPage() {
+  return (
+    <CustomerShell
+      activeSection="dashboard"
+      title="Finished Designs"
+      description="Explore published G4 Builders designs for inspiration before submitting your own request."
+    >
+      <Link href="/customer" className="mb-5 inline-flex text-sm font-semibold text-red-700 hover:underline">← Back to Dashboard</Link>
+      {/* Designs load only after the terms are accepted, so the server returns full galleries. */}
+      <FinishedDesignsTermsGate>
+        <FinishedDesignsBrowser />
+      </FinishedDesignsTermsGate>
+    </CustomerShell>
+  );
+}
+
+function FinishedDesignsBrowser() {
   const { designs, catalog, isLoading, error } = useHouseDesigns();
   const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
   const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
@@ -359,12 +376,6 @@ export function CustomerFinishedDesignsPage() {
   };
 
   return (
-    <CustomerShell
-      activeSection="dashboard"
-      title="Finished Designs"
-      description="Explore published G4 Builders designs for inspiration before submitting your own request."
-    >
-      <Link href="/customer" className="mb-5 inline-flex text-sm font-semibold text-red-700 hover:underline">← Back to Dashboard</Link>
       <div className="space-y-6">
         <Panel className="p-5">
           {error ? (
@@ -472,6 +483,7 @@ export function CustomerFinishedDesignsPage() {
               <HouseDesignGallery
                 images={selectedDesign.images}
                 name={selectedDesign.name}
+                protectedView
               />
 
               <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -551,7 +563,6 @@ export function CustomerFinishedDesignsPage() {
           )}
         </Panel>
       </div>
-    </CustomerShell>
   );
 }
 export function CustomerDesignRequestsPage({ houseDesignId }: { houseDesignId?: string }) {

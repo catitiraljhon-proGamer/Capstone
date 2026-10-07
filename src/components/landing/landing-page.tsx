@@ -1,5 +1,6 @@
 "use client";
 
+import { DesignWatermark } from "@/components/ui/design-watermark";
 import { motion } from "framer-motion";
 import {
   ArrowUpRight,
@@ -132,8 +133,10 @@ function SwappingHouseShowcase() {
         initial={{ opacity: 0.35, scale: 0.985 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.45 }}
-        className="aspect-[1.42/1] overflow-hidden rounded-xl bg-stone-200 shadow-lg ring-1 ring-stone-200"
+        className="relative aspect-[1.42/1] overflow-hidden rounded-xl bg-stone-200 shadow-lg ring-1 ring-stone-200"
+        onContextMenu={(event) => event.preventDefault()}
       >
+        <DesignWatermark />
         <div
           className="h-full w-full bg-cover bg-center"
           style={{
