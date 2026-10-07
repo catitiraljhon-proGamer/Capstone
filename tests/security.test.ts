@@ -320,4 +320,8 @@ test("full design galleries require staff access or accepted Finished Designs te
   const record = await db.collection("audit_logs").findOne({ action: "finished-designs.terms-accepted" });
   assert.equal(record?.details.termsVersion, finishedDesignsTerms.version);
   assert.match(String(record?.details.termsSnapshot), /RA 8293/);
+  assert.match(
+    String(record?.details.termsSnapshot),
+    /Case 5: Building a G4 Builders Inc design[^\n]*\nLaw: RA 8293, Section 186/,
+  );
 });

@@ -9,6 +9,12 @@ export type TermsContent = {
   title: string;
   introduction: string;
   sections: readonly { title: string; body: string }[];
+  /** Optional list of specific prohibited acts with the law and consequence for each. */
+  cases?: {
+    heading: string;
+    introduction: string;
+    items: readonly { act: string; law: string; consequence: string }[];
+  };
   acknowledgment: string;
 };
 
@@ -42,6 +48,7 @@ export function TermsDialog<T>({
   const requestPending = useRef(false);
   const titleId = useId();
   const descriptionId = useId();
+  const casesId = useId();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const NoticeIcon = notice.icon;
@@ -120,6 +127,32 @@ export function TermsDialog<T>({
             </li>
           ))}
         </ol>
+        {terms.cases ? (
+          <section aria-labelledby={casesId} className="mt-6 border-t border-stone-200 pt-5">
+            <h3 id={casesId} className="text-base font-semibold tracking-tight">{terms.cases.heading}</h3>
+            <p className="mt-1 text-sm leading-6 text-stone-600">{terms.cases.introduction}</p>
+            <ol className="mt-4 space-y-3">
+              {terms.cases.items.map((item, index) => (
+                <li key={item.act} className="rounded-lg border border-stone-200 p-4">
+                  <p className="text-sm font-semibold text-stone-950">
+                    <span className="mr-2 rounded bg-red-700 px-1.5 py-0.5 text-xs text-white">Case {index + 1}</span>
+                    {item.act}
+                  </p>
+                  <dl className="mt-3 grid gap-2 text-sm leading-6">
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-red-800">Law that applies</dt>
+                      <dd className="text-stone-700">{item.law}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-red-800">What can happen</dt>
+                      <dd className="text-stone-700">{item.consequence}</dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ) : null}
         <p className="mt-6 border-t border-stone-200 pt-4 text-xs leading-5 text-stone-500">
           Terms version {terms.version}. Your agreement is recorded with your customer profile identity, the terms version, and the date and time of acceptance.
         </p>
