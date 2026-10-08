@@ -1,3 +1,5 @@
+import type { PaymentMilestoneDto } from "@/types/construction";
+
 export const paymentMethods = ["Cash", "Bank transfer", "Card", "E-wallet", "Check"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
 export type BillingSection = "Dashboard" | "Progress Billings" | "Invoices" | "Payments" | "Customer Accounts" | "Reports";
@@ -23,6 +25,7 @@ export type BillingInvoice = {
   invoiceNumber: string;
   projectId: string;
   designRequestId?: string;
+  milestoneId?: string;
   customerId: string;
   customerName: string;
   projectName: string;
@@ -72,6 +75,8 @@ export type BillingProject = {
   billed: number;
   paid: number;
   outstanding: number;
+  /** Payment schedule for projects created from an accepted estimate; empty for legacy projects. */
+  milestones: PaymentMilestoneDto[];
 };
 
 export type BillingData = {

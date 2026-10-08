@@ -25,6 +25,7 @@ const projectId = new ObjectId();
 const draft = { projectId: projectId.toHexString(), label: "Foundation work", basis: "Signed milestone 1 and approved site report A01", progressPercentage: 25, amount: 100000, dueDate: "2099-12-31" };
 const isError = (status: number) => (error: unknown) => error instanceof BillingError && error.status === status;
 
+const dates = { preferredDate: "2099-01-10", neededBy: "2099-02-10" };
 const privateImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1cAAAAASUVORK5CYII=";
 
 async function publishedHouseDesign() {
@@ -43,7 +44,7 @@ async function publishedHouseDesign() {
 test("requesting a published design keeps its identity and specifications without duplicate uploads", async () => {
   const design = await publishedHouseDesign();
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id });
+  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id });
   assert.equal(result.selectedDesign?.id, design._id.toHexString());
   assert.equal(result.selectedDesign.name, design.name);
   assert.equal(result.floorArea, design.area);
@@ -69,7 +70,7 @@ test("requesting a published design keeps its identity and specifications withou
 test("selected designs reject unavailable records, forged specifications, unauthorized roles, and missing terms", async () => {
   const design = await publishedHouseDesign();
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id };
+  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
   for (const actor of [admin, clerk]) await assert.rejects(createDesignRequest(db, actor, input), isError(403));
   await assert.rejects(createDesignRequest(db, other, input), isError(409));
   await assert.rejects(createDesignRequest(db, customer, { houseDesignId: input.houseDesignId }), ZodError);
@@ -88,7 +89,7 @@ test("selected designs reject unavailable records, forged specifications, unauth
 
 test("custom design requests still require requirements and inspiration images", async () => {
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], termsAcceptanceId: acceptance.id };
+  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };
   await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
   const request = await createDesignRequest(db, customer, input);
@@ -97,11 +98,39 @@ test("custom design requests still require requirements and inspiration images",
   assert.deepEqual(request.inspirationImages, [privateImage]);
 });
 
+test("design requests require a Preferred Date and Needed By in the future, in order, and return them", async () => {
+  const design = await publishedHouseDesign();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
+  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };
+  const withoutPreferred = { ...input, preferredDate: undefined };
+  const withoutNeeded = { ...custom, neededBy: undefined };
+  await assert.rejects(createDesignRequest(db, customer, withoutPreferred), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, withoutNeeded), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, preferredDate: "not-a-date" }), ZodError);
+  const today = manilaDate();
+  await assert.rejects(createDesignRequest(db, customer, { ...input, preferredDate: "2020-01-01" }), isError(400));
+  await assert.rejects(createDesignRequest(db, customer, { ...input, preferredDate: today }), isError(400));
+  await assert.rejects(createDesignRequest(db, customer, { ...custom, neededBy: today }), isError(400));
+  await assert.rejects(createDesignRequest(db, customer, { ...input, preferredDate: "2099-03-01", neededBy: "2099-02-01" }), isError(400));
+  await assert.rejects(createDesignRequest(db, customer, { ...custom, preferredDate: "2099-03-01", neededBy: "2099-02-01" }), isError(400));
+  assert.equal(await db.collection("design_requests").countDocuments(), 0);
+  const result = await createDesignRequest(db, customer, { ...input, neededBy: dates.preferredDate });
+  assert.equal(result.preferredDate, "2099-01-10");
+  assert.equal(result.neededBy, "2099-01-10");
+  const saved = await db.collection<DesignRequestDocument>("design_requests").findOne({ _id: new ObjectId(result.id) });
+  assert.equal(saved?.preferredDate?.toISOString(), "2099-01-10T00:00:00.000Z");
+  assert.equal(saved?.neededBy?.toISOString(), "2099-01-10T00:00:00.000Z");
+  const listed = (await listCustomerDesigns(db, customer))[0];
+  assert.equal(listed.preferredDate, "2099-01-10");
+  assert.equal(listed.neededBy, "2099-01-10");
+});
+
 test("a selected design follows approval, delivery, and verified design-fee payment before unlocking", async () => {
   const design = await publishedHouseDesign();
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
   const request = await createDesignRequest(db, customer, {
-    houseDesignId: design._id.toHexString(), termsAcceptanceId: acceptance.id,
+    houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id,
     notes: "Please review a different gate finish.", inspirationImages: [privateImage],
   });
   assert.equal(request.notes, "Please review a different gate finish.");

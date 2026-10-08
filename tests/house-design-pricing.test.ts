@@ -114,4 +114,5 @@ test("saved design DTOs expose price overrides and legacy records stay compatibl
 test("material prices display centavos without rounding them to whole pesos", () => {
   assert.equal(formatPeso(1675.25), "₱1,675.25");
   assert.equal(formatPeso(1450), "₱1,450");
+  assert.equal(formatPeso(783_565.2), "₱783,565.20");
 });

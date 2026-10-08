@@ -93,6 +93,47 @@ function formatDate(value: string) {
   });
 }
 
+function formatDay(value: string) {
+  return new Date(`${value}T00:00:00.000Z`).toLocaleDateString("en-PH", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function manilaToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function UrgencyBadge({ neededBy }: { neededBy: string }) {
+  const days = Math.round(
+    (Date.parse(`${neededBy}T00:00:00.000Z`) -
+      Date.parse(`${manilaToday()}T00:00:00.000Z`)) /
+      86_400_000,
+  );
+  const label =
+    days < 0
+      ? "Needed By date passed"
+      : days === 0
+        ? "Needed today"
+        : `Needed in ${days} day${days === 1 ? "" : "s"}`;
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+        days <= 14 ? "bg-rose-50 text-red-800" : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: ApprovalStatus }) {
   return (
     <span
@@ -268,6 +309,32 @@ function ApprovalReviewDialog({
               ) : null}
             </div>
           </div>
+
+          {approval.recordType === "Design request" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg bg-stone-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Preferred Date
+                </p>
+                <p className="mt-2 text-sm font-semibold">
+                  {approval.preferredDate ? formatDay(approval.preferredDate) : "Not specified"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-stone-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Needed By
+                </p>
+                <p className="mt-2 text-sm font-semibold">
+                  {approval.neededBy ? formatDay(approval.neededBy) : "Not specified"}
+                </p>
+                {approval.neededBy ? (
+                  <div className="mt-2">
+                    <UrgencyBadge neededBy={approval.neededBy} />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
@@ -858,6 +925,23 @@ export function AdminApprovalsManager() {
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">
                         {approval.description}
                       </p>
+                      {approval.recordType === "Design request" ? (
+                        <div className="mt-2 space-y-1 text-xs text-stone-500">
+                          <p>
+                            Preferred Date:{" "}
+                            <span className="font-medium text-stone-700">
+                              {approval.preferredDate ? formatDay(approval.preferredDate) : "Not specified"}
+                            </span>
+                          </p>
+                          <p>
+                            Needed By:{" "}
+                            <span className="font-medium text-stone-700">
+                              {approval.neededBy ? formatDay(approval.neededBy) : "Not specified"}
+                            </span>
+                          </p>
+                          {approval.neededBy ? <UrgencyBadge neededBy={approval.neededBy} /> : null}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="whitespace-nowrap border-b border-stone-100 px-5 py-4 align-top text-stone-600">
                       {formatDate(approval.createdAt)}

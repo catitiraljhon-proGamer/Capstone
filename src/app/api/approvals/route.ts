@@ -26,6 +26,8 @@ type ApprovalSource = Pick<
   | "inspirationImages"
   | "completedDesignImages"
   | "completedAt"
+  | "preferredDate"
+  | "neededBy"
   | "amount"
 >;
 
@@ -139,6 +141,8 @@ export async function GET() {
           source.completedDesignImages ??
           (source.completedDesignImage ? [source.completedDesignImage] : []),
         completedAt: source.completedAt?.toISOString(),
+        preferredDate: source.preferredDate?.toISOString().slice(0, 10),
+        neededBy: source.neededBy?.toISOString().slice(0, 10),
       });
     }
     for (const source of estimates) {

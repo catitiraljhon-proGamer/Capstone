@@ -1,7 +1,8 @@
 import { ObjectId, MongoServerError, type ClientSession, type Db, type Filter } from "mongodb";
 import { z } from "zod";
-import { collections, type AuditLogDocument, type DesignRequestDocument, type InvoiceDocument, type NotificationDocument, type PaymentDocument, type ProjectDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type AuditLogDocument, type DesignRequestDocument, type InvoiceDocument, type NotificationDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
+import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
 import type { SessionUser } from "@/types/domain";
 
@@ -21,6 +22,7 @@ const moneySchema = z.number().finite().positive().max(1_000_000_000)
 export const invoiceInputSchema = z.object({
   projectId: idSchema.optional(),
   designRequestId: idSchema.optional(),
+  milestoneId: z.uuid().optional(),
   label: z.string().trim().min(3).max(160),
   basis: z.string().trim().min(5, "Enter the approved accomplishment or contract milestone reference.").max(2000),
   progressPercentage: z.number().min(0).max(100),
@@ -79,7 +81,7 @@ export async function billingTransaction<T>(db: Db, work: (session: ClientSessio
   } finally { await session.endSession(); }
 }
 
-async function nextReference(db: Db, session: ClientSession, prefix: string, now: Date) {
+export async function nextReference(db: Db, session: ClientSession, prefix: string, now: Date) {
   const year = now.getUTCFullYear();
   const sequence = await db.collection<{ _id: string; value: number }>("billing_counters").findOneAndUpdate(
     { _id: `${prefix}-${year}` }, { $inc: { value: 1 } }, { upsert: true, returnDocument: "after", session },
@@ -87,7 +89,7 @@ async function nextReference(db: Db, session: ClientSession, prefix: string, now
   return `${prefix}-${year}-${String(sequence!.value).padStart(6, "0")}`;
 }
 
-async function audit(db: Db, session: ClientSession, actor: SessionUser, action: string, entityType: string, entityId: ObjectId, details: AuditLogDocument["details"] = {}) {
+export async function audit(db: Db, session: ClientSession, actor: SessionUser, action: string, entityType: string, entityId: ObjectId, details: AuditLogDocument["details"] = {}) {
   await db.collection<AuditLogDocument>(collections.auditLogs).insertOne({
     _id: new ObjectId(), actorId: recordId(actor.id), actorName: actor.name, actorRole: actor.role,
     action, entityType, entityId, details, createdAt: new Date(),
@@ -124,7 +126,7 @@ async function paidForInvoice(db: Db, session: ClientSession, id: ObjectId) {
 }
 
 async function validateInvoice(db: Db, session: ClientSession, input: z.infer<typeof invoiceInputSchema>, project: ProjectDocument, exceptId?: ObjectId) {
-  if (!["Active", "Completed"].includes(project.status)) throw new BillingError("Select an active or completed project with an agreed contract.");
+  if (!["Active", "Completed", "Scheduled", "Awaiting downpayment"].includes(project.status)) throw new BillingError("Select an active, scheduled, or completed project with an agreed contract.");
   if (!Number.isFinite(project.contractPrice) || project.contractPrice <= 0) throw new BillingError("The project needs a valid agreed contract amount before billing.");
   const customer = await db.collection<UserDocument>(collections.users).findOne({
     _id: project.customerId, role: "customer", status: "active", clientArchivedAt: null,
@@ -133,6 +135,17 @@ async function validateInvoice(db: Db, session: ClientSession, input: z.infer<ty
   const otherInvoices = await db.collection<InvoiceDocument>(collections.invoices).find({
     projectId: project._id, status: { $ne: "Void" }, ...(exceptId ? { _id: { $ne: exceptId } } : {}),
   }, { session }).toArray();
+  if (project.paymentSchedule?.length) {
+    const milestone = input.milestoneId ? project.paymentSchedule.find((item) => item.id === input.milestoneId) : undefined;
+    if (!input.milestoneId) throw new BillingError("Select the payment milestone this invoice bills.");
+    if (!milestone) throw new BillingError("This payment milestone does not belong to the project.");
+    if (project.status === "Awaiting downpayment" && !milestone.isDownpayment) throw new BillingError("Only the downpayment can be billed until it is verified.", 409);
+    if (otherInvoices.some((invoice) => invoice.milestoneId === milestone.id)) throw new BillingError("This payment milestone already has an invoice. Open the existing record.", 409);
+    if (toCentavos(input.amount) !== toCentavos(milestone.amount)) throw new BillingError("The invoice amount must equal the milestone amount agreed in the accepted estimate.");
+  } else {
+    if (project.status === "Scheduled" || project.status === "Awaiting downpayment") throw new BillingError("Select an active or completed project with an agreed contract.");
+    if (input.milestoneId) throw new BillingError("This project has no payment schedule.");
+  }
   if (otherInvoices.some((invoice) => invoice.label.trim().toLowerCase() === input.label.toLowerCase())) {
     throw new BillingError("This billing stage already exists for the project. Open the existing record.", 409);
   }
@@ -172,12 +185,17 @@ export async function createInvoice(db: Db, actor: SessionUser, raw: unknown) {
     const now = new Date();
     const invoice: InvoiceDocument = {
       _id: new ObjectId(), invoiceNumber: await nextReference(db, session, "INV", now), customerId,
-      ...(input.designRequestId ? { designRequestId: recordId(input.designRequestId) } : { projectId: recordId(input.projectId!) }),
+      ...(input.designRequestId ? { designRequestId: recordId(input.designRequestId) } : { projectId: recordId(input.projectId!), ...(input.milestoneId ? { milestoneId: input.milestoneId } : {}) }),
       label: input.label, basis: input.basis,
       progressPercentage: input.designRequestId ? 0 : input.progressPercentage, amount: input.amount,
       dueDate: new Date(input.dueDate + "T00:00:00.000Z"), status: "Draft", createdAt: now, updatedAt: now,
     };
     await db.collection<InvoiceDocument>(collections.invoices).insertOne(invoice, { session });
+    if (invoice.projectId && invoice.milestoneId) {
+      await db.collection<ProjectDocument>(collections.projects).updateOne(
+        { _id: invoice.projectId, "paymentSchedule.id": invoice.milestoneId }, { $set: { "paymentSchedule.$.invoiceId": invoice._id } }, { session },
+      );
+    }
     await audit(db, session, actor, "invoice.created", "invoice", invoice._id, { reference: invoice.invoiceNumber, amount: invoice.amount });
     return invoice._id.toHexString();
   });
@@ -194,6 +212,7 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
     if (input.action === "edit") {
       if (!["Draft", "Ready"].includes(invoice.status)) throw new BillingError("Only unreleased invoices can be edited.", 409);
       if (input.invoice.projectId !== invoice.projectId?.toHexString() || input.invoice.designRequestId !== invoice.designRequestId?.toHexString()) throw new BillingError("A billing record cannot be moved to another project or design request.");
+      if (input.invoice.milestoneId !== invoice.milestoneId) throw new BillingError("The payment milestone of an invoice cannot be changed.");
       if (invoice.designRequestId) await validateDesignInvoice(db, session, invoice.designRequestId, invoice._id);
       else if (project) await validateInvoice(db, session, input.invoice, project, invoice._id);
       else throw new BillingError("The invoice source is missing.", 409);
@@ -207,7 +226,7 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
         await validateDesignInvoice(db, session, invoice.designRequestId, invoice._id);
         moneySchema.parse(invoice.amount);
       } else if (project) await validateInvoice(db, session, invoiceInputSchema.parse({
-        projectId: project._id.toHexString(), label: invoice.label, basis: invoice.basis ?? "",
+        projectId: project._id.toHexString(), ...(invoice.milestoneId ? { milestoneId: invoice.milestoneId } : {}), label: invoice.label, basis: invoice.basis ?? "",
         progressPercentage: invoice.progressPercentage, amount: invoice.amount, dueDate: invoice.dueDate.toISOString().slice(0, 10),
       }), project, invoice._id);
       else throw new BillingError("The invoice source is missing.", 409);
@@ -221,6 +240,11 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
       }, { session });
       if (activePayments) throw new BillingError("Reject pending payments and reverse verified payments before voiding this invoice.", 409);
       await invoices.updateOne({ _id: invoice._id }, { $set: { status: "Void", voidReason: input.reason, voidedAt: now, updatedAt: now } }, { session });
+      if (project && invoice.milestoneId) {
+        await db.collection<ProjectDocument>(collections.projects).updateOne(
+          { _id: project._id, "paymentSchedule.id": invoice.milestoneId }, { $unset: { "paymentSchedule.$.invoiceId": "" } }, { session },
+        );
+      }
       if (invoice.issuedAt || !["Draft", "Ready"].includes(invoice.status)) {
         await notifyCustomer(db, session, invoice.customerId, "Invoice voided", `${invoice.invoiceNumber}: ${input.reason}`, invoice._id);
       }
@@ -268,6 +292,49 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
     await audit(db, session, actor, "payment.submitted", "payment", payment._id, { reference: payment.reference, amount: payment.amount });
     return payment._id.toHexString();
   });
+}
+
+/** Keeps the "Payment due" calendar event and the project status in step with a milestone's payments. */
+async function syncMilestoneProject(db: Db, session: ClientSession, invoice: InvoiceDocument, updatedPaid: number, action: "verify" | "reverse", now: Date) {
+  const projects = db.collection<ProjectDocument>(collections.projects);
+  const project = await projects.findOne({ _id: invoice.projectId! }, { session });
+  const milestone = project?.paymentSchedule?.find((item) => item.id === invoice.milestoneId);
+  if (!project || !milestone) return;
+  const fullyPaid = toCentavos(updatedPaid) >= toCentavos(invoice.amount);
+  await db.collection<ScheduleDocument>(collections.schedules).updateMany(
+    { projectId: project._id, milestoneId: milestone.id, eventType: "Payment due", paymentStatus: fullyPaid ? { $in: ["Expected", "Pending", "Overdue"] } : "Paid" },
+    { $set: { paymentStatus: fullyPaid ? "Paid" : "Expected", updatedAt: now } }, { session },
+  );
+  if (!milestone.isDownpayment) return;
+  const notifications = db.collection<NotificationDocument>(collections.notifications);
+  if (action === "verify" && fullyPaid && project.status === "Awaiting downpayment") {
+    const startDate = project.startDate?.toISOString().slice(0, 10);
+    const scheduled = Boolean(startDate && startDate > manilaDate(now));
+    const status = scheduled ? "Scheduled" : "Active";
+    const moved = await projects.updateOne({ _id: project._id, status: "Awaiting downpayment" }, { $set: { status, updatedAt: now } }, { session });
+    if (!moved.modifiedCount) return;
+    const admins = await db.collection<UserDocument>(collections.users).find({ role: "admin", status: "active" }, { session, projection: { _id: 1 } }).toArray();
+    await notifications.insertMany([
+      {
+        _id: new ObjectId(), userId: project.customerId,
+        title: scheduled ? "Downpayment verified — your project is scheduled" : "Downpayment verified — your project is active",
+        body: scheduled ? `${project.name} is scheduled to start on ${startDate}.` : `${project.name} is now active.`,
+        href: "/customer/project", kind: "construction-project", entityId: project._id, createdAt: now,
+      },
+      ...admins.map((admin) => ({
+        _id: new ObjectId(), userId: admin._id, title: "Downpayment verified",
+        body: `${project.reference} · ${project.name} is now ${status.toLowerCase()}.`,
+        href: "/admin/projects", kind: "construction-project", entityId: project._id, createdAt: now,
+      })),
+    ], { session });
+  } else if (action === "reverse" && !fullyPaid && project.status === "Scheduled") {
+    await projects.updateOne({ _id: project._id, status: "Scheduled" }, { $set: { status: "Awaiting downpayment", updatedAt: now } }, { session });
+    await notifications.insertOne({
+      _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment reversed",
+      body: `A downpayment payment for ${project.name} was reversed. Settle the downpayment to keep your project schedule.`,
+      href: "/customer/project", kind: "construction-project", entityId: project._id, createdAt: now,
+    }, { session });
+  }
 }
 
 export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw: unknown) {
@@ -326,6 +393,9 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
         href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
       }, { session });
     }
+    if (invoice.projectId && invoice.milestoneId && (input.action === "verify" || input.action === "reverse")) {
+      await syncMilestoneProject(db, session, invoice, updatedPaid, input.action, now);
+    }
     await audit(db, session, actor, `payment.${input.action}`, "payment", payment._id, {
       reference: payment.reference, amount: payment.amount, ...("reason" in input ? { reason: input.reason } : {}),
     });
@@ -339,6 +409,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
   assertBillingRole(actor, true);
   const clerk = actor.role === "billing-clerk";
   const owner = clerk ? {} : { customerId: recordId(actor.id) };
+  await promoteScheduledProjects(db);
   const invoiceFilter: Filter<InvoiceDocument> = clerk ? {} : {
     ...owner, status: { $nin: ["Draft", "Ready"] },
     $or: [{ status: { $ne: "Void" } }, { issuedAt: { $exists: true } }],
@@ -351,6 +422,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     clerk ? db.collection<AuditLogDocument>(collections.auditLogs).find({ entityType: { $in: ["invoice", "payment"] } }).sort({ createdAt: -1 }).limit(12).toArray() : [],
     clerk ? db.collection<DesignRequestDocument>(collections.designRequests).find({ status: "Completed" }, { projection: { customerId: 1, floorArea: 1, finish: 1 } }).sort({ completedAt: -1 }).toArray() : [],
   ]);
+  const billing = projectBillingFrom(invoices, payments);
   const customerNames = new Map(users.map((user) => [user._id.toHexString(), user.name]));
   const projectNames = new Map(projects.map((project) => [project._id.toHexString(), `${project.reference} · ${project.name}`]));
   const invoiceNumbers = new Map(invoices.map((invoice) => [invoice._id.toHexString(), invoice.invoiceNumber]));
@@ -359,7 +431,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
   const invoiceDtos = invoices.map((invoice) => {
     const paid = sumMoney(payments.filter((payment) => payment.status === "Verified" && payment.invoiceId?.equals(invoice._id)).map((payment) => payment.amount));
     return {
-      id: invoice._id.toHexString(), invoiceNumber: invoice.invoiceNumber, projectId: invoice.projectId?.toHexString() ?? "", designRequestId: invoice.designRequestId?.toHexString(),
+      id: invoice._id.toHexString(), invoiceNumber: invoice.invoiceNumber, projectId: invoice.projectId?.toHexString() ?? "", designRequestId: invoice.designRequestId?.toHexString(), milestoneId: invoice.milestoneId,
       customerId: invoice.customerId.toHexString(), customerName: customerNames.get(invoice.customerId.toHexString()) ?? "Unknown customer",
       projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : projectNames.get(invoice.projectId?.toHexString() ?? "") ?? "Unknown project",
       label: invoice.label, basis: invoice.basis ?? "", progressPercentage: invoice.progressPercentage,
@@ -379,6 +451,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
         billed: sumMoney(issued.map((invoice) => invoice.amount)),
         paid: sumMoney(payments.filter((payment) => payment.status === "Verified" && payment.projectId?.equals(project._id)).map((payment) => payment.amount)),
         outstanding: sumMoney(issued.map((invoice) => invoice.balance)),
+        milestones: milestoneDtos(project, billing, !clerk),
       };
     }),
     invoices: invoiceDtos,

@@ -13,6 +13,7 @@
     "test:clients": "node --import tsx --test tests/clients.test.ts",
     "test:pricing": "node --import tsx --test tests/house-design-pricing.test.ts",
     "test:billing": "node --import tsx --test tests/billing.test.ts",
+    "test:construction": "node --import tsx --test tests/construction-pricing.test.ts tests/construction.test.ts",
     "test:security": "node --import tsx --test tests/security.test.ts",
     "db:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-mongodb.ps1",
     "db:seed": "node scripts/seed-database.mjs"

@@ -79,6 +79,12 @@ async function ensureIndexes(db: Db) {
       db.collection("projects").createIndex({ customerId: 1, status: 1 }),
       db.collection("design_requests").createIndex({ customerId: 1, createdAt: -1 }),
       db.collection("cost_estimates").createIndex({ reference: 1 }, { unique: true }),
+      db.collection("cost_estimates").createIndex({ customerId: 1, createdAt: -1 }),
+      db.collection("cost_estimates").createIndex({ status: 1, updatedAt: -1 }),
+      db.collection("cost_estimates").createIndex(
+        { designRequestId: 1 },
+        { unique: true, partialFilterExpression: { designRequestId: { $exists: true } } },
+      ),
       db.collection("approvals").createIndex({ status: 1, createdAt: -1 }),
       db
         .collection("approvals")

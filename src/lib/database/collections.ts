@@ -16,9 +16,12 @@ import type {
   ApprovalStatus,
 } from "@/types/approvals";
 import type { ObjectId } from "mongodb";
-import type { ClientDetails } from "@/types/clients";
+import type { AddressDetails, ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot } from "@/types/billing";
 import type { RequestedHouseDesign } from "@/types/design-requests";
+import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
+
+export type { ProjectStatus } from "@/types/construction";
 
 export const collections = {
   users: "users",
@@ -133,7 +136,18 @@ export type MessageDocument = {
   readByStaffIds?: ObjectId[];
 };
 
-export type ProjectStatus = "Pending" | "Active" | "On hold" | "Completed";
+/** One payment-schedule row saved on a project when the customer accepts its estimate. */
+export type ProjectMilestoneDocument = {
+  id: string;
+  label: string;
+  description: string;
+  percentage: number;
+  amount: number;
+  targetDate: Date;
+  isDownpayment: boolean;
+  /** The current non-void invoice billed for this milestone. */
+  invoiceId?: ObjectId;
+};
 
 export type ProjectDocument = {
   _id: ObjectId;
@@ -145,7 +159,14 @@ export type ProjectDocument = {
   contractPrice: number;
   billingVersion?: number;
   startDate?: Date;
+  /** The customer's "Needed By" date from the construction request. */
   targetCompletionDate?: Date;
+  estimateId?: ObjectId;
+  designRequestId?: ObjectId;
+  subtotal?: number;
+  vat?: number;
+  downpaymentPercent?: number;
+  paymentSchedule?: ProjectMilestoneDocument[];
   createdAt: Date;
   updatedAt: Date;
 };
@@ -164,6 +185,9 @@ export type DesignRequestDocument = {
   rooms: string;
   finish: HouseDesignFinish;
   notes: string;
+  /** Timespan for the design; missing on requests made before it was required. */
+  preferredDate?: Date;
+  neededBy?: Date;
   inspirationImages?: string[];
   /** Legacy single-image field retained for existing records. */
   inspirationImage?: string;
@@ -185,16 +209,50 @@ export type DesignRequestDocument = {
   updatedAt: Date;
 };
 
+export type EstimateLineItemDocument = {
+  id: string;
+  item: string;
+  description: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+};
+
+/**
+ * A construction cost estimate. It starts as the customer's construction
+ * request ("Requested"), the admin builds the BOQ and schedule, and the
+ * customer accepts it to create the project.
+ */
 export type EstimateDocument = {
   _id: ObjectId;
   reference: string;
   customerId: ObjectId;
   projectId?: ObjectId;
-  houseDesignId: ObjectId;
-  baseEstimate: number;
-  exteriorTotal: number;
+  houseDesignId?: ObjectId;
+  designRequestId?: ObjectId;
+  preferredStartDate?: Date;
+  neededBy?: Date;
+  siteAddress?: string;
+  siteAddressDetails?: AddressDetails;
+  customerNotes?: string;
+  lineItems?: EstimateLineItemDocument[];
+  subtotal?: number;
+  vatRate?: number;
+  vat?: number;
   total: number;
-  status: "Draft" | "Pending" | "Approved" | "Rejected";
+  scheduleTemplate?: MilestoneTemplate[];
+  adminNotes?: string;
+  revisionNote?: string;
+  sentAt?: Date;
+  sentBy?: ObjectId;
+  acceptedAt?: Date;
+  downpaymentPercent?: number;
+  /** Legacy totals from estimates created before the BOQ workflow. */
+  baseEstimate?: number;
+  exteriorTotal?: number;
+  /** "Pending", "Approved", and "Rejected" are legacy approval-queue statuses. */
+  status: EstimateStatus | "Pending" | "Approved" | "Rejected";
   createdAt: Date;
   updatedAt: Date;
 };
@@ -221,6 +279,8 @@ export type InvoiceDocument = {
   projectId?: ObjectId;
   /** Design fees are separate from the construction contract. */
   designRequestId?: ObjectId;
+  /** Payment-schedule row this invoice bills, for projects created from an estimate. */
+  milestoneId?: string;
   label: string;
   progressPercentage: number;
   amount: number;
@@ -316,6 +376,8 @@ export type ScheduleDocument = {
   status: ScheduleStatus;
   paymentStatus: PaymentScheduleStatus;
   expectedAmount?: number;
+  /** Payment-schedule row a "Payment due" event tracks, for projects created from an estimate. */
+  milestoneId?: string;
   createdBy: ObjectId;
   createdByName: string;
   createdAt: Date;

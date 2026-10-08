@@ -84,11 +84,12 @@ export function normalizeSelections(
 
 export const isDataImage = (src: string) => src.startsWith("data:");
 
+/** Whole pesos drop the decimals; anything with centavos always shows two digits (₱783,565.20). */
 export const formatPeso = (value: number) =>
   new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
-    minimumFractionDigits: 0,
+    minimumFractionDigits: Number.isInteger(Math.round(value * 100) / 100) ? 0 : 2,
     maximumFractionDigits: 2,
   }).format(value);
 

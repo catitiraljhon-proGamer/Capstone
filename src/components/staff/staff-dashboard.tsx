@@ -10,6 +10,7 @@ import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import type { BillingSection } from "@/types/billing";
 import {
+  Calculator,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
@@ -65,6 +66,7 @@ const adminNav = [
   { label: "Dashboard", icon: Gauge, href: "/admin" },
   { label: "Client", icon: Users, href: "/admin/clients" },
   { label: "House Design", icon: House, href: "/admin/house-designs" },
+  { label: "Cost Estimates", icon: Calculator, href: "/admin/cost-estimates" },
   { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
   { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
   { label: "Scheduling", icon: CalendarDays, href: "/admin/scheduling" },

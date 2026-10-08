@@ -8,25 +8,60 @@ import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field } from "@/components/billing/billing-primitives";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
 import { manilaDate } from "@/lib/billing";
+import type { PaymentMilestoneDto } from "@/types/construction";
 import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type PaymentMethod } from "@/types/billing";
 
 export type BillingMutation = (url: string, method: "POST" | "PATCH", body: unknown) => Promise<void>;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Unable to save this record.";
+const downpaymentBasis = "Downpayment per accepted cost estimate";
+const billableStatuses = ["Awaiting downpayment", "Scheduled", "Active", "Completed"];
+const roundPercent = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+/** Milestones the clerk may still bill: no non-void invoice yet, and only the downpayment while awaiting it. */
+function billableMilestones(project: BillingProject | undefined, currentMilestoneId?: string) {
+  if (!project) return [];
+  return project.milestones.filter((milestone) =>
+    (milestone.id === currentMilestoneId || !milestone.invoice) && (project.status !== "Awaiting downpayment" || milestone.isDownpayment));
+}
+
+/** Form values implied by a milestone: label, exact amount, cumulative progress, and a due date that is not in the past. */
+function milestoneFields(project: BillingProject, milestone: PaymentMilestoneDto) {
+  const index = project.milestones.findIndex((item) => item.id === milestone.id);
+  const progress = project.milestones.slice(0, index + 1).reduce((sum, item) => sum + item.percentage, 0);
+  const today = manilaDate();
+  return {
+    label: milestone.label, amount: String(milestone.amount), progressPercentage: String(Math.min(100, roundPercent(progress))),
+    dueDate: milestone.targetDate && milestone.targetDate >= today ? milestone.targetDate : manilaDate(new Date(Date.now() + 7 * 86_400_000)),
+  };
+}
 
 export function InvoiceForm({ projects, designRequests, designRequestId, invoice, mutate, onClose }: {
   projects: BillingProject[]; designRequests: BillingData["designRequests"]; designRequestId?: string; invoice?: BillingInvoice; mutate: BillingMutation; onClose: () => void;
 }) {
   const [form, setForm] = useState({
-    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", label: invoice?.label ?? (designRequestId ? "House design fee" : ""), basis: invoice?.basis ?? "",
+    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? "House design fee" : ""), basis: invoice?.basis ?? "",
     progressPercentage: String(invoice?.progressPercentage ?? 0), amount: invoice ? String(invoice.amount) : "", dueDate: invoice?.dueDate ?? manilaDate(),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const project = projects.find((item) => item.id === form.projectId);
+  const hasMilestones = !form.designRequestId && Boolean(project?.milestones.length);
+  const availableMilestones = hasMilestones ? billableMilestones(project, invoice?.milestoneId) : [];
+  const milestone = hasMilestones ? project?.milestones.find((item) => item.id === form.milestoneId) : undefined;
+  function chooseProject(projectId: string) {
+    const next = projects.find((item) => item.id === projectId);
+    const first = next?.milestones.length ? billableMilestones(next)[0] : undefined;
+    setForm({ ...form, projectId, milestoneId: first?.id ?? "", ...(next && first ? { ...milestoneFields(next, first), basis: first.isDownpayment && !form.basis ? downpaymentBasis : form.basis } : {}) });
+  }
+  function chooseMilestone(milestoneId: string) {
+    const picked = project?.milestones.find((item) => item.id === milestoneId);
+    if (!project || !picked) { setForm({ ...form, milestoneId }); return; }
+    setForm({ ...form, milestoneId, ...milestoneFields(project, picked), basis: picked.isDownpayment ? (form.basis || downpaymentBasis) : (form.basis === downpaymentBasis ? "" : form.basis) });
+  }
   async function submit(event: FormEvent) {
     event.preventDefault(); setBusy(true); setError(null);
-    const { projectId, designRequestId, ...fields } = form;
-    const input = { ...fields, ...(designRequestId ? { designRequestId } : { projectId }), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
+    const { projectId, designRequestId, milestoneId, ...fields } = form;
+    const input = { ...fields, ...(designRequestId ? { designRequestId } : { projectId }), ...(hasMilestones ? { milestoneId } : {}), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
     try {
       await mutate(invoice ? `/api/billing/invoices/${invoice.id}` : "/api/billing/invoices", invoice ? "PATCH" : "POST", invoice ? { action: "edit", invoice: input } : input);
       onClose();
@@ -36,7 +71,7 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
     <form onSubmit={submit} className="space-y-4">
       <BillingErrorMessage message={error} />
       <label className="block text-sm font-medium">Billing for
-        <select disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId ? "design" : "project"} onChange={(event) => { setForm({ ...form, projectId: "", designRequestId: event.target.value === "design" ? (designRequests.find((item) => !item.invoiceId)?.id ?? "") : "", label: event.target.value === "design" ? "House design fee" : "" }); }}>
+        <select disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId ? "design" : "project"} onChange={(event) => { setForm({ ...form, projectId: "", milestoneId: "", designRequestId: event.target.value === "design" ? (designRequests.find((item) => !item.invoiceId)?.id ?? "") : "", label: event.target.value === "design" ? "House design fee" : "" }); }}>
           <option value="project">Construction progress</option><option value="design" disabled={!designRequests.some((item) => !item.invoiceId || item.id === invoice?.designRequestId)}>Completed design fee</option>
         </select>
       </label>
@@ -46,14 +81,21 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         </select>
         <p className="mt-2 text-xs font-normal leading-5 text-stone-500">Use the agreed design fee. Full verified payment unlocks this request only. This fee is separate from the construction contract.</p>
       </label> : <label className="block text-sm font-medium">Customer / project
-        <select required disabled={busy || Boolean(invoice)} className={field} value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })}>
-          <option value="">Select an active project</option>
-          {projects.filter((item) => ["Active", "Completed"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.reference} · {item.name}</option>)}
+        <select required disabled={busy || Boolean(invoice)} className={field} value={form.projectId} onChange={(event) => chooseProject(event.target.value)}>
+          <option value="">Select a project</option>
+          {projects.filter((item) => billableStatuses.includes(item.status) || item.id === invoice?.projectId).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.reference} · {item.name}</option>)}
         </select>
       </label>}
       {project && <div className="rounded-lg bg-rose-50 p-3 text-sm text-stone-600">
         Contract: <strong className="text-stone-950">{formatPeso(project.contractPrice)}</strong> · Available to bill, including drafts: <strong className="text-stone-950">{formatPeso(project.contractPrice - project.allocated + (invoice?.amount ?? 0))}</strong>
       </div>}
+      {hasMilestones && <label className="block text-sm font-medium">Billing milestone
+        <select required disabled={busy || Boolean(invoice)} className={field} value={form.milestoneId} onChange={(event) => chooseMilestone(event.target.value)}>
+          <option value="">{availableMilestones.length ? "Select a milestone to bill" : "No milestone available to bill"}</option>
+          {availableMilestones.map((item) => <option key={item.id} value={item.id}>{item.label} — {item.percentage}% · {formatPeso(item.amount)}</option>)}
+        </select>
+        <p className="mt-2 text-xs font-normal leading-5 text-stone-500">{project?.status === "Awaiting downpayment" ? "Only the downpayment can be billed until it is paid and the project is scheduled." : "Each milestone is billed once, for the exact amount in the accepted payment schedule."}</p>
+      </label>}
       <label className="block text-sm font-medium">Billing stage
         <input required minLength={3} maxLength={160} className={field} placeholder="e.g. Second billing — foundation work" value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />
       </label>
@@ -61,12 +103,12 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         <textarea required minLength={5} maxLength={2000} rows={3} className={field} placeholder="Reference the signed payment schedule or approved accomplishment report and describe the work covered." value={form.basis} onChange={(event) => setForm({ ...form, basis: event.target.value })} />
       </label>
       <div className="grid gap-4 sm:grid-cols-3">
-        <label className="text-sm font-medium">Amount (PHP)<PesoInput required min="0.01" max="1000000000" step="0.01" wrapperClassName="mt-1.5" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
-        {!form.designRequestId && <label className="text-sm font-medium">Project progress (%)<input required type="number" min="0" max="100" step="0.01" className={field} value={form.progressPercentage} onChange={(event) => setForm({ ...form, progressPercentage: event.target.value })} /></label>}
+        <label className="text-sm font-medium">Amount (PHP)<PesoInput required readOnly={Boolean(milestone)} min="0.01" max="1000000000" step="0.01" wrapperClassName="mt-1.5" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>
+        {!form.designRequestId && <label className="text-sm font-medium">Project progress (%)<input required readOnly={Boolean(milestone)} type="number" min="0" max="100" step="0.01" className={field} value={form.progressPercentage} onChange={(event) => setForm({ ...form, progressPercentage: event.target.value })} /></label>}
         <label className="text-sm font-medium">Due date<input required type="date" className={field} value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label>
       </div>
       <p className="text-xs leading-5 text-stone-500">Use the agreed fee or approved contract as your basis. Review the saved draft before issuing it to the customer.</p>
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || (!project && !form.designRequestId)}>{busy ? "Saving…" : "Save draft"}</Button></div>
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || (!project && !form.designRequestId) || (hasMilestones && !milestone)}>{busy ? "Saving…" : "Save draft"}</Button></div>
     </form>
   </BillingDialog>;
 }

@@ -18,6 +18,9 @@ export type DesignRequestDto = {
   rooms: string;
   finish: HouseDesignFinish;
   notes: string;
+  /** YYYY-MM-DD; missing on requests made before the timespan was required. */
+  preferredDate?: string;
+  neededBy?: string;
   inspirationImages: string[];
   status: "Pending" | "In review" | "Approved" | "Rejected" | "Completed";
   completedAt?: string;

@@ -18,7 +18,7 @@ function Pager({ page, total, onPage }: { page: number; total: number; onPage: (
   </div>;
 }
 
-export function InvoiceTable({ invoices, onView }: { invoices: BillingInvoice[]; onView: (invoice: BillingInvoice) => void }) {
+export function InvoiceTable({ invoices, milestoneLabels, onView }: { invoices: BillingInvoice[]; milestoneLabels?: Record<string, string>; onView: (invoice: BillingInvoice) => void }) {
   const [requestedPage, setPage] = useState(0);
   const page = Math.min(requestedPage, Math.max(0, Math.ceil(invoices.length / 10) - 1));
   if (!invoices.length) return <BillingEmpty />;
@@ -26,7 +26,7 @@ export function InvoiceTable({ invoices, onView }: { invoices: BillingInvoice[];
     <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Invoice / customer", "Billing stage", "Amount / paid", "Balance", "Due / status", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
     <tbody className="divide-y divide-stone-100">{invoices.slice(page * 10, page * 10 + 10).map((invoice) => <tr key={invoice.id} className="hover:bg-rose-50/30">
       <td className={cell}><p className="font-semibold">{invoice.invoiceNumber}</p><p className="mt-1 text-stone-600">{invoice.customerName}</p></td>
-      <td className={cell}><p className="max-w-56 break-words font-medium">{invoice.label}</p><p className="mt-1 max-w-56 text-xs text-stone-500">{invoice.projectName}</p></td>
+      <td className={cell}><p className="max-w-56 break-words font-medium">{invoice.label}</p>{invoice.milestoneId && milestoneLabels?.[invoice.milestoneId] && <p className="mt-1 max-w-56 text-xs font-medium text-red-700">Milestone: {milestoneLabels[invoice.milestoneId]}</p>}<p className="mt-1 max-w-56 text-xs text-stone-500">{invoice.projectName}</p></td>
       <td className={cell}><p className="whitespace-nowrap font-semibold">{formatPeso(invoice.amount)}</p><p className="mt-1 whitespace-nowrap text-xs text-stone-500">{formatPeso(invoice.paid)} paid</p></td>
       <td className={cell}><p className={`whitespace-nowrap font-semibold ${invoice.overdue ? "text-red-700" : ""}`}>{invoice.status === "Void" ? "—" : formatPeso(invoice.balance)}</p></td>
       <td className={cell}><p className="mb-2 whitespace-nowrap text-xs text-stone-500">{billingDate(invoice.dueDate)}</p><BillingBadge status={invoice.status} />{invoice.overdue && invoice.status !== "Overdue" && <p className="mt-1 text-xs font-medium text-red-700">Overdue balance</p>}</td>

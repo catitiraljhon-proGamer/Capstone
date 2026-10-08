@@ -32,6 +32,8 @@ export type ApprovalDto = {
   inspirationImages?: string[];
   completedDesignImages?: string[];
   completedAt?: string;
+  preferredDate?: string;
+  neededBy?: string;
   amount?: number;
   createdAt: string;
   reviewedAt?: string;

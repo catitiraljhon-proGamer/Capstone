@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CheckCircle2, Download, FileImage, LockKeyhole, RefreshCw } from "lucide-react";
+import { CheckCircle2, Download, FileImage, HardHat, LockKeyhole, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BillingDialog, BillingErrorMessage, billingDate, billingJson } from "@/components/billing/billing-primitives";
 import { formatPeso } from "@/lib/house-design-data";
@@ -38,9 +38,9 @@ export function CustomerRequestedDesigns() {
     <section className="rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-6 text-white">
       <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Designed for you</p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">Your requested house designs</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-rose-100">Follow your request from admin approval to delivery. Once your design is ready, settle the design fee. Viewing and downloading unlock when the Billing Clerk verifies full payment.</p>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-rose-100">Follow your request from admin approval to delivery. Once your design is ready, settle the design fee. Viewing and downloading unlock when the Billing Clerk verifies full payment. After unlocking, you can request a construction cost estimate for the design.</p>
       <ol className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-white">
-        {["Submit request", "Admin approval & design", "Pay design fee", "View your design"].map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
+        {["Submit request", "Admin approval & design", "Pay design fee", "View your design", "Proceed to construction"].map((step, index) => <li key={step}>{index + 1}. {step}</li>)}
       </ol>
     </section>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,6 +67,10 @@ export function CustomerRequestedDesigns() {
         </div>
         <div className="space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2"><span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800">{statusText[design.status]}</span><span className="text-xs text-stone-500">Requested {billingDate(design.createdAt)}</span></div>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg bg-stone-50 px-3 py-2"><dt className="text-xs text-stone-500">Preferred Date</dt><dd className="mt-1 font-semibold text-stone-950">{design.preferredDate ? billingDate(design.preferredDate) : "Not specified"}</dd></div>
+            <div className="rounded-lg bg-stone-50 px-3 py-2"><dt className="text-xs text-stone-500">Needed By</dt><dd className="mt-1 font-semibold text-stone-950">{design.neededBy ? billingDate(design.neededBy) : "Not specified"}</dd></div>
+          </dl>
           <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-stone-600">{design.notes}</p>
           {design.status === "Completed" && <p className="text-xs text-stone-500">{design.imageCount} design image{design.imageCount === 1 ? "" : "s"} delivered {design.completedAt ? billingDate(design.completedAt) : ""}</p>}
           {design.access === "in-progress" && <p className="rounded-lg bg-stone-50 p-4 text-sm leading-6 text-stone-600">{design.status === "Rejected" ? "Review your request or contact the admin before submitting a new one." : "Your design will appear after admin approval and completion. No design fee is due here yet."}</p>}
@@ -76,7 +80,7 @@ export function CustomerRequestedDesigns() {
             <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">{[["Amount", design.invoice.amount], ["Verified paid", design.invoice.paid], ["Balance", design.invoice.balance]].map(([label, value]) => <div key={label}><dt className="text-xs text-stone-500">{label}</dt><dd className="mt-1 font-semibold">{formatPeso(Number(value))}</dd></div>)}</dl>
           </div>}
           {design.access === "payment-required" && <div><p className="mb-3 text-sm leading-6 text-stone-600">{design.invoice?.pending ? "Payment submitted — awaiting Billing Clerk verification. The design stays locked until the full fee is verified." : "Settle the remaining design fee to unlock your images. Partial payments do not unlock the design."}</p><Button asChild><Link href={"/customer/billing?invoice=" + design.invoice?.id}>Pay / review design fee</Link></Button></div>}
-          {design.access === "unlocked" && <div><p className="mb-3 text-sm text-stone-600">Full payment verified. Your design is ready to view and download.</p><Button onClick={() => setSelectedId(design.id)}><FileImage className="mr-2 h-4 w-4" />View My Design</Button></div>}
+          {design.access === "unlocked" && <div><p className="mb-3 text-sm text-stone-600">Full payment verified. Your design is ready to view and download.</p><div className="flex flex-wrap gap-2"><Button onClick={() => setSelectedId(design.id)}><FileImage className="mr-2 h-4 w-4" />View My Design</Button><Button asChild variant="outline"><Link href={"/customer/project?designRequestId=" + design.id}><HardHat className="mr-2 h-4 w-4" />Proceed to construction</Link></Button></div></div>}
         </div>
       </article>)}
     </div>

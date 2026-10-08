@@ -7,6 +7,7 @@ import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
+import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -48,6 +49,28 @@ const statusLabel: Record<DesignRequestStatus, string> = {
   Rejected: "Not feasible",
   Completed: "Delivered — check My House Design for access",
 };
+
+/** Tomorrow in Manila time as YYYY-MM-DD, the earliest allowed date. */
+function manilaTomorrow() {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  return new Date(Date.parse(`${today}T00:00:00.000Z`) + 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function formatDay(value: string) {
+  return new Date(`${value}T00:00:00.000Z`).toLocaleDateString("en-PH", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("en-PH", {
@@ -92,6 +115,9 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
   const [bathrooms, setBathrooms] = useState("");
   const [finish, setFinish] = useState<HouseDesignFinish>("Standard");
   const [notes, setNotes] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [neededBy, setNeededBy] = useState("");
+  const [minDate] = useState(manilaTomorrow);
   const [inspirationImages, setInspirationImages] = useState<SelectedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -183,6 +209,11 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       return;
     }
 
+    if (neededBy < preferredDate) {
+      setError("The Needed By date must be on or after the Preferred Date.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
     setSuccessMessage(null);
@@ -199,6 +230,8 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
             finish,
           }),
           notes,
+          preferredDate,
+          neededBy,
           inspirationImages: inspirationImages.map((image) => image.src),
           termsAcceptanceId: acceptance.id,
         }),
@@ -221,6 +254,8 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       setBedrooms("");
       setBathrooms("");
       setNotes("");
+      setPreferredDate("");
+      setNeededBy("");
       setInspirationImages([]);
       setSuccessMessage(
         selectedDesign
@@ -377,6 +412,37 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
             />
           </label>
 
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="block text-sm font-semibold">
+                Preferred Date <RequiredIndicator />
+              </span>
+              <input
+                type="date"
+                min={minDate}
+                value={preferredDate}
+                onChange={(event) => setPreferredDate(event.target.value)}
+                required
+                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
+              />
+              <span className="mt-1 block text-xs font-normal text-stone-500">When you would like the design ready.</span>
+            </label>
+            <label className="block">
+              <span className="block text-sm font-semibold">
+                Needed By <RequiredIndicator />
+              </span>
+              <input
+                type="date"
+                min={preferredDate > minDate ? preferredDate : minDate}
+                value={neededBy}
+                onChange={(event) => setNeededBy(event.target.value)}
+                required
+                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
+              />
+              <span className="mt-1 block text-xs font-normal text-stone-500">The latest date you need it.</span>
+            </label>
+          </div>
+
           <div className="mt-5">
             <div className="flex items-end justify-between gap-3">
               <div>
@@ -514,6 +580,16 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
                 <p className="mt-3 text-xs font-semibold text-stone-700">
                   {statusLabel[request.status]}
                 </p>
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg bg-stone-50 px-3 py-2">
+                    <dt className="text-xs text-stone-500">Preferred Date</dt>
+                    <dd className="mt-1 font-semibold text-stone-950">{request.preferredDate ? formatDay(request.preferredDate) : "Not specified"}</dd>
+                  </div>
+                  <div className="rounded-lg bg-stone-50 px-3 py-2">
+                    <dt className="text-xs text-stone-500">Needed By</dt>
+                    <dd className="mt-1 font-semibold text-stone-950">{request.neededBy ? formatDay(request.neededBy) : "Not specified"}</dd>
+                  </div>
+                </dl>
                 {request.bedrooms !== undefined && request.bathrooms !== undefined ? (
                   <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div className="rounded-lg bg-stone-50 px-3 py-2">

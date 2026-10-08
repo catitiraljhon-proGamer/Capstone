@@ -26,7 +26,7 @@ export async function GET() {
         db
           .collection<ProjectDocument>(collections.projects)
           .findOne(
-            { customerId, status: { $in: ["Pending", "Active", "On hold"] } },
+            { customerId, status: { $in: ["Awaiting downpayment", "Scheduled", "Pending", "Active", "On hold"] } },
             { sort: { createdAt: -1 } },
           ),
         db.collection(collections.designRequests).countDocuments({

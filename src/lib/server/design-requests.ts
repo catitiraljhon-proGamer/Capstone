@@ -33,6 +33,8 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
     selectedDesign: design.selectedDesign,
     rooms: design.rooms, finish: design.finish, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
+    ...(design.preferredDate ? { preferredDate: design.preferredDate.toISOString().slice(0, 10) } : {}),
+    ...(design.neededBy ? { neededBy: design.neededBy.toISOString().slice(0, 10) } : {}),
     status: design.status, completedAt: design.completedAt?.toISOString(), createdAt: design.createdAt.toISOString(),
     imageCount: imagesFor(design).length,
     access: design.status !== "Completed" ? "in-progress" : !invoice ? "awaiting-invoice" : unlocked ? "unlocked" : "payment-required",

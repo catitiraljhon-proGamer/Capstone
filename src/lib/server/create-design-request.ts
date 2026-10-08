@@ -9,6 +9,7 @@ import {
   type ProjectDocument,
   type UserDocument,
 } from "@/lib/database/collections";
+import { manilaDate } from "@/lib/billing";
 import { recordAuditLog } from "@/lib/server/audit";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { BillingError } from "@/lib/server/billing";
@@ -22,11 +23,16 @@ const termsAcceptanceId = z.string().regex(
   "Accept the Design Request Terms and Conditions first.",
 );
 
+const preferredDate = z.iso.date("Choose a Preferred Date after today.");
+const neededBy = z.iso.date("Choose a Needed By date after today.");
+
 const inputSchema = z.union([
   z.object({
     houseDesignId: z.string().regex(/^[a-f\d]{24}$/i, "Select an available house design."),
     notes: z.string().trim().max(4_000).default(""),
     inspirationImages: z.array(embeddedImageSchema).max(6).default([]),
+    preferredDate,
+    neededBy,
     termsAcceptanceId,
   }).strict(),
   z.object({
@@ -36,6 +42,8 @@ const inputSchema = z.union([
     finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
     notes: z.string().trim().min(1).max(4_000),
     inspirationImages: embeddedImagesSchema,
+    preferredDate,
+    neededBy,
     termsAcceptanceId,
   }).strict(),
 ]);
@@ -45,6 +53,12 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     throw new BillingError("Only customers can submit design requests.", 403);
   }
   const input = inputSchema.parse(raw);
+  const today = manilaDate();
+  if (input.preferredDate <= today) throw new BillingError("Choose a Preferred Date after today.", 400);
+  if (input.neededBy <= today) throw new BillingError("Choose a Needed By date after today.", 400);
+  if (input.neededBy < input.preferredDate) {
+    throw new BillingError("The Needed By date must be on or after the Preferred Date.", 400);
+  }
   const termsAcceptance = await requireDesignRequestTerms(db, actor, input.termsAcceptanceId);
   const customerId = new ObjectId(actor.id);
   let details: Pick<DesignRequestDocument,
@@ -69,7 +83,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     };
   } else {
     const project = await db.collection<ProjectDocument>(collections.projects).findOne(
-      { customerId, status: { $in: ["Pending", "Active", "On hold"] } },
+      { customerId, status: { $in: ["Awaiting downpayment", "Scheduled", "Pending", "Active", "On hold"] } },
       { sort: { createdAt: -1 } },
     );
     details = {
@@ -84,6 +98,8 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   const document: DesignRequestDocument = {
     _id: new ObjectId(), customerId, ...details, termsAcceptance,
     inspirationImages: input.inspirationImages,
+    preferredDate: new Date(`${input.preferredDate}T00:00:00.000Z`),
+    neededBy: new Date(`${input.neededBy}T00:00:00.000Z`),
     status: "Pending", createdAt: now, updatedAt: now,
   };
   await db.collection<DesignRequestDocument>(collections.designRequests).insertOne(document);
@@ -99,7 +115,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   if (admins.length) {
     await db.collection<NotificationDocument>(collections.notifications).insertMany(admins.map((admin) => ({
       _id: new ObjectId(), userId: admin._id, title: "New design request",
-      body: `${actor.name} ${subject}: ${document.notes.length > 120 ? `${document.notes.slice(0, 117)}…` : document.notes}`,
+      body: `${actor.name} ${subject}: ${document.notes.length > 120 ? `${document.notes.slice(0, 117)}…` : document.notes} (Needed by ${input.neededBy})`,
       href: "/admin/approvals", kind: "design-request", entityId: document._id, createdAt: now,
     })));
   }
@@ -108,6 +124,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     details: {
       floorArea: document.floorArea, finish: document.finish, status: document.status,
       inspirationImageCount: input.inspirationImages.length,
+      preferredDate: input.preferredDate, neededBy: input.neededBy,
       ...(document.selectedDesign ? { selectedHouseDesignId: document.selectedDesign.id } : {}),
       termsVersion: termsAcceptance.version,
       termsAcceptedAt: termsAcceptance.acceptedAt.toISOString(),

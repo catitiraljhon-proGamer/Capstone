@@ -19,6 +19,7 @@ import {
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import { CustomerRequestedDesigns } from "@/components/customer/customer-requested-designs";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
+import { CustomerProject } from "@/components/customer/customer-project";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
 import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
 import { LogoutButton } from "@/components/ui/logout-button";
@@ -32,6 +33,7 @@ import {
   FilePlus2,
   FileText,
   Gauge,
+  HardHat,
   HelpCircle,
   Home,
   Menu,
@@ -49,6 +51,7 @@ type CustomerSection =
   | "dashboard"
   | "design"
   | "requests"
+  | "project"
   | "billing"
   | "documents"
   | "profile"
@@ -65,6 +68,7 @@ const customerNav: {
   { label: "Dashboard", icon: Gauge, href: "/customer", section: "dashboard" },
   { label: "My House Design", icon: Home, href: "/customer/house-design", section: "design" },
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
+  { label: "My Project", icon: HardHat, href: "/customer/project", section: "project" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
   { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
   { label: "My Profile", icon: UserRound, href: "/customer/profile", section: "profile" },
@@ -334,6 +338,14 @@ export function CustomerDashboard() {
 
 export function CustomerHouseDesignPage() {
   return <CustomerShell activeSection="design" title="My House Design" description="Your requested designs, delivery status, and payment access."><CustomerRequestedDesigns /></CustomerShell>;
+}
+
+export function CustomerProjectPage({ designRequestId, estimateId }: { designRequestId?: string; estimateId?: string }) {
+  return (
+    <CustomerShell activeSection="project" title="My Project" description="Request construction, review your cost estimate, and follow your project payments.">
+      <CustomerProject designRequestId={designRequestId} estimateId={estimateId} />
+    </CustomerShell>
+  );
 }
 
 export function CustomerFinishedDesignsPage() {

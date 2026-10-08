@@ -6,12 +6,12 @@ import { readSession } from "@/lib/server/session";
 import type { Db } from "mongodb";
 import type { SessionUser, UserRole } from "@/types/domain";
 
-export async function designRequestApi(request: Request, role: UserRole, work: (db: Db, actor: SessionUser) => Promise<Response>) {
+export async function designRequestApi(request: Request, role: UserRole | UserRole[], work: (db: Db, actor: SessionUser) => Promise<Response>) {
   let response: Response;
   try {
     const actor = await readSession();
     if (!actor) response = unauthorized();
-    else if (actor.role !== role) response = forbidden();
+    else if (!(Array.isArray(role) ? role : [role]).includes(actor.role)) response = forbidden();
     else {
       const origin = request.headers.get("origin");
       if (request.method !== "GET" && (request.headers.get("sec-fetch-site") === "cross-site" || (origin && origin !== new URL(request.url).origin))) {
