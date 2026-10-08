@@ -3,6 +3,7 @@
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { CheckCircle2, Eye, EyeOff, HardHat } from "lucide-react";
 import Link from "next/link";
@@ -42,7 +43,7 @@ export function RegisterAccountPage({
     const confirmPassword = String(formData.get("confirmPassword") ?? "");
     const age = Number(formData.get("age"));
     const contactNumber = String(formData.get("contactNumber") ?? "").trim();
-    const address = String(formData.get("address") ?? "").trim();
+    const addressDetails = readAddressDetails(formData);
     const occupation = String(formData.get("occupation") ?? "").trim();
 
     if (password !== confirmPassword) {
@@ -56,7 +57,7 @@ export function RegisterAccountPage({
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, age, contactNumber, address, occupation }),
+        body: JSON.stringify({ name, email, password, age, contactNumber, addressDetails, occupation }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -205,22 +206,10 @@ export function RegisterAccountPage({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="address" className="text-sm font-medium text-stone-700">
-                Complete address <RequiredIndicator />
-              </label>
-              <textarea
-                id="address"
-                name="address"
-                autoComplete="street-address"
-                minLength={5}
-                maxLength={500}
-                rows={3}
-                required
-                placeholder="House/unit number, street, barangay, city/municipality, province, and postal code"
-                className="w-full resize-y rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
-              />
-            </div>
+            <PhAddressFields
+              inputClassName="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+              labelClassName="block text-sm font-medium text-stone-700"
+            />
 
             <div className="space-y-2">
               <label htmlFor="occupation" className="text-sm font-medium text-stone-700">

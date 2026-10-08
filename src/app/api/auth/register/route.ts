@@ -6,7 +6,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
-import { createClientSchema } from "@/lib/server/clients";
+import { createClientSchema, toClientDetails } from "@/lib/server/clients";
 import {
   clientIp,
   formatRetryAfter,
@@ -36,7 +36,8 @@ const registrationSchema = createClientSchema.extend({
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password, ...clientDetails } = registrationSchema.parse(await request.json());
+    const { name, email, password, ...input } = registrationSchema.parse(await request.json());
+    const clientDetails = toClientDetails(input);
     const db = await getDatabase();
     // Every attempt from a network address counts, which limits both
     // automated sign-ups and probing which emails already have accounts.

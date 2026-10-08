@@ -14,7 +14,11 @@ import { sessionCookieName } from "@/lib/server/session";
 let mongo: MongoMemoryServer;
 let db: Db;
 const admin: SessionUser = { id: new ObjectId().toHexString(), name: "Test Admin", email: "admin@example.test", role: "admin" };
-const details = { name: "Test Client", age: 35, contactNumber: "+63 917 123 4567", address: "123 Example Street, Sample City", occupation: "Engineer" };
+// Real PSGC codes: Barangay Baclaran, Balayan, Batangas.
+const addressInput = { provinceCode: "0401000000", cityCode: "0401003000", barangayCode: "0401003001", barangay: "Baclaran", street: "123 Example Street", postalCode: "4213" };
+const storedAddressDetails = { ...addressInput, province: "Batangas", city: "Balayan" };
+const formattedAddress = "123 Example Street, Brgy. Baclaran, Balayan, Batangas 4213";
+const details = { name: "Test Client", age: 35, contactNumber: "+63 917 123 4567", addressDetails: addressInput, occupation: "Engineer" };
 const password = "Test-password-2026";
 const registrationInput = { ...details, email: "new@example.test", password };
 
@@ -49,7 +53,7 @@ after(async () => {
 test("validates ages, required contact details, and overposted account fields", () => {
   assert.equal(clientProfileSchema.parse({ ...details, age: 0 }).age, 0);
   assert.equal(clientProfileSchema.parse({ ...details, occupation: "  " }).occupation, "");
-  for (const change of [{ age: -1 }, { age: 121 }, { age: 1.5 }, { age: "35" }, { age: null }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, { address: "   " }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
+  for (const change of [{ age: -1 }, { age: 121 }, { age: 1.5 }, { age: "35" }, { age: null }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, postalCode: "421" } }, { addressDetails: { ...addressInput, cityCode: "0401014000" } }, { addressDetails: { ...addressInput, provinceCode: "1300000000" } }, { address: "Free text address" }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
     assert.equal(clientProfileSchema.safeParse({ ...details, ...change }).success, false, JSON.stringify(change));
   }
 });
@@ -84,7 +88,7 @@ test("customer registration saves a complete record visible in the Client Module
   }));
   const response = await registerCustomer(registrationRequest({
     ...registrationInput, name: `  ${details.name}  `, email: "  NEW@EXAMPLE.TEST  ",
-    contactNumber: `  ${details.contactNumber}  `, address: `  ${details.address}  `,
+    contactNumber: `  ${details.contactNumber}  `, addressDetails: { ...addressInput, street: `  ${addressInput.street}  ` },
     occupation: `  ${details.occupation}  `,
   }));
   assert.equal(response.status, 201);
@@ -97,7 +101,8 @@ test("customer registration saves a complete record visible in the Client Module
   assert.equal(saved.status, "active");
   assert.equal(await compare(password, saved.passwordHash!), true);
   assert.deepEqual(saved.clientDetails, {
-    age: details.age, contactNumber: details.contactNumber, address: details.address, occupation: details.occupation,
+    age: details.age, contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation,
+    addressDetails: storedAddressDetails,
   });
   const listed = await listClients(db, admin, { q: registrationInput.email });
   assert.equal(listed.total, 1);
@@ -132,7 +137,7 @@ test("registration rejects incomplete or invalid client details and injected acc
   const invalidChanges = [
     { age: undefined }, { age: null }, { age: "35" }, { age: -1 }, { age: 121 }, { age: 1.5 },
     { contactNumber: undefined }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" },
-    { address: undefined }, { address: "   " }, { occupation: "a".repeat(101) },
+    { addressDetails: undefined }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, barangayCode: "0401014001" } }, { occupation: "a".repeat(101) },
     { role: "admin" }, { status: "disabled" }, { passwordHash: "injected" },
   ];
   for (const change of invalidChanges) {
@@ -149,14 +154,14 @@ test("registration rejects incomplete or invalid client details and injected acc
 test("duplicate registration cannot duplicate or overwrite a client record", async () => {
   assert.equal((await registerCustomer(registrationRequest(registrationInput))).status, 201);
   const response = await registerCustomer(registrationRequest({
-    ...registrationInput, email: "  NEW@EXAMPLE.TEST  ", name: "Replacement Name", address: "Replacement Address",
+    ...registrationInput, email: "  NEW@EXAMPLE.TEST  ", name: "Replacement Name", addressDetails: { ...addressInput, street: "Replacement Street" },
   }));
   assert.equal(response.status, 409);
   assert.equal(response.cookies.get(sessionCookieName), undefined);
   const listed = await listClients(db, admin, {});
   assert.equal(listed.total, 1);
   assert.equal(listed.clients[0].name, details.name);
-  assert.equal(listed.clients[0].address, details.address);
+  assert.equal(listed.clients[0].address, formattedAddress);
   assert.equal(await db.collection("audit_logs").countDocuments({ action: "auth.registered" }), 1);
 });
 
@@ -183,7 +188,7 @@ test("customer updates only their profile and the administrator reads the same s
   assert.equal(await db.collection("users").countDocuments(), 1);
   const audit = await db.collection("audit_logs").findOne({ action: "client.updated" });
   assert.ok(audit);
-  assert.equal(JSON.stringify(audit).includes(details.address), false);
+  assert.equal(JSON.stringify(audit).includes(formattedAddress), false);
   assert.equal(JSON.stringify(audit).includes(details.contactNumber), false);
 });
 
@@ -246,7 +251,7 @@ test("client writes reject cross-origin requests and non-JSON forms", () => {
 });
 
 test("archiving and unarchiving preserve client identity, account access, and project and billing records", async () => {
-  const original = legacyUser({ clientDetails: { age: details.age, contactNumber: details.contactNumber, address: details.address, occupation: details.occupation } });
+  const original = legacyUser({ clientDetails: { age: details.age, contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation, addressDetails: storedAddressDetails } });
   await db.collection<UserDocument>("users").insertOne(original);
   const project = { _id: new ObjectId(), customerId: original._id, reference: "TEST-PROJECT" };
   const invoice = { _id: new ObjectId(), customerId: original._id, projectId: project._id, invoiceNumber: "TEST-INVOICE" };

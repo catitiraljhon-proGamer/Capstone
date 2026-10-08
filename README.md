@@ -65,6 +65,26 @@ appear automatically in the admin Client Module (`/admin/clients`) and the custo
 profile (`/customer/profile`). Both views use the same record, including later edits.
 Existing accounts and Google registrations can complete missing details in their profile.
 
+## Philippine address dropdowns
+
+Client forms (Register, Complete your client information, My Profile, and the
+admin client editor) use dependent dropdowns: province, then city or
+municipality, then barangay, each sorted A to Z, plus a typed street and 4-digit
+postal code. The lists come from the PSA Philippine Standard Geographic Code
+(PSGC) via psgc.cloud: 84 provinces (including Metro Manila), 1,642 cities and
+municipalities, and 42,027 barangays.
+
+- `scripts/build-ph-address.mjs` downloads the PSGC data and writes
+  `public/ph-address/` (one small file per province, loaded on demand) and
+  `src/lib/ph-address-index.json` (used by the server to check that the city
+  is in the province and the barangay is in the city). Re-run
+  `node scripts/build-ph-address.mjs` when the PSA publishes updates.
+- Highly urbanized cities (e.g. Angeles, Cebu City, Baguio) are listed under the
+  province people expect, and Manila's districts are merged into one city.
+- Postal codes are typed because the source's ZIP codes are unreliable.
+- Records saved before this change keep their text address and stay complete;
+  the form asks the client to pick it from the lists the next time they edit.
+
 ## Editable material prices
 
 In Admin → House Designs → Edit Design, each default exterior material has a type

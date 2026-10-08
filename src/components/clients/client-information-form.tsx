@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { PhAddressFields, readAddressDetails, type AddressDetailsInput } from "@/components/clients/ph-address-fields";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
-import type { ClientDetails, ClientDto } from "@/types/clients";
+import type { ClientDto } from "@/types/clients";
 
-export type ClientFormInput = ClientDetails & { name: string; email?: string; password?: string };
+export type ClientFormInput = {
+  name: string;
+  age: number;
+  contactNumber: string;
+  occupation: string;
+  addressDetails: AddressDetailsInput;
+  email?: string;
+  password?: string;
+};
 
 const fieldClass = "mt-2 min-h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-base text-stone-950 outline-none placeholder:text-stone-500 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 read-only:bg-stone-50 sm:text-sm";
 
@@ -28,7 +37,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
     try {
       await onSave({
         name: value("name"), age: Number(value("age")),
-        contactNumber: value("contactNumber"), address: value("address"), occupation: value("occupation"),
+        contactNumber: value("contactNumber"), addressDetails: readAddressDetails(data), occupation: value("occupation"),
         ...(creating ? { email: value("email"), password: value("password") } : {}),
       });
     } catch (failure) {
@@ -60,10 +69,14 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
           <input name="contactNumber" type="tel" autoComplete="tel" required minLength={7} maxLength={25} placeholder="Enter contact number" defaultValue={client?.contactNumber ?? ""} className={fieldClass} />
           <span className="mt-1 block text-xs font-normal text-stone-500">Example: 0917 123 4567 or +63 917 123 4567.</span>
         </label>
-        <label className="min-w-0 text-sm font-medium text-stone-700 sm:col-span-2">
-          Complete address <RequiredIndicator />
-          <textarea name="address" autoComplete="street-address" required minLength={5} maxLength={500} rows={3} placeholder="Enter house/unit number, street, barangay, city/municipality, province, and postal code" defaultValue={client?.address ?? ""} className={`${fieldClass} resize-y`} />
-        </label>
+        <div className="min-w-0 sm:col-span-2">
+          <PhAddressFields
+            defaultValue={client?.addressDetails}
+            legacyAddress={client?.address}
+            inputClassName={fieldClass}
+            labelClassName="block text-sm font-medium text-stone-700"
+          />
+        </div>
         <label className="min-w-0 text-sm font-medium text-stone-700 sm:col-span-2">
           Occupation (optional)
           <input name="occupation" maxLength={100} placeholder="Enter occupation (optional)" defaultValue={client?.occupation ?? ""} className={fieldClass} />
