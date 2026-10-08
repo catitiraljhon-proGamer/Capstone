@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { PesoInput } from "@/components/ui/peso-input";
 import { billingDate } from "@/components/billing/billing-primitives";
 import {
@@ -12,6 +13,7 @@ import {
   scheduleTemplateError,
   VAT_RATE,
 } from "@/lib/construction";
+import { amountError, dateError, numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
 import type {
   CostEstimateDto,
@@ -19,12 +21,12 @@ import type {
   EstimateStatus,
   MilestoneTemplate,
 } from "@/types/construction";
-import { FolderKanban, LoaderCircle, Plus, Send, Trash2, Wand2 } from "lucide-react";
+import { FolderKanban, Plus, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const inputClass =
-  "w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100";
+  "w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100 aria-invalid:border-red-600";
 const headClass = "px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500";
 
 export const formatEstimateDate = (value: string | null | undefined) => (value ? billingDate(value) : "—");
@@ -302,8 +304,52 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
+type Issue = { id: string; where: string; message: string };
+
+const blankLine = (): LineRow => ({ key: nextKey(), item: "", description: "", unit: "lot", quantity: "1", unitPrice: "0" });
+const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+
+function lineErrors(row: LineRow) {
+  const quantity =
+    numberError(row.quantity, { label: "Quantity", max: 10_000_000, maxDecimals: 4 }) ??
+    (Number(row.quantity) <= 0 ? "Quantity must be more than 0." : null);
+  return {
+    item: textError(row.item, { label: "Item name", max: 160 }),
+    unit: textError(row.unit, { label: "Unit", max: 24 }),
+    quantity,
+    unitPrice: amountError(row.unitPrice, { label: "Unit price", allowZero: true, max: 1_000_000_000 }),
+  };
+}
+
+function scheduleErrors(row: ScheduleRow, index: number, previous: ScheduleRow | undefined) {
+  const base = numberError(row.percentage, { label: "Percentage", max: 100, maxDecimals: 2, unit: "%" });
+  const value = Number(row.percentage);
+  const percentage =
+    base ??
+    (index === 0 && value < MIN_DOWNPAYMENT_PERCENT
+      ? `The downpayment must be at least ${MIN_DOWNPAYMENT_PERCENT}%.`
+      : value <= 0
+        ? "Percentage must be more than 0%."
+        : null);
+  return {
+    label: textError(row.label, { label: "Milestone name", min: 3, max: 120 }),
+    percentage,
+    targetDate: dateError(row.targetDate, {
+      label: "Target date",
+      min: previous && isoDate.test(previous.targetDate) ? previous.targetDate : undefined,
+      minLabel: "the previous milestone's date",
+    }),
+  };
+}
+
+/** Rules the save endpoint enforces; everything else may stay incomplete in a draft. */
+const draftBlocksSchedule = (row: ScheduleRow) => ({
+  label: row.label.trim() === "",
+  percentage: row.percentage.trim() !== "" && !(Number(row.percentage) >= 0 && Number(row.percentage) <= 100),
+});
+
 function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; onUpdated: (estimate: CostEstimateDto) => void }) {
-  const [lines, setLines] = useState<LineRow[]>(() => toLineRows(estimate.lineItems));
+  const [lines, setLines] = useState<LineRow[]>(() => (estimate.lineItems.length > 0 ? toLineRows(estimate.lineItems) : [blankLine()]));
   const [schedule, setSchedule] = useState<ScheduleRow[]>(() =>
     toScheduleRows(
       estimate.scheduleTemplate.length > 0
@@ -312,55 +358,73 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     ),
   );
   const [adminNotes, setAdminNotes] = useState(estimate.adminNotes);
-  const [busy, setBusy] = useState<"save" | "send" | "prefill" | null>(null);
+  const [busy, setBusy] = useState<"save" | "send" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const [submitted, setSubmitted] = useState(false);
+  const [sendAttempted, setSendAttempted] = useState(false);
 
   const template = useMemo(() => fromScheduleRows(schedule), [schedule]);
   const totals = useMemo(() => estimateTotals(fromLineRows(lines)), [lines]);
   const scheduleError = useMemo(() => scheduleTemplateError(template), [template]);
   const percentTotal = template.reduce((sum, row) => sum + row.percentage, 0);
-  const canSend = !scheduleError && totals.total > 0 && !busy;
+  const lineErrorRows = useMemo(() => lines.map(lineErrors), [lines]);
+  const scheduleErrorRows = useMemo(() => schedule.map((row, index) => scheduleErrors(row, index, schedule[index - 1])), [schedule]);
+  const totalError = totals.total <= 0 ? "Add at least one priced line item before sending." : null;
 
-  async function loadPrefill() {
-    setBusy("prefill");
-    setError(null);
-    try {
-      const response = await fetch(`/api/construction/estimates/${estimate.id}/prefill`, { cache: "no-store" });
-      const prefill = await readJson<{ lineItems: EstimateLineItemInput[]; scheduleTemplate: MilestoneTemplate[] }>(
-        response,
-        "Unable to prefill from the design.",
-      );
-      setLines(toLineRows(prefill.lineItems));
-      if (prefill.scheduleTemplate.length > 0) setSchedule(toScheduleRows(prefill.scheduleTemplate));
-      setNotice("Prefilled from the design. Review and adjust before sending.");
-    } catch (prefillError) {
-      setError(prefillError instanceof Error ? prefillError.message : "Unable to prefill from the design.");
-    } finally {
-      setBusy(null);
+  const touch = (id: string) => setTouched((current) => (current.has(id) ? current : new Set(current).add(id)));
+  const shown = (id: string, message: string | null) => (submitted || touched.has(id) ? message : null);
+  /** Shared id and accessibility attributes for an input with an inline message. */
+  const field = (id: string, message: string | null) => ({
+    id,
+    "aria-invalid": message ? (true as const) : undefined,
+    "aria-describedby": message ? `${id}-error` : undefined,
+    onBlur: () => touch(id),
+  });
+
+  function collectIssues(mode: "save" | "send"): Issue[] {
+    const issues: Issue[] = [];
+    if (lines.length === 0) issues.push({ id: "est-add-line", where: "Bill of quantities", message: "Add at least one line item." });
+    lines.forEach((row, index) => {
+      const errors = lineErrorRows[index];
+      (["item", "unit", "quantity", "unitPrice"] as const).forEach((name) => {
+        const message = errors[name];
+        if (message) issues.push({ id: `est-line-${row.key}-${name}`, where: `Line item ${index + 1}`, message });
+      });
+    });
+    schedule.forEach((row, index) => {
+      const errors = scheduleErrorRows[index];
+      const blocks = draftBlocksSchedule(row);
+      (["label", "percentage", "targetDate"] as const).forEach((name) => {
+        const message = errors[name];
+        if (!message) return;
+        if (mode === "save" && !(name === "label" ? blocks.label : name === "percentage" ? blocks.percentage : false)) return;
+        issues.push({ id: `est-sched-${row.key}-${name}`, where: `Milestone ${index + 1}`, message });
+      });
+    });
+    if (mode === "send") {
+      if (scheduleError && !issues.some((issue) => issue.id.startsWith("est-sched-"))) {
+        const last = schedule[schedule.length - 1];
+        issues.push({ id: schedule.length < 2 || !last ? "est-add-milestone" : `est-sched-${last.key}-percentage`, where: "Payment schedule", message: scheduleError });
+      }
+      if (totalError) issues.push({ id: lines[0] ? `est-line-${lines[0].key}-unitPrice` : "est-add-line", where: "Bill of quantities", message: totalError });
     }
+    return issues;
   }
 
-  useEffect(() => {
-    if (estimate.lineItems.length > 0) return;
-    let active = true;
-    fetch(`/api/construction/estimates/${estimate.id}/prefill`, { cache: "no-store" })
-      .then((response) =>
-        readJson<{ lineItems: EstimateLineItemInput[]; scheduleTemplate: MilestoneTemplate[] }>(response, "Unable to prefill from the design."),
-      )
-      .then((prefill) => {
-        if (!active) return;
-        setLines((current) => (current.length === 0 ? toLineRows(prefill.lineItems) : current));
-        if (prefill.scheduleTemplate.length > 0) setSchedule(toScheduleRows(prefill.scheduleTemplate));
-        setNotice("Line items prefilled from the selected design. Review and adjust before sending.");
-      })
-      .catch(() => {
-        // Auto-prefill is best effort; the admin can still build the BOQ manually.
-      });
-    return () => {
-      active = false;
-    };
-  }, [estimate.id, estimate.lineItems.length]);
+  /** Marks every field as checked, reports what to fix, and focuses the first invalid field. */
+  function reject(issues: Issue[], verb: string) {
+    setSubmitted(true);
+    setNotice(null);
+    const first = issues[0];
+    setError(
+      issues.length === 1
+        ? `Fix this before ${verb}: ${first.where}: ${first.message}`
+        : `Fix ${issues.length} problems before ${verb}. First: ${first.where}: ${first.message}`,
+    );
+    requestAnimationFrame(() => document.getElementById(first.id)?.focus());
+  }
 
   function updateLine(key: number, patch: Partial<LineRow>) {
     setLines((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -378,19 +442,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     });
   }
 
-  function validateLines() {
-    if (lines.length === 0) return "Add at least one line item.";
-    if (lines.some((row) => !row.item.trim())) return "Every line item needs a name.";
-    if (lines.some((row) => !(num(row.quantity) > 0))) return "Every line item needs a quantity above 0.";
-    return null;
-  }
-
-  async function save(): Promise<CostEstimateDto | null> {
-    const lineError = validateLines();
-    if (lineError) {
-      setError(lineError);
-      return null;
-    }
+  async function save(): Promise<CostEstimateDto> {
     const response = await fetch(`/api/construction/estimates/${estimate.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -402,12 +454,15 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
   }
 
   async function saveDraft() {
+    if (busy) return;
+    const issues = collectIssues("save");
+    if (issues.length > 0) return reject(issues, "saving");
     setBusy("save");
     setError(null);
     setNotice(null);
     try {
-      const saved = await save();
-      if (saved) setNotice("Draft saved.");
+      await save();
+      setNotice("Draft saved.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save this estimate.");
     } finally {
@@ -416,7 +471,10 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
   }
 
   async function sendToCustomer() {
-    if (!canSend) return;
+    if (busy) return;
+    setSendAttempted(true);
+    const issues = collectIssues("send");
+    if (issues.length > 0) return reject(issues, "sending");
     if (
       !window.confirm(
         `Send this estimate to ${estimate.customer.name}?\n\nContract total: ${formatPeso(totals.total)} (incl. 12% VAT). The customer will be able to accept it with a downpayment of at least ${MIN_DOWNPAYMENT_PERCENT}%. You will not be able to edit it afterwards.`,
@@ -428,8 +486,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     setError(null);
     setNotice(null);
     try {
-      const saved = await save();
-      if (!saved) return;
+      await save();
       const response = await fetch(`/api/construction/estimates/${estimate.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -444,28 +501,19 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     }
   }
 
-  function confirmPrefill() {
-    const hasContent = lines.some((row) => row.item.trim());
-    if (hasContent && !window.confirm("Replace the current line items and schedule with the design's prefill?")) return;
-    void loadPrefill();
-  }
-
   return (
     <div className="space-y-5">
       <DetailsCard estimate={estimate} />
 
       <Card title="Bill of quantities" note="Itemize the work. Amounts are quantity × unit price.">
         <div className="mb-4 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={Boolean(busy) || !estimate.designRequestId} onClick={confirmPrefill}>
-            {busy === "prefill" ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
-            Prefill from design
-          </Button>
           <Button
+            id="est-add-line"
             type="button"
             variant="outline"
             size="sm"
             disabled={Boolean(busy)}
-            onClick={() => setLines((current) => [...current, { key: nextKey(), item: "", description: "", unit: "lot", quantity: "1", unitPrice: "0" }])}
+            onClick={() => setLines((current) => [...current, blankLine()])}
           >
             <Plus className="mr-1.5 h-4 w-4" /> Add line item
           </Button>
@@ -487,41 +535,57 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
               {lines.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-3 py-8 text-center text-stone-500">
-                    No line items yet. Prefill from the design or add one manually.
+                    No line items yet. Add a line item to start the bill of quantities.
                   </td>
                 </tr>
               ) : null}
-              {lines.map((row, index) => (
-                <tr key={row.key}>
-                  <td className="w-44 px-2 py-2">
-                    <input aria-label={`Item ${index + 1}`} maxLength={160} className={inputClass} value={row.item} onChange={(event) => updateLine(row.key, { item: event.target.value })} />
-                  </td>
-                  <td className="min-w-48 px-2 py-2">
-                    <input aria-label={`Description ${index + 1}`} maxLength={400} className={inputClass} value={row.description} onChange={(event) => updateLine(row.key, { description: event.target.value })} />
-                  </td>
-                  <td className="w-24 px-2 py-2">
-                    <input aria-label={`Unit ${index + 1}`} maxLength={24} className={inputClass} value={row.unit} onChange={(event) => updateLine(row.key, { unit: event.target.value })} />
-                  </td>
-                  <td className="w-28 px-2 py-2">
-                    <input aria-label={`Quantity ${index + 1}`} type="number" min="0" step="any" inputMode="decimal" className={`${inputClass} tabular-nums`} value={row.quantity} onChange={(event) => updateLine(row.key, { quantity: event.target.value })} />
-                  </td>
-                  <td className="w-40 px-2 py-2">
-                    <PesoInput aria-label={`Unit price ${index + 1}`} min="0" step="0.01" value={row.unitPrice} onChange={(event) => updateLine(row.key, { unitPrice: event.target.value })} />
-                  </td>
-                  <td className="w-36 whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums">
-                    {formatPeso(lineAmount(num(row.quantity), num(row.unitPrice)))}
-                  </td>
-                  <td className="w-12 px-2 py-2">
-                    <Button type="button" variant="ghost" size="icon" aria-label={`Remove line item ${index + 1}`} disabled={Boolean(busy)} onClick={() => setLines((current) => current.filter((item) => item.key !== row.key))}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              ))}
+              {lines.map((row, index) => {
+                const errors = lineErrorRows[index];
+                const itemId = `est-line-${row.key}-item`;
+                const unitId = `est-line-${row.key}-unit`;
+                const quantityId = `est-line-${row.key}-quantity`;
+                const priceId = `est-line-${row.key}-unitPrice`;
+                const itemMessage = shown(itemId, errors.item);
+                const unitMessage = shown(unitId, errors.unit);
+                const quantityMessage = shown(quantityId, errors.quantity);
+                const priceMessage = shown(priceId, errors.unitPrice);
+                return (
+                  <tr key={row.key} className="align-top">
+                    <td className="w-44 px-2 py-2">
+                      <input aria-label={`Item ${index + 1}`} maxLength={160} className={inputClass} value={row.item} onChange={(event) => updateLine(row.key, { item: event.target.value })} {...field(itemId, itemMessage)} />
+                      <FieldError id={`${itemId}-error`} message={itemMessage} />
+                    </td>
+                    <td className="min-w-48 px-2 py-2">
+                      <input aria-label={`Description ${index + 1}`} maxLength={400} className={inputClass} value={row.description} onChange={(event) => updateLine(row.key, { description: event.target.value })} />
+                    </td>
+                    <td className="w-24 px-2 py-2">
+                      <input aria-label={`Unit ${index + 1}`} maxLength={24} className={inputClass} value={row.unit} onChange={(event) => updateLine(row.key, { unit: event.target.value })} {...field(unitId, unitMessage)} />
+                      <FieldError id={`${unitId}-error`} message={unitMessage} />
+                    </td>
+                    <td className="w-28 px-2 py-2">
+                      <input aria-label={`Quantity ${index + 1}`} type="number" min="0" step="any" inputMode="decimal" className={`${inputClass} tabular-nums`} value={row.quantity} onChange={(event) => updateLine(row.key, { quantity: event.target.value })} {...field(quantityId, quantityMessage)} />
+                      <FieldError id={`${quantityId}-error`} message={quantityMessage} />
+                    </td>
+                    <td className="w-40 px-2 py-2">
+                      <PesoInput aria-label={`Unit price ${index + 1}`} min="0" step="0.01" value={row.unitPrice} onChange={(event) => updateLine(row.key, { unitPrice: event.target.value })} {...field(priceId, priceMessage)} />
+                      <FieldError id={`${priceId}-error`} message={priceMessage} />
+                    </td>
+                    <td className="w-36 whitespace-nowrap px-3 py-4 text-right font-medium tabular-nums">
+                      {formatPeso(lineAmount(num(row.quantity), num(row.unitPrice)))}
+                    </td>
+                    <td className="w-12 px-2 py-2">
+                      <Button type="button" variant="ghost" size="icon" aria-label={`Remove line item ${index + 1}`} disabled={Boolean(busy)} onClick={() => setLines((current) => current.filter((item) => item.key !== row.key))}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <TotalsBox {...totals} />
+        {sendAttempted && totalError ? <div className="ml-auto max-w-sm text-right"><FieldError id="est-total-error" message={totalError} /></div> : null}
       </Card>
 
       <Card
@@ -540,35 +604,47 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
-              {schedule.map((row, index) => (
-                <tr key={row.key}>
-                  <td className="w-56 px-2 py-2">
-                    <input aria-label={`Milestone ${index + 1} label`} maxLength={120} className={inputClass} value={row.label} onChange={(event) => updateSchedule(row.key, { label: event.target.value })} />
-                    {index === 0 ? <span className="mt-1 block text-xs text-stone-500">Downpayment</span> : null}
-                  </td>
-                  <td className="min-w-56 px-2 py-2">
-                    <input aria-label={`Milestone ${index + 1} description`} maxLength={400} className={inputClass} value={row.description} onChange={(event) => updateSchedule(row.key, { description: event.target.value })} />
-                  </td>
-                  <td className="w-24 px-2 py-2">
-                    <input aria-label={`Milestone ${index + 1} percentage`} type="number" min="0" max="100" step="0.01" inputMode="decimal" className={`${inputClass} tabular-nums`} value={row.percentage} onChange={(event) => updateSchedule(row.key, { percentage: event.target.value })} />
-                  </td>
-                  <td className="w-44 px-2 py-2">
-                    <input aria-label={`Milestone ${index + 1} target date`} type="date" className={inputClass} value={row.targetDate} onChange={(event) => updateSchedule(row.key, { targetDate: event.target.value })} />
-                  </td>
-                  <td className="w-12 px-2 py-2">
-                    {index > 0 ? (
-                      <Button type="button" variant="ghost" size="icon" aria-label={`Remove milestone ${index + 1}`} disabled={Boolean(busy) || schedule.length <= 2} onClick={() => setSchedule((current) => current.filter((item) => item.key !== row.key))}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+              {schedule.map((row, index) => {
+                const errors = scheduleErrorRows[index];
+                const labelId = `est-sched-${row.key}-label`;
+                const percentId = `est-sched-${row.key}-percentage`;
+                const dateId = `est-sched-${row.key}-targetDate`;
+                const labelMessage = shown(labelId, errors.label);
+                const percentMessage = shown(percentId, errors.percentage);
+                const dateMessage = shown(dateId, errors.targetDate);
+                return (
+                  <tr key={row.key} className="align-top">
+                    <td className="w-56 px-2 py-2">
+                      <input aria-label={`Milestone ${index + 1} label`} maxLength={120} className={inputClass} value={row.label} onChange={(event) => updateSchedule(row.key, { label: event.target.value })} {...field(labelId, labelMessage)} />
+                      <FieldError id={`${labelId}-error`} message={labelMessage} />
+                      {index === 0 ? <span className="mt-1 block text-xs text-stone-500">Downpayment</span> : null}
+                    </td>
+                    <td className="min-w-56 px-2 py-2">
+                      <input aria-label={`Milestone ${index + 1} description`} maxLength={400} className={inputClass} value={row.description} onChange={(event) => updateSchedule(row.key, { description: event.target.value })} />
+                    </td>
+                    <td className="w-28 px-2 py-2">
+                      <input aria-label={`Milestone ${index + 1} percentage`} type="number" min="0" max="100" step="0.01" inputMode="decimal" className={`${inputClass} tabular-nums`} value={row.percentage} onChange={(event) => updateSchedule(row.key, { percentage: event.target.value })} {...field(percentId, percentMessage)} />
+                      <FieldError id={`${percentId}-error`} message={percentMessage} />
+                    </td>
+                    <td className="w-44 px-2 py-2">
+                      <input aria-label={`Milestone ${index + 1} target date`} type="date" className={inputClass} value={row.targetDate} onChange={(event) => updateSchedule(row.key, { targetDate: event.target.value })} {...field(dateId, dateMessage)} />
+                      <FieldError id={`${dateId}-error`} message={dateMessage} />
+                    </td>
+                    <td className="w-12 px-2 py-2">
+                      {index > 0 ? (
+                        <Button type="button" variant="ghost" size="icon" aria-label={`Remove milestone ${index + 1}`} disabled={Boolean(busy) || schedule.length <= 2} onClick={() => setSchedule((current) => current.filter((item) => item.key !== row.key))}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <Button type="button" variant="outline" size="sm" disabled={Boolean(busy) || schedule.length >= 8} onClick={addScheduleRow}>
+          <Button id="est-add-milestone" type="button" variant="outline" size="sm" disabled={Boolean(busy) || schedule.length >= 8} onClick={addScheduleRow}>
             <Plus className="mr-1.5 h-4 w-4" /> Add milestone
           </Button>
           <p className={`text-sm font-medium tabular-nums ${Math.abs(percentTotal - 100) > 0.001 ? "text-red-700" : "text-stone-600"}`}>
@@ -606,15 +682,10 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
       ) : null}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {!canSend && !busy ? (
-          <p className="mr-auto text-xs text-stone-500">
-            {scheduleError ?? (totals.total <= 0 ? "Add priced line items before sending." : "")}
-          </p>
-        ) : null}
         <Button type="button" variant="outline" disabled={Boolean(busy)} onClick={() => void saveDraft()}>
           {busy === "save" ? "Saving…" : "Save draft"}
         </Button>
-        <Button type="button" disabled={!canSend} onClick={() => void sendToCustomer()}>
+        <Button type="button" disabled={Boolean(busy)} onClick={() => void sendToCustomer()}>
           <Send className="mr-1.5 h-4 w-4" />
           {busy === "send" ? "Sending…" : "Send to customer"}
         </Button>

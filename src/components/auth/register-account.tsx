@@ -3,7 +3,9 @@
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { useClientFormValidation } from "@/components/clients/client-information-form";
 import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
+import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { CheckCircle2, Eye, EyeOff, HardHat } from "lucide-react";
 import Link from "next/link";
@@ -27,6 +29,8 @@ export function RegisterAccountPage({
   const [errorMessage, setErrorMessage] = useState("");
   const [googleError, setGoogleError] = useState(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const validation = useClientFormValidation("register");
+  const { describe, error: fieldError, errorId } = validation;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -34,22 +38,19 @@ export function RegisterAccountPage({
     setErrorMessage("");
     setGoogleError("");
 
+    // Show every message under its field and focus the first invalid one.
+    if (!validation.validate(event.currentTarget)) return;
+
     const formData = new FormData(event.currentTarget);
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "")
       .trim()
       .toLowerCase();
     const password = String(formData.get("password") ?? "");
-    const confirmPassword = String(formData.get("confirmPassword") ?? "");
     const age = Number(formData.get("age"));
     const contactNumber = String(formData.get("contactNumber") ?? "").trim();
     const addressDetails = readAddressDetails(formData);
     const occupation = String(formData.get("occupation") ?? "").trim();
-
-    if (password !== confirmPassword) {
-      setErrorMessage("The passwords do not match.");
-      return;
-    }
 
     setIsSubmitting(true);
 
@@ -127,7 +128,7 @@ export function RegisterAccountPage({
             </div>
           </div>
 
-          <form className="mt-6 max-w-xl space-y-5" onSubmit={handleSubmit}>
+          <form className="mt-6 max-w-xl space-y-5" onSubmit={handleSubmit} {...validation.formProps}>
             <p className="text-sm leading-6 text-stone-600">
               Fields marked with a red asterisk (<RequiredIndicator />) are required. Occupation is optional.
             </p>
@@ -147,8 +148,10 @@ export function RegisterAccountPage({
                 maxLength={100}
                 required
                 placeholder="Juan Dela Cruz"
-                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                {...describe("name")}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
+              <FieldError id={errorId("name")} message={fieldError("name")} />
             </div>
 
             <div className="space-y-2">
@@ -166,8 +169,10 @@ export function RegisterAccountPage({
                 maxLength={254}
                 required
                 placeholder="name@example.com"
-                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                {...describe("email")}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
+              <FieldError id={errorId("email")} message={fieldError("email")} />
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -185,8 +190,10 @@ export function RegisterAccountPage({
                   step={1}
                   required
                   placeholder="Enter your age"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                  {...describe("age")}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                 />
+                <FieldError id={errorId("age")} message={fieldError("age")} />
               </div>
               <div className="space-y-2">
                 <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
@@ -201,14 +208,17 @@ export function RegisterAccountPage({
                   maxLength={25}
                   required
                   placeholder="0917 123 4567"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                  {...describe("contactNumber")}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                 />
+                <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
               </div>
             </div>
 
             <PhAddressFields
               inputClassName="mt-2 w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
               labelClassName="block text-sm font-medium text-stone-700"
+              errors={validation.addressErrors}
             />
 
             <div className="space-y-2">
@@ -221,8 +231,10 @@ export function RegisterAccountPage({
                 type="text"
                 maxLength={100}
                 placeholder="Enter your occupation"
-                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                {...describe("occupation")}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
+              <FieldError id={errorId("occupation")} message={fieldError("occupation")} />
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
@@ -243,7 +255,8 @@ export function RegisterAccountPage({
                     maxLength={72}
                     required
                     placeholder="At least 8 characters"
-                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 pr-11 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                    {...describe("password")}
+                    className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 pr-11 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                   />
                   <button
                     type="button"
@@ -260,6 +273,7 @@ export function RegisterAccountPage({
                     )}
                   </button>
                 </div>
+                <FieldError id={errorId("password")} message={fieldError("password")} />
               </div>
 
               <div className="space-y-2">
@@ -278,8 +292,10 @@ export function RegisterAccountPage({
                   maxLength={72}
                   required
                   placeholder="Repeat your password"
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+                  {...describe("confirmPassword")}
+                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                 />
+                <FieldError id={errorId("confirmPassword")} message={fieldError("confirmPassword")} />
               </div>
             </div>
 

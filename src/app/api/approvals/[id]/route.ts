@@ -15,15 +15,10 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const decisionSchema = z
-  .object({
-    decision: z.enum(["Approved", "Rejected"]),
-    note: z.string().trim().max(1_000).optional(),
-  })
-  .refine(
-    (input) => input.decision !== "Rejected" || Boolean(input.note?.trim()),
-    { message: "Add a reason before rejecting this approval.", path: ["note"] },
-  );
+const decisionSchema = z.object({
+  decision: z.literal("Approved"),
+  note: z.string().trim().max(1_000).optional(),
+});
 
 const customerHrefs: Record<ApprovalRecordType, string> = {
   "Design request": "/customer/design-requests",
@@ -67,7 +62,7 @@ async function sourceExists(
 
 async function updateConnectedSource(
   approval: ApprovalDocument,
-  decision: "Approved" | "Rejected",
+  decision: "Approved",
   now: Date,
   db: Awaited<ReturnType<typeof getDatabase>>,
 ) {

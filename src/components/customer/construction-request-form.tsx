@@ -1,19 +1,41 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { HardHat } from "lucide-react";
 import { BillingErrorMessage, BillingPanel, billingJson } from "@/components/billing/billing-primitives";
-import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
+import { PhAddressFields, readAddressDetails, type AddressFieldErrors } from "@/components/clients/ph-address-fields";
 import { constructionFieldClass, constructionLabelClass, Eyebrow } from "@/components/customer/construction-shared";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
+import { dateError, manilaDay, textError } from "@/lib/form-validation";
 import type { AddressDetails } from "@/types/clients";
 import type { ConstructionRequestInput, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
 
-/** YYYY-MM-DD in Manila time, `days` from today. */
-function manilaDate(days: number) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(Date.now() + days * 86_400_000));
+const NOTES_MAX = 2000;
+
+type AddressKey = "province" | "city" | "barangay" | "street" | "postalCode";
+type AddressErrors = Record<AddressKey, string | null>;
+/** Form control name for each address field, in the order they appear on screen. */
+const addressFields: [AddressKey, string][] = [
+  ["province", "addressProvinceCode"],
+  ["city", "addressCityCode"],
+  ["barangay", "addressBarangayCode"],
+  ["street", "addressStreet"],
+  ["postalCode", "addressPostalCode"],
+];
+const noAddressErrors: AddressErrors = { province: null, city: null, barangay: null, street: null, postalCode: null };
+
+function addressErrorsOf(form: HTMLFormElement): AddressErrors {
+  const address = readAddressDetails(new FormData(form));
+  return {
+    province: address.provinceCode ? null : "Choose the province.",
+    city: address.cityCode ? null : "Choose the city or municipality.",
+    barangay: address.barangayCode ? null : "Choose the barangay.",
+    street: address.street.length >= 2 ? null : "Enter the house number and street.",
+    postalCode: !address.postalCode ? "Enter the postal code." : /^\d{4}$/.test(address.postalCode) ? null : "Postal code must be 4 digits.",
+  };
 }
 
 function addOneDay(date: string) {
@@ -31,27 +53,75 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
   onSubmitted: (estimate: CostEstimateDto) => void;
   onCancel: () => void;
 }) {
-  const [minStart] = useState(() => manilaDate(1));
+  const [minStart] = useState(() => manilaDay(1));
   // The design request's timespan is only a starting suggestion; the dates must still be in the future.
   const suggestion = design.preferredDate && design.neededBy && design.preferredDate >= minStart && design.neededBy > design.preferredDate ? design : null;
   const [startDate, setStartDate] = useState(suggestion?.preferredDate ?? "");
   const [neededBy, setNeededBy] = useState(suggestion?.neededBy ?? "");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set());
+  const [submitted, setSubmitted] = useState(false);
+  const [addressErrors, setAddressErrors] = useState<AddressErrors>(noAddressErrors);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const startError = dateError(startDate, { label: "Preferred start date" }) ?? (startDate < minStart ? "Preferred start date must be after today." : null);
+  const neededError =
+    dateError(neededBy, { label: "Needed by date" }) ??
+    (startDate && !startError && neededBy <= startDate
+      ? "The Needed By date must be after your preferred start date."
+      : neededBy < minStart
+        ? "Needed By date must be after today."
+        : null);
+  const notesError = textError(notes, { label: "Notes", required: false, max: NOTES_MAX });
+  const show = (key: string, message: string | null) => (submitted || touched.has(key) ? message : null);
+  const touch = (key: string) => setTouched((current) => (current.has(key) ? current : new Set(current).add(key)));
+  const startMessage = show("start", startError);
+  const neededMessage = show("needed", neededError);
+  const notesMessage = show("notes", notesError);
+
+  /** Re-reads the address controls after React has applied the change (cascading selects reset later fields). */
+  function refreshAddress(event: { target: EventTarget }) {
+    const form = formRef.current;
+    const name = event.target instanceof HTMLElement ? event.target.getAttribute("name") : null;
+    const key = addressFields.find(([, field]) => field === name)?.[0];
+    if (key) touch(key);
+    if (form) setTimeout(() => setAddressErrors(addressErrorsOf(form)), 0);
+  }
+  // Shown under each address control by PhAddressFields, keyed by its form field name.
+  const shownAddressErrors = Object.fromEntries(
+    addressFields.map(([key, name]) => [name, show(key, addressErrors[key])]),
+  ) as AddressFieldErrors;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (saving) return;
-    const data = new FormData(event.currentTarget);
-    if (startDate < minStart) return setError("Choose a preferred start date from tomorrow onward.");
-    if (neededBy <= startDate) return setError("The Needed By date must be after your preferred start date.");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const addressNow = addressErrorsOf(form);
+    setAddressErrors(addressNow);
+    setSubmitted(true);
+    const firstAddress = addressFields.find(([key]) => addressNow[key]);
+    const invalid =
+      startError ? "request-start-date"
+      : neededError ? "request-needed-by"
+      : firstAddress ? firstAddress[1]
+      : notesError ? "request-notes"
+      : null;
+    if (invalid) {
+      setError("Fix the highlighted fields before sending your request.");
+      const target = form.elements.namedItem(invalid) ?? document.getElementById(invalid);
+      if (target instanceof HTMLElement) target.focus();
+      return;
+    }
     const input: ConstructionRequestInput = {
       designRequestId: design.id,
       preferredStartDate: startDate,
       neededBy,
       // The server fills in province and city names from the PSGC codes.
       siteAddress: readAddressDetails(data) as AddressDetails,
-      notes: String(data.get("notes") ?? "").trim(),
+      notes: notes.trim(),
     };
     setSaving(true);
     setError(null);
@@ -89,37 +159,56 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
         <div><dt className="text-xs text-stone-500">Finish</dt><dd className="mt-1 font-semibold">{design.finish}</dd></div>
       </dl>}
 
-      <form onSubmit={submit} className="mt-6 space-y-5">
+      <form ref={formRef} noValidate onSubmit={submit} className="mt-6 space-y-5">
         <fieldset disabled={saving} className="min-w-0 space-y-5 disabled:opacity-70">
           <div className="grid min-w-0 gap-5 sm:grid-cols-2">
             <label className={`min-w-0 ${constructionLabelClass}`}>
               Preferred Start Date <RequiredIndicator />
               <input
-                type="date" required min={minStart} value={startDate}
+                id="request-start-date" type="date" min={minStart} value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
-                className={constructionFieldClass}
+                onBlur={() => touch("start")}
+                aria-invalid={startMessage ? true : undefined}
+                aria-describedby={startMessage ? "request-start-date-error" : undefined}
+                className={`${constructionFieldClass} aria-invalid:border-red-600`}
               />
-              <span className="mt-1 block text-xs font-normal text-stone-500">Construction starts after your downpayment is verified.</span>
+              {startMessage
+                ? <FieldError id="request-start-date-error" message={startMessage} />
+                : <span className="mt-1 block text-xs font-normal text-stone-500">Construction starts after your downpayment is verified.</span>}
             </label>
             <label className={`min-w-0 ${constructionLabelClass}`}>
               Needed By <RequiredIndicator />
               <input
-                type="date" required min={startDate ? addOneDay(startDate) : addOneDay(minStart)} value={neededBy}
+                id="request-needed-by" type="date" min={startDate ? addOneDay(startDate) : addOneDay(minStart)} value={neededBy}
                 onChange={(event) => setNeededBy(event.target.value)}
-                className={constructionFieldClass}
+                onBlur={() => touch("needed")}
+                aria-invalid={neededMessage ? true : undefined}
+                aria-describedby={neededMessage ? "request-needed-by-error" : undefined}
+                className={`${constructionFieldClass} aria-invalid:border-red-600`}
               />
-              <span className="mt-1 block text-xs font-normal text-stone-500">The date you want the house turned over.</span>
+              {neededMessage
+                ? <FieldError id="request-needed-by-error" message={neededMessage} />
+                : <span className="mt-1 block text-xs font-normal text-stone-500">The date you want the house turned over.</span>}
             </label>
           </div>
-          <PhAddressFields inputClassName={constructionFieldClass} labelClassName={constructionLabelClass} />
+          <div onChange={refreshAddress} onBlur={refreshAddress}>
+            <PhAddressFields inputClassName={`${constructionFieldClass} aria-invalid:border-red-600`} labelClassName={constructionLabelClass} errors={shownAddressErrors} />
+          </div>
           <p className="-mt-2 text-xs text-stone-500">Enter the address of the lot where the house will be built.</p>
           <label className={`block min-w-0 ${constructionLabelClass}`}>
             Notes (optional)
             <textarea
-              name="notes" rows={4} maxLength={1000}
+              id="request-notes" name="notes" rows={4} value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              onBlur={() => touch("notes")}
+              aria-invalid={notesMessage ? true : undefined}
+              aria-describedby={notesMessage ? "request-notes-error" : undefined}
               placeholder="Access to the lot, existing structures, preferred materials, or anything else we should know."
-              className={constructionFieldClass}
+              className={`${constructionFieldClass} aria-invalid:border-red-600`}
             />
+            {notesMessage
+              ? <FieldError id="request-notes-error" message={notesMessage} />
+              : <span className="mt-1 block text-right text-xs font-normal text-stone-500">{notes.length}/{NOTES_MAX}</span>}
           </label>
         </fieldset>
         <BillingErrorMessage message={error} />

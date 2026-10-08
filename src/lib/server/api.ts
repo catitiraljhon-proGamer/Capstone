@@ -2,10 +2,22 @@ import { NextResponse } from "next/server";
 import { MongoServerError } from "mongodb";
 import { ZodError } from "zod";
 
+/** zod's built-in messages ("Too small: expected number to be >=20") need the field name to make sense. */
+const builtInZodMessage = /^(Invalid|Too (small|big)|Expected|Unrecognized|Required)/;
+
+/** The first validation problem, phrased for the person who submitted the form. */
+export function validationMessage(error: ZodError) {
+  const issue = error.issues[0];
+  if (!issue) return "The submitted data is invalid.";
+  if (!builtInZodMessage.test(issue.message)) return issue.message;
+  const field = issue.path.filter((part) => typeof part === "string").at(-1);
+  return field ? `Check the ${String(field).replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()} field: ${issue.message}` : issue.message;
+}
+
 export function apiError(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json(
-      { error: "The submitted data is invalid.", issues: error.issues },
+      { error: validationMessage(error), issues: error.issues },
       { status: 400 },
     );
   }

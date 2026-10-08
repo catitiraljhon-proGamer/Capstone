@@ -5,8 +5,6 @@ import {
   collections,
   type DesignRequestDocument,
   type EstimateDocument,
-  type ExteriorItemDocument,
-  type HouseDesignDocument,
   type InvoiceDocument,
   type NotificationDocument,
   type ProjectDocument,
@@ -19,8 +17,6 @@ import {
   MIN_DOWNPAYMENT_PERCENT,
   VAT_RATE,
   buildPaymentSchedule,
-  defaultScheduleTemplate,
-  estimateLinesFromDesign,
   estimateTotals,
   lineAmount,
   scheduleTemplateError,
@@ -32,8 +28,6 @@ import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import type {
   ConstructionProjectDto,
   CostEstimateDto,
-  EstimateLineItemInput,
-  MilestoneTemplate,
 } from "@/types/construction";
 import type { SessionUser, UserRole } from "@/types/domain";
 
@@ -236,31 +230,6 @@ export async function listEstimates(db: Db, actor: SessionUser): Promise<CostEst
 export async function getEstimate(db: Db, actor: SessionUser, id: string): Promise<CostEstimateDto> {
   requireRole(actor, ["customer", "admin"], "You do not have access to cost estimates.");
   return (await toEstimateDtos(db, [await findEstimate(db, actor, id)], actor.role))[0];
-}
-
-/** Starting BOQ and payment schedule for the admin: the design's priced items when it has one. */
-export async function prefillEstimate(db: Db, actor: SessionUser, id: string): Promise<{ lineItems: EstimateLineItemInput[]; scheduleTemplate: MilestoneTemplate[] }> {
-  requireRole(actor, ["admin"], "Only an administrator can prepare cost estimates.");
-  const estimate = await findEstimate(db, actor, id);
-  const request = estimate.designRequestId
-    ? await db.collection<DesignRequestDocument>(collections.designRequests).findOne({ _id: estimate.designRequestId })
-    : null;
-  const houseDesignId = estimate.houseDesignId ?? request?.houseDesignId;
-  const house = houseDesignId ? await db.collection<HouseDesignDocument>(collections.houseDesigns).findOne({ _id: houseDesignId }) : null;
-  let lineItems: EstimateLineItemInput[];
-  if (house) {
-    const items = await db.collection<ExteriorItemDocument>(collections.exteriorItems).find({ active: true }).sort({ order: 1 }).toArray();
-    lineItems = estimateLinesFromDesign(house, items);
-  } else {
-    lineItems = [{
-      item: "Base construction", description: "Structural and architectural works", unit: "sq m",
-      quantity: request?.floorArea ?? 1, unitPrice: 0,
-    }];
-  }
-  return {
-    lineItems,
-    scheduleTemplate: defaultScheduleTemplate(isoDate(estimate.preferredStartDate), isoDate(estimate.neededBy)),
-  };
 }
 
 type EstimateAction = z.infer<typeof estimateActionSchema>;

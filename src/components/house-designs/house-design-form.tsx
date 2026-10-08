@@ -2,7 +2,9 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { PesoInput } from "@/components/ui/peso-input";
+import { amountError, numberError, textError } from "@/lib/form-validation";
 import {
   createDefaultSelections,
   formatPeso,
@@ -94,38 +96,65 @@ const invalidInputClass = "border-red-600";
 
 type MaterialPriceDraft = Omit<MaterialPriceOverride, "unitPrice"> & { unitPrice: string };
 
-function isMaterialPriceValid(price: MaterialPriceDraft) {
-  const value = Number(price.unitPrice);
-  return price.unitPrice.trim() !== "" && Number.isFinite(value) &&
-    value > 0 && value <= 100_000_000 &&
-    Math.abs(value * 100 - Math.round(value * 100)) < 0.000001;
+/** Quantity and unit price stay as typed text until the form is saved. */
+type CustomItemDraft = Omit<CustomExteriorItem, "quantity" | "unitPrice"> & {
+  quantity: string;
+  unitPrice: string;
+};
+
+type CustomItemField = "item" | "material" | "unit" | "quantity" | "unitPrice";
+type CustomItemErrors = Partial<Record<CustomItemField, string | null>>;
+
+const maxUnitPrice = 100_000_000;
+
+/** Same rule as the server: unit prices must be above zero, two decimals at most. */
+function materialPriceError(price: MaterialPriceDraft) {
+  return amountError(price.unitPrice, { label: `${price.item} unit price`, max: maxUnitPrice });
 }
 
-function isCustomItemComplete(item: CustomExteriorItem) {
-  return (
-    item.item.trim().length > 0 &&
-    item.material.trim().length > 0 &&
-    item.unit.trim().length > 0 &&
-    Number.isFinite(item.quantity) &&
-    item.quantity > 0 &&
-    Number.isFinite(item.unitPrice) &&
-    item.unitPrice > 0
-  );
+function isMaterialPriceValid(price: MaterialPriceDraft) {
+  return materialPriceError(price) === null;
+}
+
+function customItemErrors(item: CustomItemDraft): CustomItemErrors {
+  return {
+    item: textError(item.item, { label: "Item name", max: 120 }),
+    material: textError(item.material, { label: "Material", max: 160 }),
+    unit: textError(item.unit, { label: "Unit", max: 30 }),
+    quantity:
+      numberError(item.quantity, { label: "Quantity" }) ??
+      (Number(item.quantity) <= 0 ? "Quantity must be more than 0." : null),
+    unitPrice: amountError(item.unitPrice, { label: "Unit price", allowZero: true }),
+  };
+}
+
+function isCustomItemComplete(item: CustomItemDraft) {
+  return Object.values(customItemErrors(item)).every((message) => !message);
+}
+
+function toCustomItem(item: CustomItemDraft): CustomExteriorItem {
+  return {
+    ...item,
+    item: item.item.trim(),
+    material: item.material.trim(),
+    unit: item.unit.trim(),
+    quantity: Number(item.quantity),
+    unitPrice: Number(item.unitPrice),
+  };
 }
 
 function validate(
   values: FormValues,
   images: string[],
-  customItems: CustomExteriorItem[],
+  customItems: CustomItemDraft[],
   existingNames: string[],
 ): FieldErrors {
   const errors: FieldErrors = {};
   const trimmedName = values.name.trim();
-  const areaValue = Number(values.area);
-  const rateValue = Number(values.rate);
 
-  if (!trimmedName) {
-    errors.name = "Design name is required.";
+  const nameMessage = textError(values.name, { label: "Design name", min: 2, max: 120 });
+  if (nameMessage) {
+    errors.name = nameMessage;
   } else if (
     existingNames.some(
       (existing) => existing.toLowerCase() === trimmedName.toLowerCase(),
@@ -138,16 +167,19 @@ function validate(
     errors.houseType = "Select a house type so customers can find this design.";
   }
 
-  if (!values.area.trim() || !Number.isFinite(areaValue) || areaValue <= 0) {
-    errors.area = "Enter a floor area greater than 0.";
-  }
+  const areaMessage =
+    numberError(values.area, { label: "Floor area", max: 100_000, unit: " sq m" }) ??
+    (Number(values.area) <= 0 ? "Floor area must be more than 0 sq m." : null);
+  if (areaMessage) errors.area = areaMessage;
 
-  if (!values.rate.trim() || !Number.isFinite(rateValue) || rateValue <= 0) {
-    errors.rate = "Enter a cost rate greater than 0.";
-  }
+  const rateMessage = amountError(values.rate, { label: "Cost rate", max: maxUnitPrice });
+  if (rateMessage) errors.rate = rateMessage;
 
-  if (!values.rooms.trim()) {
-    errors.rooms = "Describe the room setup, for example 3 bedrooms, 2 toilets.";
+  const roomsMessage = textError(values.rooms, { label: "Room setup", max: 200 });
+  if (roomsMessage) {
+    errors.rooms = values.rooms.trim()
+      ? roomsMessage
+      : "Describe the room setup, for example 3 bedrooms, 2 toilets.";
   }
 
   if (images.length === 0) {
@@ -170,19 +202,6 @@ function RequiredMark() {
       </span>
       <span className="sr-only">(required)</span>
     </>
-  );
-}
-
-function FieldError({ id, message }: { id: string; message: string }) {
-  return (
-    <p
-      id={id}
-      role="alert"
-      className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-red-700"
-    >
-      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      {message}
-    </p>
   );
 }
 
@@ -273,9 +292,15 @@ export function HouseDesignForm({
       ? normalizeSelections(design.defaultSelections, exteriorItems)
       : createDefaultSelections(exteriorItems),
   );
-  const [customItems, setCustomItems] = useState<CustomExteriorItem[]>(
-    design?.customItems ?? [],
+  const [customItems, setCustomItems] = useState<CustomItemDraft[]>(() =>
+    (design?.customItems ?? []).map((item) => ({
+      ...item,
+      quantity: String(item.quantity),
+      unitPrice: String(item.unitPrice),
+    })),
   );
+  const [submitted, setSubmitted] = useState(false);
+  const [touchedItemFields, setTouchedItemFields] = useState<Record<string, boolean>>({});
   const [materialPriceDrafts, setMaterialPriceDrafts] = useState<MaterialPriceDraft[]>(() =>
     (design?.materialPrices ?? []).map((price) => ({ ...price, unitPrice: String(price.unitPrice) })),
   );
@@ -288,7 +313,7 @@ export function HouseDesignForm({
   const runValidation = (): FieldErrors => ({
     ...validate(values, images, customItems, existingNames),
     ...(materialPriceDrafts.some((price) => !isMaterialPriceValid(price)) ? {
-      materialPrices: "Enter prices greater than 0 and no more than PHP 100,000,000, with up to two decimal places.",
+      materialPrices: materialPriceDrafts.map(materialPriceError).find(Boolean) ?? "Fix the unit prices marked below.",
     } : {}),
   });
 
@@ -303,6 +328,22 @@ export function HouseDesignForm({
       ...current.filter((price) => !(price.item === item.item && price.material === option.name && price.unit === option.unit)),
       { item: item.item, material: option.name, unit: option.unit, unitPrice },
     ]);
+  };
+
+  const touchItemField = (id: string, field: CustomItemField) =>
+    setTouchedItemFields((current) => (current[`${id}-${field}`] ? current : { ...current, [`${id}-${field}`]: true }));
+
+  /** A custom item field's message, shown after it was left or a save was attempted. */
+  const itemError = (item: CustomItemDraft, field: CustomItemField) =>
+    submitted || touchedItemFields[`${item.id}-${field}`] ? customItemErrors(item)[field] ?? null : null;
+
+  const itemFieldProps = (item: CustomItemDraft, field: CustomItemField) => {
+    const message = itemError(item, field);
+    return {
+      onBlur: () => touchItemField(item.id, field),
+      "aria-invalid": message ? true : undefined,
+      "aria-describedby": message ? `${item.id}-${field === "unitPrice" ? "price" : field}-error` : undefined,
+    } as const;
   };
 
   /** Validate on blur so errors appear after the user finishes a field. */
@@ -327,9 +368,13 @@ export function HouseDesignForm({
       }
     }
     // Custom items have per-row ids, so aim at the first incomplete row.
+    const invalidItem = customItems.find((item) => !isCustomItemComplete(item));
+    const invalidItemField = invalidItem
+      ? (Object.entries(customItemErrors(invalidItem)).find(([, message]) => message)?.[0] as CustomItemField | undefined)
+      : undefined;
     const targetId =
       field === "customItems"
-        ? `${customItems.find((item) => !isCustomItemComplete(item))?.id ?? ""}-item`
+        ? `${invalidItem?.id ?? ""}-${invalidItemField === "unitPrice" ? "price" : invalidItemField ?? "item"}`
         : fieldIds[field];
     const element =
       document.getElementById(targetId) ??
@@ -345,7 +390,7 @@ export function HouseDesignForm({
     {
       area: Number.isFinite(areaValue) ? areaValue : 0,
       rate: Number.isFinite(rateValue) ? rateValue : 0,
-      customItems: customItems.filter(isCustomItemComplete),
+      customItems: customItems.filter(isCustomItemComplete).map(toCustomItem),
       materialPrices,
     },
     selections,
@@ -419,14 +464,14 @@ export function HouseDesignForm({
         item: "",
         material: "",
         unit: "sqm",
-        quantity: 1,
-        unitPrice: 0,
+        quantity: "1",
+        unitPrice: "",
       },
     ]);
 
   const updateCustomItem = (
     id: string,
-    changes: Partial<CustomExteriorItem>,
+    changes: Partial<CustomItemDraft>,
   ) =>
     setCustomItems((current) =>
       current.map((item) => (item.id === id ? { ...item, ...changes } : item)),
@@ -438,6 +483,7 @@ export function HouseDesignForm({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    setSubmitted(true);
     const nextErrors = runValidation();
     const invalidFields = fieldOrder.filter((field) => nextErrors[field]);
 
@@ -462,12 +508,7 @@ export function HouseDesignForm({
       status,
       defaultSelections: selections,
       materialPrices,
-      customItems: customItems.map((item) => ({
-        ...item,
-        item: item.item.trim(),
-        material: item.material.trim(),
-        unit: item.unit.trim(),
-      })),
+      customItems: customItems.map(toCustomItem),
     });
   };
 
@@ -620,9 +661,9 @@ export function HouseDesignForm({
                   id={fieldIds.area}
                   name="area"
                   type="number"
-                  inputMode="numeric"
-                  min="1"
-                  step="1"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="0.01"
                   className={`${inputClass} tabular-nums ${errors.area ? invalidInputClass : ""}`}
                   value={values.area}
                   onChange={(event) => setValue("area", event.target.value)}
@@ -647,9 +688,9 @@ export function HouseDesignForm({
                 <PesoInput
                   id={fieldIds.rate}
                   name="rate"
-                  inputMode="numeric"
-                  min="1"
-                  step="500"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="0.01"
                   value={values.rate}
                   onChange={(event) => setValue("rate", event.target.value)}
                   onBlur={() => handleBlur("rate")}
@@ -743,7 +784,7 @@ export function HouseDesignForm({
                 const priceDraft = materialPriceDrafts.find((price) =>
                   price.item === item.item && price.material === option.name && price.unit === option.unit,
                 );
-                const invalidPrice = Boolean(errors.materialPrices && priceDraft && !isMaterialPriceValid(priceDraft));
+                const priceMessage = errors.materialPrices && priceDraft ? materialPriceError(priceDraft) : null;
 
                 return (
                   <div key={item.item} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
@@ -770,7 +811,11 @@ export function HouseDesignForm({
                       ))}
                     </select>
                     </Field>
-                    <Field htmlFor={`${id}-price`} label={`Price (PHP / ${option.unit})`}>
+                    <Field
+                      htmlFor={`${id}-price`}
+                      label={`Price (PHP / ${option.unit})`}
+                      error={priceMessage ?? undefined}
+                    >
                       <PesoInput
                         id={`${id}-price`}
                         aria-label={`${item.item} unit price (PHP / ${option.unit})`}
@@ -782,8 +827,8 @@ export function HouseDesignForm({
                         value={priceDraft?.unitPrice ?? String(option.unitPrice)}
                         onChange={(event) => updateMaterialPrice(itemIndex, event.target.value)}
                         onBlur={() => handleBlur("materialPrices")}
-                        aria-invalid={invalidPrice}
-                        aria-describedby={invalidPrice ? `${fieldIds.materialPrices}-error` : undefined}
+                        aria-invalid={Boolean(priceMessage)}
+                        aria-describedby={priceMessage ? `${id}-price-error` : undefined}
                       />
                     </Field>
                     {priceDraft && <button
@@ -798,7 +843,6 @@ export function HouseDesignForm({
                 );
               })}
             </div>
-            {errors.materialPrices && <FieldError id={`${fieldIds.materialPrices}-error`} message={errors.materialPrices} />}
           </fieldset>
 
           <fieldset className="rounded-xl border border-stone-200 p-5">
@@ -815,7 +859,7 @@ export function HouseDesignForm({
               <ul className="mt-4 space-y-4">
                 {customItems.map((item, index) => {
                   const incomplete =
-                    Boolean(errors.customItems) && !isCustomItemComplete(item);
+                    (submitted || Boolean(errors.customItems)) && !isCustomItemComplete(item);
 
                   return (
                     <li
@@ -846,10 +890,12 @@ export function HouseDesignForm({
                           htmlFor={`${item.id}-item`}
                           label="Item name"
                           required
+                          error={itemError(item, "item") ?? undefined}
                         >
                           <input
                             id={`${item.id}-item`}
-                            className={inputClass}
+                            className={`${inputClass} aria-invalid:border-red-600`}
+                            {...itemFieldProps(item, "item")}
                             value={item.item}
                             onChange={(event) =>
                               updateCustomItem(item.id, {
@@ -863,10 +909,12 @@ export function HouseDesignForm({
                           htmlFor={`${item.id}-material`}
                           label="Material"
                           required
+                          error={itemError(item, "material") ?? undefined}
                         >
                           <input
                             id={`${item.id}-material`}
-                            className={inputClass}
+                            className={`${inputClass} aria-invalid:border-red-600`}
+                            {...itemFieldProps(item, "material")}
                             value={item.material}
                             onChange={(event) =>
                               updateCustomItem(item.id, {
@@ -876,10 +924,16 @@ export function HouseDesignForm({
                             placeholder="CHB with steel gate"
                           />
                         </Field>
-                        <Field htmlFor={`${item.id}-unit`} label="Unit" required>
+                        <Field
+                          htmlFor={`${item.id}-unit`}
+                          label="Unit"
+                          required
+                          error={itemError(item, "unit") ?? undefined}
+                        >
                           <input
                             id={`${item.id}-unit`}
-                            className={inputClass}
+                            className={`${inputClass} aria-invalid:border-red-600`}
+                            {...itemFieldProps(item, "unit")}
                             value={item.unit}
                             onChange={(event) =>
                               updateCustomItem(item.id, {
@@ -893,18 +947,20 @@ export function HouseDesignForm({
                           htmlFor={`${item.id}-quantity`}
                           label="Quantity"
                           required
+                          error={itemError(item, "quantity") ?? undefined}
                         >
                           <input
                             id={`${item.id}-quantity`}
                             type="number"
-                            inputMode="numeric"
-                            min="1"
-                            step="1"
-                            className={`${inputClass} tabular-nums`}
+                            inputMode="decimal"
+                            min="0"
+                            step="any"
+                            className={`${inputClass} tabular-nums aria-invalid:border-red-600`}
+                            {...itemFieldProps(item, "quantity")}
                             value={item.quantity}
                             onChange={(event) =>
                               updateCustomItem(item.id, {
-                                quantity: Number(event.target.value),
+                                quantity: event.target.value,
                               })
                             }
                           />
@@ -913,16 +969,18 @@ export function HouseDesignForm({
                           htmlFor={`${item.id}-price`}
                           label="Unit price (PHP)"
                           required
+                          error={itemError(item, "unitPrice") ?? undefined}
                         >
                           <PesoInput
                             id={`${item.id}-price`}
-                            inputMode="numeric"
-                            min="1"
-                            step="100"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            {...itemFieldProps(item, "unitPrice")}
                             value={item.unitPrice}
                             onChange={(event) =>
                               updateCustomItem(item.id, {
-                                unitPrice: Number(event.target.value),
+                                unitPrice: event.target.value,
                               })
                             }
                           />
@@ -933,11 +991,11 @@ export function HouseDesignForm({
                           </p>
                           <p className="mt-1 text-sm font-semibold tabular-nums text-stone-950">
                             {formatPeso(
-                              (Number.isFinite(item.quantity)
-                                ? item.quantity
+                              (Number.isFinite(Number(item.quantity))
+                                ? Number(item.quantity)
                                 : 0) *
-                                (Number.isFinite(item.unitPrice)
-                                  ? item.unitPrice
+                                (Number.isFinite(Number(item.unitPrice))
+                                  ? Number(item.unitPrice)
                                   : 0),
                             )}
                           </p>

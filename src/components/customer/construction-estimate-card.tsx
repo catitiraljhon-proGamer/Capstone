@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, ClipboardCheck, Hourglass, MessageSquareText } from "lucide-react";
 import { BillingDialog, BillingErrorMessage, BillingPanel, billingJson } from "@/components/billing/billing-primitives";
 import { constructionFieldClass, constructionLabelClass, dateOrDash, Eyebrow, Fact, ScheduleTable } from "@/components/customer/construction-shared";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { buildPaymentSchedule, MIN_DOWNPAYMENT_PERCENT } from "@/lib/construction";
+import { numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
 import type { CostEstimateDto, EstimateAction } from "@/types/construction";
 
@@ -74,10 +76,16 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [percentTouched, setPercentTouched] = useState(false);
+  const [reasonTouched, setReasonTouched] = useState(false);
+  const percentRef = useRef<HTMLInputElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+
   const percent = percentText.trim() === "" ? NaN : Number(percentText);
-  const percentError = !Number.isFinite(percent) || percent < minPercent || percent > 100
-    ? `Enter a downpayment between ${minPercent}% and 100%.`
-    : null;
+  const percentError =
+    numberError(percentText, { label: "Downpayment", max: 100, maxDecimals: 2, unit: "%" }) ??
+    (percent < minPercent ? `Your downpayment must be at least ${minPercent}% of the contract total.` : null);
+  const shownPercentError = percentTouched ? percentError : null;
   const schedule = useMemo(
     () => buildPaymentSchedule(estimate.total, estimate.scheduleTemplate, percentError ? minPercent : percent),
     [estimate.total, estimate.scheduleTemplate, percent, percentError, minPercent],
@@ -99,7 +107,18 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
     }
   }
 
-  const reasonValid = reason.trim().length >= 5;
+  const reasonError = textError(reason, { label: "Reason for revision", min: 5, max: 1000 });
+  const shownReasonError = reasonTouched ? reasonError : null;
+
+  function openAccept() {
+    setError(null);
+    if (percentError) {
+      setPercentTouched(true);
+      percentRef.current?.focus();
+      return;
+    }
+    setDialog("accept");
+  }
 
   return (
     <div className="space-y-6">
@@ -123,25 +142,30 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your downpayment</p>
             <p className="mt-2 break-words text-3xl font-semibold tracking-tight">{formatPeso(downpayment)}</p>
-            <p className="mt-1 text-xs text-rose-100">{percentError ? "Adjust the percentage to see your amount." : `${Number.isInteger(percent) ? percent : percent.toFixed(2)}% of the ${formatPeso(estimate.total)} contract total`}</p>
+            <p className="mt-1 text-xs text-rose-100">{percentError ? "Fix the percentage to see your amount." : `${Number.isInteger(percent) ? percent : percent.toFixed(2)}% of the ${formatPeso(estimate.total)} contract total`}</p>
           </div>
           <label className="block min-w-0 text-sm font-medium text-rose-100">
             Downpayment %
             <input
               type="number" inputMode="decimal" min={minPercent} max={100} step={0.01}
+              ref={percentRef} id="estimate-downpayment-percent"
               value={percentText} onChange={(event) => setPercentText(event.target.value)}
-              aria-invalid={Boolean(percentError)}
+              onBlur={() => setPercentTouched(true)}
+              aria-invalid={shownPercentError ? true : undefined}
+              aria-describedby={shownPercentError ? "estimate-downpayment-percent-error" : undefined}
               className="mt-2 min-h-11 w-full rounded-lg border border-rose-200 bg-white px-3 py-2.5 text-base text-stone-950 outline-none focus:ring-2 focus:ring-rose-300 sm:text-sm"
             />
           </label>
         </div>
-        <p className={`mt-2 text-xs ${percentError ? "font-semibold text-red-700" : "text-stone-500"}`}>{percentError ?? `Minimum downpayment is ${minPercent}%.`}</p>
+        {shownPercentError
+          ? <FieldError id="estimate-downpayment-percent-error" message={shownPercentError} />
+          : <p className="mt-2 text-xs text-stone-500">{`Minimum downpayment is ${minPercent}%.`}</p>}
         <div className="mt-3"><ScheduleTable rows={schedule} /></div>
       </div>
 
       <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:justify-end">
-        <Button variant="outline" className="min-h-11" onClick={() => { setError(null); setReason(""); setDialog("revise"); }}>Request revision</Button>
-        <Button className="min-h-11" disabled={Boolean(percentError)} onClick={() => { setError(null); setDialog("accept"); }}><ClipboardCheck className="mr-2 h-4 w-4" />Accept estimate</Button>
+        <Button variant="outline" className="min-h-11" onClick={() => { setError(null); setReason(""); setReasonTouched(false); setDialog("revise"); }}>Request revision</Button>
+        <Button className="min-h-11" onClick={openAccept}><ClipboardCheck className="mr-2 h-4 w-4" />Accept estimate</Button>
       </div>
 
       {dialog === "accept" && (
@@ -165,22 +189,28 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
 
       {dialog === "revise" && (
         <BillingDialog title="Request a revision" busy={busy} onClose={() => setDialog(null)}>
-          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (reasonValid) void run({ action: "request-revision", reason: reason.trim() }, "Revision requested. G4 Builders will send you an updated estimate."); }}>
+          <form noValidate className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (reasonError) { setReasonTouched(true); reasonRef.current?.focus(); return; } void run({ action: "request-revision", reason: reason.trim() }, "Revision requested. G4 Builders will send you an updated estimate."); }}>
             <p className="text-sm leading-6 text-stone-600">Tell G4 Builders what to change, such as scope, materials, or the payment schedule. We will send you an updated estimate.</p>
             <label className={constructionLabelClass}>
               Reason for revision <RequiredIndicator />
               <textarea
-                required minLength={5} maxLength={1000} rows={5} value={reason} autoFocus
+                required maxLength={1000} rows={5} value={reason} autoFocus
+                ref={reasonRef} id="estimate-revision-reason"
                 onChange={(event) => setReason(event.target.value)}
+                onBlur={() => setReasonTouched(true)}
+                aria-invalid={shownReasonError ? true : undefined}
+                aria-describedby={shownReasonError ? "estimate-revision-reason-error" : undefined}
                 placeholder="Example: Please use a lower-cost roofing material."
-                className={constructionFieldClass}
+                className={`${constructionFieldClass} aria-invalid:border-red-600`}
               />
-              <span className="mt-1 block text-xs font-normal text-stone-500">At least 5 characters.</span>
+              {shownReasonError
+                ? <FieldError id="estimate-revision-reason-error" message={shownReasonError} />
+                : <span className="mt-1 block text-xs font-normal text-stone-500">At least 5 characters.</span>}
             </label>
             <BillingErrorMessage message={error} />
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Cancel</Button>
-              <Button type="submit" className="min-h-11" disabled={busy || !reasonValid}>{busy ? "Sending…" : "Send revision request"}</Button>
+              <Button type="submit" className="min-h-11" disabled={busy}>{busy ? "Sending…" : "Send revision request"}</Button>
             </div>
           </form>
         </BillingDialog>

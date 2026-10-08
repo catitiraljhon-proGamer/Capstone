@@ -183,14 +183,14 @@ function ApprovalReviewDialog({
   isSaving,
   error,
   onClose,
-  onDecision,
+  onApprove,
   onDeliver,
 }: {
   approval: ApprovalDto;
   isSaving: boolean;
   error: string | null;
   onClose: () => void;
-  onDecision: (decision: "Approved" | "Rejected", note: string) => void;
+  onApprove: (note: string) => void;
   onDeliver: (images: string[]) => void;
 }) {
   const [note, setNote] = useState(approval.reviewNote ?? "");
@@ -401,7 +401,7 @@ function ApprovalReviewDialog({
               <label className="text-sm font-semibold text-stone-700">
                 Review note
                 <span className="ml-1 font-normal text-stone-500">
-                  (required when rejecting)
+                  (optional)
                 </span>
                 <textarea
                   rows={4}
@@ -409,7 +409,7 @@ function ApprovalReviewDialog({
                   value={note}
                   disabled={isSaving || !approval.sourceAvailable}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="Add instructions, conditions, or the reason for rejection."
+                  placeholder="Add instructions or conditions for the client."
                   className="mt-2 w-full resize-none rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100"
                 />
               </label>
@@ -419,18 +419,8 @@ function ApprovalReviewDialog({
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
                   disabled={isSaving || !approval.sourceAvailable}
-                  onClick={() => onDecision("Rejected", note)}
-                  className="border-red-200 text-red-700 hover:bg-red-50"
-                >
-                  {isSaving ? null : <XCircle className="mr-2 h-4 w-4" />}
-                  Reject
-                </Button>
-                <Button
-                  type="button"
-                  disabled={isSaving || !approval.sourceAvailable}
-                  onClick={() => onDecision("Approved", note)}
+                  onClick={() => onApprove(note)}
                 >
                   {isSaving ? (
                     <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -697,15 +687,8 @@ export function AdminApprovalsManager() {
     setSelectedApproval(approval);
   };
 
-  const submitDecision = async (
-    decision: "Approved" | "Rejected",
-    note: string,
-  ) => {
+  const submitApproval = async (note: string) => {
     if (!selectedApproval) return;
-    if (decision === "Rejected" && !note.trim()) {
-      setDecisionError("Add a reason before rejecting this approval.");
-      return;
-    }
 
     setIsSaving(true);
     setDecisionError(null);
@@ -713,13 +696,13 @@ export function AdminApprovalsManager() {
       const response = await fetch(`/api/approvals/${selectedApproval.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, note }),
+        body: JSON.stringify({ decision: "Approved", note }),
       });
       await readJson<{ approval: { status: ApprovalStatus } }>(response);
       setSuccessMessage(
-        decision === "Approved" && selectedApproval.recordType === "Design request"
+        selectedApproval.recordType === "Design request"
           ? `${selectedApproval.reference} is feasible and approved. The client was notified; upload the completed design from the Approved queue when it is ready.`
-          : `${selectedApproval.reference} was ${decision.toLowerCase()}. The client has been notified.`,
+          : `${selectedApproval.reference} was approved. The client has been notified.`,
       );
       setSelectedApproval(null);
       await loadApprovals(true);
@@ -1021,7 +1004,7 @@ export function AdminApprovalsManager() {
           onClose={() => {
             if (!isSaving) setSelectedApproval(null);
           }}
-          onDecision={(decision, note) => void submitDecision(decision, note)}
+          onApprove={(note) => void submitApproval(note)}
           onDeliver={(images) => void submitDelivery(images)}
         />
       ) : null}

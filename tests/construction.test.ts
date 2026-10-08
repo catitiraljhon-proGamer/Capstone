@@ -7,7 +7,7 @@ import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
 import type { DesignRequestDocument, InvoiceDocument, PaymentDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
 import { BillingError, changeInvoice, createInvoice, getBillingData, reviewPayment, submitPayment } from "@/lib/server/billing";
-import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects, prefillEstimate } from "@/lib/server/construction";
+import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects } from "@/lib/server/construction";
 import { defaultScheduleTemplate } from "@/lib/construction";
 import { manilaDate } from "@/lib/billing";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
@@ -143,16 +143,12 @@ test("only the owner of an unlocked design can request construction, and each de
   assert.equal(notice?.href, `/admin/cost-estimates?estimate=${estimate.id}`);
 });
 
-test("admin prefills a base line, then saves and sends a validated estimate", async () => {
+test("admin saves and sends a validated estimate using the default schedule", async () => {
   const estimate = await requestedEstimate();
-  const prefill = await prefillEstimate(db, admin, estimate.id);
-  assert.equal(prefill.lineItems.length, 1);
-  assert.equal(prefill.lineItems[0].quantity, 120);
-  assert.equal(prefill.lineItems[0].unitPrice, 0);
-  assert.deepEqual(prefill.scheduleTemplate.map((row) => row.percentage), [30, 30, 30, 10]);
-  assert.equal(prefill.scheduleTemplate[0].targetDate, startDate());
-  assert.equal(prefill.scheduleTemplate[3].targetDate, neededBy());
-  await assert.rejects(prefillEstimate(db, customer, estimate.id), isError(403));
+  const defaults = defaultScheduleTemplate(startDate(), neededBy());
+  assert.deepEqual(defaults.map((row) => row.percentage), [30, 30, 30, 10]);
+  assert.equal(defaults[0].targetDate, startDate());
+  assert.equal(defaults[3].targetDate, neededBy());
 
   await assert.rejects(changeEstimate(db, customer, estimate.id, savePayload()), isError(403));
   await assert.rejects(changeEstimate(db, admin, estimate.id, { action: "accept", downpaymentPercent: 30 }), isError(403));

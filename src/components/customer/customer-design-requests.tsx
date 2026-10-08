@@ -7,7 +7,9 @@ import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
+import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
+import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,19 +51,6 @@ const statusLabel: Record<DesignRequestStatus, string> = {
   Rejected: "Not feasible",
   Completed: "Delivered — check Dream House for access",
 };
-
-/** Tomorrow in Manila time as YYYY-MM-DD, the earliest allowed date. */
-function manilaTomorrow() {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  return new Date(Date.parse(`${today}T00:00:00.000Z`) + 86_400_000)
-    .toISOString()
-    .slice(0, 10);
-}
 
 function formatDay(value: string) {
   return new Date(`${value}T00:00:00.000Z`).toLocaleDateString("en-PH", {
@@ -117,7 +106,10 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [neededBy, setNeededBy] = useState("");
-  const [minDate] = useState(manilaTomorrow);
+  const [minDate] = useState(() => manilaDay(1));
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [inspirationImages, setInspirationImages] = useState<SelectedImage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -169,11 +161,12 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
 
     const remainingSlots = maxImages - inspirationImages.length;
     if (remainingSlots <= 0) {
-      setError(`You can upload up to ${maxImages} inspiration images.`);
+      setImageError(`You can upload up to ${maxImages} inspiration images.`);
       return;
     }
 
     setIsReadingImage(true);
+    setImageError(null);
     setError(null);
     setSuccessMessage(null);
     try {
@@ -185,17 +178,67 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       );
       setInspirationImages((current) => [...current, ...selected]);
       if (files.length > remainingSlots) {
-        setError(`Only ${remainingSlots} more image(s) were added. The limit is ${maxImages}.`);
+        setImageError(`Only ${remainingSlots} more image(s) were added. The limit is ${maxImages}.`);
       }
-    } catch (imageError) {
-      setError(
-        imageError instanceof Error
-          ? imageError.message
+    } catch (readError) {
+      setImageError(
+        readError instanceof Error
+          ? readError.message
           : "Unable to read the inspiration image.",
       );
     } finally {
       setIsReadingImage(false);
     }
+  };
+
+  const preferredDateError = dateError(preferredDate, {
+    label: "Preferred Date",
+    min: minDate,
+    minLabel: `tomorrow (${formatDay(minDate)}); it must be after today`,
+  });
+  const neededByError =
+    dateError(neededBy, {
+      label: "Needed By",
+      min: minDate,
+      minLabel: `tomorrow (${formatDay(minDate)}); it must be after today`,
+    }) ??
+    (!preferredDateError && preferredDate && neededBy < preferredDate
+      ? `Needed By must be on or after the Preferred Date (${formatDay(preferredDate)}).`
+      : null);
+  const fieldErrors: Record<string, string | null> = {
+    floorArea: hasDesignSelection ? null : numberError(floorArea, { label: "Floor area", max: 100_000, unit: " sq m" }) ??
+      (Number(floorArea) <= 0 ? "Floor area must be more than 0 sq m." : null),
+    bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0 }),
+    bathrooms: hasDesignSelection ? null : numberError(bathrooms, { label: "Number of bathrooms", integer: true, min: 0 }),
+    finish: hasDesignSelection || catalog.finishes.includes(finish) ? null : "Choose a finish level.",
+    notes: textError(notes, {
+      label: "Description",
+      required: !hasDesignSelection,
+      max: 4000,
+    }),
+    preferredDate: preferredDateError,
+    neededBy: neededByError,
+    images: !hasDesignSelection && inspirationImages.length === 0
+      ? "Upload at least one inspiration image (JPG, PNG, or WebP, up to 750 KB each)."
+      : null,
+  };
+  const fieldIds: Record<string, string> = {
+    floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms", finish: "dr-finish",
+    notes: "dr-notes", preferredDate: "dr-preferred-date", neededBy: "dr-needed-by", images: "dr-images",
+  };
+  const fieldOrder = ["floorArea", "bedrooms", "bathrooms", "finish", "notes", "preferredDate", "neededBy", "images"];
+  const touch = (name: string) => setTouched((current) => (current[name] ? current : { ...current, [name]: true }));
+  /** The message for a field, shown after it was left or a submit was attempted. */
+  const showError = (name: string) => {
+    if (name === "images" && imageError) return imageError;
+    return (submitted || touched[name] ? fieldErrors[name] : null) ?? null;
+  };
+  const describe = (name: string) => {
+    const message = showError(name);
+    return {
+      "aria-invalid": message ? true : undefined,
+      "aria-describedby": message ? `${fieldIds[name]}-error` : undefined,
+    } as const;
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -204,13 +247,13 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       setError("Choose an available design from Finished Designs before submitting your request.");
       return;
     }
-    if (!hasDesignSelection && inspirationImages.length === 0) {
-      setError("Upload at least one inspiration image before submitting your request.");
-      return;
-    }
 
-    if (neededBy < preferredDate) {
-      setError("The Needed By date must be on or after the Preferred Date.");
+    setSubmitted(true);
+    const firstInvalid = fieldOrder.find((name) => fieldErrors[name]);
+    if (firstInvalid) {
+      const element = document.getElementById(fieldIds[firstInvalid]);
+      element?.focus();
+      element?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
 
@@ -257,6 +300,9 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       setPreferredDate("");
       setNeededBy("");
       setInspirationImages([]);
+      setTouched({});
+      setSubmitted(false);
+      setImageError(null);
       setSuccessMessage(
         selectedDesign
           ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in Dream House; the design fee will be billed separately.`
@@ -310,7 +356,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
           </p>
         ) : null}
 
-        <form onSubmit={submit}>
+        <form onSubmit={submit} noValidate>
           {hasDesignSelection ? (
             <div className="mt-5 rounded-lg border border-stone-200 bg-stone-50 p-4">
               {isCatalogLoading ? <p role="status" className="text-sm text-stone-600">Loading your selected design…</p> : null}
@@ -334,116 +380,158 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
             </div>
           ) : (
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Floor Area (m²)
-              </span>
-              <input
-                type="number"
-                min="1"
-                max="100000"
-                step="0.01"
-                value={floorArea}
-                onChange={(event) => setFloorArea(event.target.value)}
-                required
-                placeholder="Enter floor area"
-                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Number of Bedrooms
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={bedrooms}
-                onChange={(event) => setBedrooms(event.target.value)}
-                required
-                placeholder="Enter number of bedrooms"
-                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Number of Bathrooms
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="1"
-                value={bathrooms}
-                onChange={(event) => setBathrooms(event.target.value)}
-                required
-                placeholder="Enter number of bathrooms"
-                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Finish Level
-              </span>
-              <select
-                value={finish}
-                onChange={(event) =>
-                  setFinish(event.target.value as HouseDesignFinish)
-                }
-                className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600"
-              >
-                {catalog.finishes.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </label>
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Floor Area (m²)
+                </span>
+                <input
+                  id={fieldIds.floorArea}
+                  type="number"
+                  min="1"
+                  max="100000"
+                  step="0.01"
+                  value={floorArea}
+                  onChange={(event) => setFloorArea(event.target.value)}
+                  onBlur={() => touch("floorArea")}
+                  required
+                  placeholder="Enter floor area"
+                  {...describe("floorArea")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                />
+              </label>
+              <FieldError id={`${fieldIds.floorArea}-error`} message={showError("floorArea")} />
+            </div>
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Number of Bedrooms
+                </span>
+                <input
+                  id={fieldIds.bedrooms}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={bedrooms}
+                  onChange={(event) => setBedrooms(event.target.value)}
+                  onBlur={() => touch("bedrooms")}
+                  required
+                  placeholder="Enter number of bedrooms"
+                  {...describe("bedrooms")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                />
+              </label>
+              <FieldError id={`${fieldIds.bedrooms}-error`} message={showError("bedrooms")} />
+            </div>
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Number of Bathrooms
+                </span>
+                <input
+                  id={fieldIds.bathrooms}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={bathrooms}
+                  onChange={(event) => setBathrooms(event.target.value)}
+                  onBlur={() => touch("bathrooms")}
+                  required
+                  placeholder="Enter number of bathrooms"
+                  {...describe("bathrooms")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                />
+              </label>
+              <FieldError id={`${fieldIds.bathrooms}-error`} message={showError("bathrooms")} />
+            </div>
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Finish Level
+                </span>
+                <select
+                  id={fieldIds.finish}
+                  value={finish}
+                  onChange={(event) =>
+                    setFinish(event.target.value as HouseDesignFinish)
+                  }
+                  onBlur={() => touch("finish")}
+                  {...describe("finish")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                >
+                  {catalog.finishes.map((option) => (
+                    <option key={option}>{option}</option>
+                  ))}
+                </select>
+              </label>
+              <FieldError id={`${fieldIds.finish}-error`} message={showError("finish")} />
+            </div>
           </div>
           )}
 
-          <label className="mt-5 block text-sm font-semibold">
-            {hasDesignSelection ? "Additional notes or requested changes (optional)" : "Description"}
-            <textarea
-              rows={5}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              required={!hasDesignSelection}
-              maxLength={4000}
-              placeholder={hasDesignSelection ? "Leave blank to request the design as shown, or describe the changes you would like the admin to review." : "Describe the style, layout, preferred materials, colors, and budget concerns."}
-              className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600"
-            />
-          </label>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Preferred Date <RequiredIndicator />
-              </span>
-              <input
-                type="date"
-                min={minDate}
-                value={preferredDate}
-                onChange={(event) => setPreferredDate(event.target.value)}
-                required
-                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
+          <div className="mt-5">
+            <label className="block text-sm font-semibold">
+              {hasDesignSelection ? "Additional notes or requested changes (optional)" : "Description"}
+              <textarea
+                id={fieldIds.notes}
+                rows={5}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                onBlur={() => touch("notes")}
+                required={!hasDesignSelection}
+                maxLength={4000}
+                placeholder={hasDesignSelection ? "Leave blank to request the design as shown, or describe the changes you would like the admin to review." : "Describe the style, layout, preferred materials, colors, and budget concerns."}
+                {...describe("notes")}
+                className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600 aria-invalid:border-red-600"
               />
-              <span className="mt-1 block text-xs font-normal text-stone-500">When you would like the design ready.</span>
             </label>
-            <label className="block">
-              <span className="block text-sm font-semibold">
-                Needed By <RequiredIndicator />
-              </span>
-              <input
-                type="date"
-                min={preferredDate > minDate ? preferredDate : minDate}
-                value={neededBy}
-                onChange={(event) => setNeededBy(event.target.value)}
-                required
-                className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600"
-              />
-              <span className="mt-1 block text-xs font-normal text-stone-500">The latest date you need it.</span>
-            </label>
+            <FieldError id={`${fieldIds.notes}-error`} message={showError("notes")} />
           </div>
 
-          <div className="mt-5">
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Preferred Date <RequiredIndicator />
+                </span>
+                <input
+                  id={fieldIds.preferredDate}
+                  type="date"
+                  min={minDate}
+                  value={preferredDate}
+                  onChange={(event) => setPreferredDate(event.target.value)}
+                  onBlur={() => touch("preferredDate")}
+                  required
+                  {...describe("preferredDate")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                />
+                <span className="mt-1 block text-xs font-normal text-stone-500">When you would like the design ready.</span>
+              </label>
+              <FieldError id={`${fieldIds.preferredDate}-error`} message={showError("preferredDate")} />
+            </div>
+            <div>
+              <label className="block">
+                <span className="block text-sm font-semibold">
+                  Needed By <RequiredIndicator />
+                </span>
+                <input
+                  id={fieldIds.neededBy}
+                  type="date"
+                  min={preferredDate > minDate ? preferredDate : minDate}
+                  value={neededBy}
+                  onChange={(event) => setNeededBy(event.target.value)}
+                  onBlur={() => touch("neededBy")}
+                  required
+                  {...describe("neededBy")}
+                  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+                />
+                <span className="mt-1 block text-xs font-normal text-stone-500">The latest date you need it.</span>
+              </label>
+              <FieldError id={`${fieldIds.neededBy}-error`} message={showError("neededBy")} />
+            </div>
+          </div>
+
+          <div className="mt-5 outline-none" id={fieldIds.images} tabIndex={-1}>
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold">{hasDesignSelection ? "Additional reference images (optional)" : "House inspiration images"}</p>
@@ -527,6 +615,8 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
               </label>
             )}
           </div>
+
+          <FieldError id={`${fieldIds.images}-error`} message={showError("images")} />
 
           <button
             type="submit"

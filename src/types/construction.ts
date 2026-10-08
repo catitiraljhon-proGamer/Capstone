@@ -9,7 +9,6 @@ import type { AddressDetails } from "@/types/clients";
  * - GET   /api/construction/estimates               customer: own · admin: all → { estimates: CostEstimateDto[] }
  * - POST  /api/construction/estimates               customer: ConstructionRequestInput → { estimate: CostEstimateDto }
  * - GET   /api/construction/estimates/[id]          customer: own · admin: any → { estimate: CostEstimateDto }
- * - GET   /api/construction/estimates/[id]/prefill  admin → { lineItems: EstimateLineItemInput[]; scheduleTemplate: MilestoneTemplate[] }
  * - PATCH /api/construction/estimates/[id]          EstimateAction → { estimate: CostEstimateDto; projectId?: string }
  * - GET   /api/construction/projects                customer: own · admin/billing-clerk: all → { projects: ConstructionProjectDto[] }
  * - PATCH /api/construction/projects/[id]           admin: ProjectStatusAction → { project: ConstructionProjectDto }

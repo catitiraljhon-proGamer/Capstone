@@ -1,11 +1,4 @@
 import { fromCentavos, toCentavos } from "@/lib/billing";
-import {
-  getExteriorEstimate,
-  normalizeSelections,
-  type CustomExteriorItem,
-  type ExteriorItemChoice,
-  type MaterialPriceOverride,
-} from "@/lib/house-design-data";
 import type { EstimateLineItemInput, MilestoneTemplate } from "@/types/construction";
 
 export const VAT_RATE = 0.12;
@@ -91,18 +84,4 @@ export function buildPaymentSchedule(total: number, template: MilestoneTemplate[
   });
   // A 100% downpayment leaves zero-amount milestones; keep only billable rows.
   return rows.filter((row) => row.isDownpayment || row.amount > 0);
-}
-
-/** Prefills BOQ lines from a published house design: base construction plus each exterior material. */
-export function estimateLinesFromDesign(
-  design: { area: number; rate: number; defaultSelections?: number[]; customItems?: CustomExteriorItem[]; materialPrices?: MaterialPriceOverride[] },
-  exteriorItems: ExteriorItemChoice[],
-): EstimateLineItemInput[] {
-  const estimate = getExteriorEstimate(design, normalizeSelections(design.defaultSelections, exteriorItems), exteriorItems);
-  return [
-    { item: "Base construction", description: `Structural and architectural works at ${design.rate.toLocaleString("en-PH")} per sq m`, unit: "sq m", quantity: design.area, unitPrice: design.rate },
-    ...estimate.exteriorRows.map((row) => ({
-      item: row.item, description: row.material, unit: row.unit, quantity: row.quantity, unitPrice: row.unitPrice,
-    })),
-  ];
 }
