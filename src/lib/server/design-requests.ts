@@ -85,8 +85,8 @@ export async function deliverDesign(db: Db, actor: SessionUser, id: string, raw:
     } }, { session });
     await db.collection<NotificationDocument>(collections.notifications).insertOne({
       _id: new ObjectId(), userId: design.customerId, title: "Your requested design is ready",
-      body: "Your finished design is in My House Design. The Billing Clerk will issue the design fee; viewing and downloading unlock after full payment is verified.",
-      href: "/customer/house-design", kind: "design-request-completed", entityId: design._id, createdAt: now,
+      body: "Your finished design is in Dream House. The Billing Clerk will issue the design fee; viewing and downloading unlock after full payment is verified.",
+      href: "/customer/dream-house", kind: "design-request-completed", entityId: design._id, createdAt: now,
     }, { session });
     const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
     if (clerks.length) await db.collection<NotificationDocument>(collections.notifications).insertMany(clerks.map((clerk) => ({

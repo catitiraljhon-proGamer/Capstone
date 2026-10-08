@@ -192,7 +192,7 @@ test("admin prefills a base line, then saves and sends a validated estimate", as
   assert.ok(sent.sentAt);
   await assert.rejects(changeEstimate(db, admin, estimate.id, savePayload()), isError(409));
   await assert.rejects(changeEstimate(db, admin, estimate.id, { action: "send" }), isError(409));
-  assert.equal((await db.collection("notifications").findOne({ userId: new ObjectId(customer.id), kind: "construction-estimate" }))?.href, `/customer/project?estimate=${estimate.id}`);
+  assert.equal((await db.collection("notifications").findOne({ userId: new ObjectId(customer.id), kind: "construction-estimate" }))?.href, `/customer/dream-house?estimate=${estimate.id}`);
 });
 
 test("customers never see line items before the estimate is sent, and only their own estimates", async () => {
@@ -364,7 +364,7 @@ test("verifying the downpayment schedules the project; reversing it returns to a
   const dueEvent = await db.collection("schedules").findOne({ projectId: new ObjectId(projectId), milestoneId: project.milestones[0].id });
   assert.equal(dueEvent?.paymentStatus, "Paid");
   const notice = await db.collection("notifications").findOne({ userId: new ObjectId(customer.id), title: "Downpayment verified — your project is scheduled" });
-  assert.equal(notice?.href, "/customer/project");
+  assert.equal(notice?.href, "/customer/dream-house");
   assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(admin.id), title: "Downpayment verified" }), 1);
 
   await reviewPayment(db, clerk, rest, { action: "reverse", reason: "Deposit slip was not honored" });

@@ -1,6 +1,6 @@
 // Keep published versions unchanged; bump the version whenever the terms change.
 export const designRequestTerms = {
-  version: "2026-10-02",
+  version: "2026-10-08",
   title: "Design Request Terms and Conditions",
   introduction: "Please read these terms before submitting a design request to G4 Builders Inc.",
   paymentNotice: "You must pay the full design fee before you can view or download your requested design. Access opens only after the Billing Clerk verifies full payment.",
@@ -23,7 +23,7 @@ export const designRequestTerms = {
     },
     {
       title: "Delivery and viewing your design",
-      body: "Track review and completion in Design Requests or My House Design. Once the design is completed and full payment is verified, you can view and download the delivered design images in My House Design. Discuss the expected completion schedule with the team; submitting a request does not guarantee a delivery date.",
+      body: "Track review and completion in Design Requests or Dream House. Once the design is completed and full payment is verified, you can view and download the delivered design images in Dream House. Discuss the expected completion schedule with the team; submitting a request does not guarantee a delivery date.",
     },
     {
       title: "Changes, questions, and payment concerns",

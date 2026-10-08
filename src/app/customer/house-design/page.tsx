@@ -1,12 +1,11 @@
-import { CustomerHouseDesignPage } from "@/components/customer/customer-dashboard";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "My House Design | G4 Builders Inc",
-  robots: { index: false, follow: false },
-  description: "View your requested house designs after verified payment.",
-};
-
-export default function HouseDesignPage() {
-  return <CustomerHouseDesignPage />;
+// Legacy URL: this page now lives in Dream House. Old links and notifications keep working.
+export default async function HouseDesignPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
+  }
+  const suffix = query.toString();
+  redirect(suffix ? `/customer/dream-house?${suffix}` : "/customer/dream-house");
 }

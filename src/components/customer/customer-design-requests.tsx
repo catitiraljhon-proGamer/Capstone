@@ -47,7 +47,7 @@ const statusLabel: Record<DesignRequestStatus, string> = {
   "In review": "Under feasibility review",
   Approved: "Approved — design in progress",
   Rejected: "Not feasible",
-  Completed: "Delivered — check My House Design for access",
+  Completed: "Delivered — check Dream House for access",
 };
 
 /** Tomorrow in Manila time as YYYY-MM-DD, the earliest allowed date. */
@@ -259,7 +259,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       setInspirationImages([]);
       setSuccessMessage(
         selectedDesign
-          ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in My House Design; the design fee will be billed separately.`
+          ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in Dream House; the design fee will be billed separately.`
           : "Your request and inspiration images were sent directly to the admin for feasibility review.",
       );
     } catch (submitError) {
@@ -542,7 +542,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold tracking-tight">Request History</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Track approval and design work. Delivered designs are kept in My House Design and unlock after full payment is verified.
+          Track approval and design work. Delivered designs are kept in Dream House and unlock after full payment is verified.
         </p>
         <div className="mt-4 space-y-4">
           {requests.map((request) => (
@@ -609,7 +609,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
                 </p>
                 {request.completedAt ? (
                   <p className="mt-3 text-xs font-semibold text-emerald-700">
-                    Delivered {formatDate(request.completedAt)} · Open My House Design for payment and viewing
+                    Delivered {formatDate(request.completedAt)} · Open Dream House for payment and viewing
                   </p>
                 ) : null}
               </div>
@@ -627,7 +627,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       </section>
       </div>
 
-      <Link href="/customer/house-design" className="inline-flex rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800">Open My House Design</Link>
+      <Link href="/customer/dream-house" className="inline-flex rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800">Open Dream House</Link>
     </div>
   );
 }

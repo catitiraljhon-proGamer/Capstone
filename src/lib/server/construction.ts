@@ -324,7 +324,7 @@ async function sendEstimate(db: Db, session: ClientSession, actor: SessionUser, 
   await notify(db, session, [estimate.customerId], {
     title: "Your construction cost estimate is ready",
     body: `${estimate.reference} totals ${estimate.total.toLocaleString("en-PH", { style: "currency", currency: "PHP" })} including VAT. Review it and choose your downpayment.`,
-    href: `/customer/project?estimate=${estimate._id.toHexString()}`, kind: "construction-estimate", entityId: estimate._id,
+    href: `/customer/dream-house?estimate=${estimate._id.toHexString()}`, kind: "construction-estimate", entityId: estimate._id,
   });
   await audit(db, session, actor, "estimate.sent", "estimate", estimate._id, { reference: estimate.reference, total: estimate.total });
   return {};
@@ -480,7 +480,7 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
     await notify(db, session, [project.customerId], {
       title: `Project ${input.status === "Completed" ? "completed" : input.status === "On hold" ? "put on hold" : "is active"}`,
       body: `${project.name} is now ${input.status.toLowerCase()}.`,
-      href: "/customer/project", kind: "construction-project", entityId: project._id,
+      href: "/customer/dream-house", kind: "construction-project", entityId: project._id,
     });
     await audit(db, session, actor, "project.status-changed", "project", project._id, { reference: project.reference, from, to: input.status });
     const updated = await projects.findOne({ _id: project._id }, { session });

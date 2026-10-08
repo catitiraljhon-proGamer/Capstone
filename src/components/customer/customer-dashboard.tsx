@@ -17,9 +17,8 @@ import {
   type HouseDesign,
 } from "@/lib/house-design-data";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
-import { CustomerRequestedDesigns } from "@/components/customer/customer-requested-designs";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
-import { CustomerProject } from "@/components/customer/customer-project";
+import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
 import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
 import { LogoutButton } from "@/components/ui/logout-button";
@@ -33,7 +32,6 @@ import {
   FilePlus2,
   FileText,
   Gauge,
-  HardHat,
   HelpCircle,
   Home,
   Menu,
@@ -49,9 +47,8 @@ import type { ComponentType, ReactNode } from "react";
 type IconType = ComponentType<{ className?: string }>;
 type CustomerSection =
   | "dashboard"
-  | "design"
+  | "dream-house"
   | "requests"
-  | "project"
   | "billing"
   | "documents"
   | "profile"
@@ -66,9 +63,8 @@ const customerNav: {
   section: CustomerSection;
 }[] = [
   { label: "Dashboard", icon: Gauge, href: "/customer", section: "dashboard" },
-  { label: "My House Design", icon: Home, href: "/customer/house-design", section: "design" },
+  { label: "Dream House", icon: Home, href: "/customer/dream-house", section: "dream-house" },
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
-  { label: "My Project", icon: HardHat, href: "/customer/project", section: "project" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
   { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
   { label: "My Profile", icon: UserRound, href: "/customer/profile", section: "profile" },
@@ -231,10 +227,10 @@ export function CustomerDashboard() {
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
-                  href="/customer/house-design"
+                  href="/customer/dream-house"
                   className="rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800"
                 >
-                  My Requested Designs
+                  Dream House
                 </Link>
                 <Link
                   href="/customer/design-requests"
@@ -336,14 +332,10 @@ export function CustomerDashboard() {
   );
 }
 
-export function CustomerHouseDesignPage() {
-  return <CustomerShell activeSection="design" title="My House Design" description="Your requested designs, delivery status, and payment access."><CustomerRequestedDesigns /></CustomerShell>;
-}
-
-export function CustomerProjectPage({ designRequestId, estimateId }: { designRequestId?: string; estimateId?: string }) {
+export function CustomerDreamHousePage({ designId, designRequestId, estimateId }: { designId?: string; designRequestId?: string; estimateId?: string }) {
   return (
-    <CustomerShell activeSection="project" title="My Project" description="Request construction, review your cost estimate, and follow your project payments.">
-      <CustomerProject designRequestId={designRequestId} estimateId={estimateId} />
+    <CustomerShell activeSection="dream-house" title="Dream House" description="Follow each design from request and payment through construction cost estimation.">
+      <CustomerDreamHouse designId={designId} designRequestId={designRequestId} estimateId={estimateId} />
     </CustomerShell>
   );
 }
@@ -582,7 +574,7 @@ export function CustomerDesignRequestsPage({ houseDesignId }: { houseDesignId?: 
     <CustomerShell
       activeSection="requests"
       title="Design Requests"
-      description="Submit your requirements for admin approval and track the design work. Delivered designs are in My House Design."
+      description="Submit your requirements for admin approval and track the design work. Delivered designs continue in Dream House."
     >
       <CustomerDesignRequests key={houseDesignId ?? "custom"} houseDesignId={houseDesignId} />
     </CustomerShell>

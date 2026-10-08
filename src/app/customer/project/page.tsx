@@ -1,18 +1,11 @@
-import { CustomerProjectPage } from "@/components/customer/customer-dashboard";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "My Project | G4 Builders Inc",
-  robots: { index: false, follow: false },
-  description: "Request construction, review your cost estimate, and follow your project payments.",
-};
-
-export default async function ProjectPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ designRequestId?: string | string[]; estimate?: string | string[] }>;
-}) {
-  const { designRequestId, estimate } = await searchParams;
-  const first = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
-  return <CustomerProjectPage designRequestId={first(designRequestId)} estimateId={first(estimate)} />;
+// Legacy URL: this page now lives in Dream House. Old links and notifications keep working.
+export default async function ProjectPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
+  }
+  const suffix = query.toString();
+  redirect(suffix ? `/customer/dream-house?${suffix}` : "/customer/dream-house");
 }

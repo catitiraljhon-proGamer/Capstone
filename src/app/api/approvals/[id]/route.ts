@@ -27,7 +27,7 @@ const decisionSchema = z
 
 const customerHrefs: Record<ApprovalRecordType, string> = {
   "Design request": "/customer/design-requests",
-  "Cost estimate": "/customer/house-design",
+  "Cost estimate": "/customer/dream-house",
   Billing: "/customer/billing",
   Document: "/customer/documents",
 };

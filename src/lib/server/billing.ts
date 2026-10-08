@@ -319,7 +319,7 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
         _id: new ObjectId(), userId: project.customerId,
         title: scheduled ? "Downpayment verified — your project is scheduled" : "Downpayment verified — your project is active",
         body: scheduled ? `${project.name} is scheduled to start on ${startDate}.` : `${project.name} is now active.`,
-        href: "/customer/project", kind: "construction-project", entityId: project._id, createdAt: now,
+        href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
       },
       ...admins.map((admin) => ({
         _id: new ObjectId(), userId: admin._id, title: "Downpayment verified",
@@ -332,7 +332,7 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
     await notifications.insertOne({
       _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment reversed",
       body: `A downpayment payment for ${project.name} was reversed. Settle the downpayment to keep your project schedule.`,
-      href: "/customer/project", kind: "construction-project", entityId: project._id, createdAt: now,
+      href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
     }, { session });
   }
 }
@@ -372,8 +372,8 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
   if (invoice.designRequestId && toCentavos(updatedPaid) >= toCentavos(invoice.amount)) {
     await db.collection<NotificationDocument>(collections.notifications).insertOne({
       _id: new ObjectId(), userId: invoice.customerId, title: "Your house design is unlocked",
-      body: "Full payment of your design fee was verified. Open My House Design to view and download your completed images.",
-      href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
+      body: "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
+      href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
     }, { session });
   }
   if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "verify", now);
@@ -419,7 +419,7 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
         await db.collection<NotificationDocument>(collections.notifications).insertOne({
           _id: new ObjectId(), userId: invoice.customerId, title: "Design access requires payment",
           body: "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
-          href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
+          href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
         }, { session });
       }
       if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "reverse", now);
