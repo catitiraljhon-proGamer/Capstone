@@ -6,9 +6,20 @@ import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingEmpty, billingDate } from "@/components/billing/billing-primitives";
 import type { BillingInvoice, BillingPayment } from "@/types/billing";
+import { paymongoMethodLabels } from "@/types/paymongo";
 
 const head = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500";
 const cell = "px-4 py-4 align-top text-sm";
+
+/** Pills marking a payment made through the (simulated) PayMongo online checkout. */
+export function GatewayPills({ payment }: { payment: BillingPayment }) {
+  const gateway = payment.gateway;
+  if (!gateway) return null;
+  return <span className="mt-1.5 flex flex-wrap gap-1">
+    <span className="inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">Online · PayMongo ({paymongoMethodLabels[gateway.method] ?? gateway.method})</span>
+    {!gateway.livemode && <span className="inline-flex rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-inset ring-stone-200">Test mode</span>}
+  </span>;
+}
 
 function Pager({ page, total, onPage }: { page: number; total: number; onPage: (value: number) => void }) {
   if (total <= 10) return null;
@@ -43,7 +54,7 @@ export function PaymentTable({ payments, customer, onView }: { payments: Billing
     <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Payment / invoice", "Customer / method", "Amount", "Date / status", "Receipt", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
     <tbody className="divide-y divide-stone-100">{payments.slice(page * 10, page * 10 + 10).map((payment) => <tr key={payment.id} className="hover:bg-rose-50/30">
       <td className={cell}><p className="font-semibold">{payment.reference}</p><p className="mt-1 text-xs text-stone-500">{payment.invoiceNumber}</p></td>
-      <td className={cell}><p>{payment.customerName}</p><p className="mt-1 text-xs text-stone-500">{payment.method}</p></td>
+      <td className={cell}><p>{payment.customerName}</p><p className="mt-1 text-xs text-stone-500">{payment.method}</p><GatewayPills payment={payment} /></td>
       <td className={cell + " whitespace-nowrap font-semibold"}>{formatPeso(payment.amount)}</td>
       <td className={cell}><p className="mb-2 whitespace-nowrap text-xs text-stone-500">{billingDate(payment.paidAt)}</p><BillingBadge status={payment.status} /></td>
       <td className={cell}>{payment.receiptNumber ? <a className="whitespace-nowrap font-medium text-red-700 underline underline-offset-4" target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/receipts/${payment.id}`}>{payment.receiptNumber}{payment.status === "Reversed" ? " (void)" : ""}</a> : <span className="text-xs text-stone-400">{payment.status === "Verified" ? "Legacy record" : "Not issued"}</span>}</td>

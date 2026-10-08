@@ -4,7 +4,7 @@ import { collections, type AuditLogDocument, type DesignRequestDocument, type In
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
-import type { SessionUser } from "@/types/domain";
+import type { SessionUser, UserRole } from "@/types/domain";
 
 export class BillingError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -89,7 +89,7 @@ export async function nextReference(db: Db, session: ClientSession, prefix: stri
   return `${prefix}-${year}-${String(sequence!.value).padStart(6, "0")}`;
 }
 
-export async function audit(db: Db, session: ClientSession, actor: SessionUser, action: string, entityType: string, entityId: ObjectId, details: AuditLogDocument["details"] = {}) {
+export async function audit(db: Db, session: ClientSession, actor: Pick<SessionUser, "id" | "name" | "role">, action: string, entityType: string, entityId: ObjectId, details: AuditLogDocument["details"] = {}) {
   await db.collection<AuditLogDocument>(collections.auditLogs).insertOne({
     _id: new ObjectId(), actorId: recordId(actor.id), actorName: actor.name, actorRole: actor.role,
     action, entityType, entityId, details, createdAt: new Date(),
@@ -111,7 +111,7 @@ async function lockProject(db: Db, session: ClientSession, id: ObjectId) {
   return project;
 }
 
-async function lockInvoice(db: Db, session: ClientSession, id: ObjectId) {
+export async function lockInvoice(db: Db, session: ClientSession, id: ObjectId) {
   const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOneAndUpdate(
     { _id: id }, { $inc: { billingVersion: 1 } }, { session, returnDocument: "after" },
   );
@@ -119,7 +119,7 @@ async function lockInvoice(db: Db, session: ClientSession, id: ObjectId) {
   return invoice;
 }
 
-async function paidForInvoice(db: Db, session: ClientSession, id: ObjectId) {
+export async function paidForInvoice(db: Db, session: ClientSession, id: ObjectId) {
   const payments = await db.collection<PaymentDocument>(collections.payments)
     .find({ invoiceId: id, status: "Verified" }, { session, projection: { amount: 1 } }).toArray();
   return sumMoney(payments.map((payment) => payment.amount));
@@ -337,6 +337,51 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
   }
 }
 
+export type PaymentVerifier = { id: string; name: string; role: UserRole };
+
+/**
+ * Verifies a Pending payment inside an existing billing transaction: issues the receipt, updates the invoice status,
+ * unlocks designs, advances downpayment projects, and notifies and audits. The caller must already hold the invoice
+ * lock (`lockInvoice`) and pass the invoice returned by it.
+ */
+export async function verifyPaymentInSession(db: Db, session: ClientSession, { payment, invoice, verifier, now }: {
+  payment: PaymentDocument; invoice: InvoiceDocument; verifier: PaymentVerifier; now: Date;
+}) {
+  if (payment.status !== "Pending") throw new BillingError("Only pending payments can be verified.", 409);
+  moneySchema.parse(payment.amount);
+  if (["Draft", "Ready", "Void"].includes(invoice.status)) throw new BillingError("The linked invoice is not payable.", 409);
+  const paid = await paidForInvoice(db, session, invoice._id);
+  if (toCentavos(payment.amount) > toCentavos(invoiceState(invoice, paid).balance)) throw new BillingError("This payment exceeds the current balance. Review it before verification.", 409);
+  const customer = await db.collection<UserDocument>(collections.users).findOne({ _id: invoice.customerId }, { session });
+  const project = invoice.projectId ? await db.collection<ProjectDocument>(collections.projects).findOne({ _id: invoice.projectId }, { session }) : null;
+  if (!customer || (!project && !invoice.designRequestId)) throw new BillingError("The linked customer or project is missing.", 409);
+  const updatedPaid = sumMoney([paid, payment.amount]);
+  await db.collection<PaymentDocument>(collections.payments).updateOne({ _id: payment._id, status: "Pending" }, { $set: {
+    status: "Verified", verifiedAt: now, verifiedBy: recordId(verifier.id), reviewedAt: now, reviewedByName: verifier.name,
+    receipt: {
+      number: await nextReference(db, session, "RCT", now), customerName: customer.name, projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : `${project!.reference} · ${project!.name}`,
+      invoiceNumber: invoice.invoiceNumber, invoiceLabel: invoice.label, invoiceAmount: invoice.amount,
+      amount: payment.amount, balanceAfterPayment: fromCentavos(toCentavos(invoice.amount) - toCentavos(updatedPaid)),
+      method: payment.method, transactionReference: payment.transactionReference || payment.reference,
+      paidAt: payment.paidAt.toISOString(), issuedAt: now.toISOString(), verifiedByName: verifier.name,
+    },
+  } }, { session });
+  await db.collection<InvoiceDocument>(collections.invoices).updateOne({ _id: invoice._id }, {
+    $set: { status: invoiceState(invoice, updatedPaid, now).status, updatedAt: now },
+  }, { session });
+  if (invoice.designRequestId && toCentavos(updatedPaid) >= toCentavos(invoice.amount)) {
+    await db.collection<NotificationDocument>(collections.notifications).insertOne({
+      _id: new ObjectId(), userId: invoice.customerId, title: "Your house design is unlocked",
+      body: "Full payment of your design fee was verified. Open My House Design to view and download your completed images.",
+      href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
+    }, { session });
+  }
+  if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "verify", now);
+  await audit(db, session, verifier, "payment.verify", "payment", payment._id, { reference: payment.reference, amount: payment.amount });
+  await notifyCustomer(db, session, payment.customerId, "Payment verified — receipt available",
+    `${payment.reference} for ${invoice.invoiceNumber}. Your receipt is available in Billing.`, payment._id);
+}
+
 export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw: unknown) {
   assertBillingRole(actor);
   const input = paymentActionSchema.parse(raw);
@@ -348,28 +393,13 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     const invoice = await lockInvoice(db, session, payment.invoiceId);
     if (!payment.customerId.equals(invoice.customerId) || payment.projectId?.toHexString() !== invoice.projectId?.toHexString()) throw new BillingError("The payment and invoice do not match.", 409);
     const now = new Date();
+    if (input.action === "verify") {
+      await verifyPaymentInSession(db, session, { payment, invoice, verifier: { id: actor.id, name: actor.name, role: actor.role }, now });
+      return;
+    }
     const paid = await paidForInvoice(db, session, invoice._id);
     let updatedPaid = paid;
-    if (input.action === "verify") {
-      if (payment.status !== "Pending") throw new BillingError("Only pending payments can be verified.", 409);
-      moneySchema.parse(payment.amount);
-      if (["Draft", "Ready", "Void"].includes(invoice.status)) throw new BillingError("The linked invoice is not payable.", 409);
-      if (toCentavos(payment.amount) > toCentavos(invoiceState(invoice, paid).balance)) throw new BillingError("This payment exceeds the current balance. Review it before verification.", 409);
-      const customer = await db.collection<UserDocument>(collections.users).findOne({ _id: invoice.customerId }, { session });
-      const project = invoice.projectId ? await db.collection<ProjectDocument>(collections.projects).findOne({ _id: invoice.projectId }, { session }) : null;
-      if (!customer || (!project && !invoice.designRequestId)) throw new BillingError("The linked customer or project is missing.", 409);
-      updatedPaid = sumMoney([paid, payment.amount]);
-      await payments.updateOne({ _id: payment._id, status: "Pending" }, { $set: {
-        status: "Verified", verifiedAt: now, verifiedBy: recordId(actor.id), reviewedAt: now, reviewedByName: actor.name,
-        receipt: {
-          number: await nextReference(db, session, "RCT", now), customerName: customer.name, projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : `${project!.reference} · ${project!.name}`,
-          invoiceNumber: invoice.invoiceNumber, invoiceLabel: invoice.label, invoiceAmount: invoice.amount,
-          amount: payment.amount, balanceAfterPayment: fromCentavos(toCentavos(invoice.amount) - toCentavos(updatedPaid)),
-          method: payment.method, transactionReference: payment.transactionReference || payment.reference,
-          paidAt: payment.paidAt.toISOString(), issuedAt: now.toISOString(), verifiedByName: actor.name,
-        },
-      } }, { session });
-    } else if (input.action === "reject") {
+    if (input.action === "reject") {
       if (payment.status !== "Pending") throw new BillingError("Only pending payments can be rejected.", 409);
       await payments.updateOne({ _id: payment._id }, { $set: {
         status: "Rejected", reviewNote: input.reason, reviewedAt: now, reviewedByName: actor.name,
@@ -384,24 +414,21 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     await db.collection<InvoiceDocument>(collections.invoices).updateOne({ _id: invoice._id }, {
       $set: { status: invoiceState(invoice, updatedPaid, now).status, updatedAt: now },
     }, { session });
-    if (invoice.designRequestId && (input.action === "verify" || input.action === "reverse")) {
-      const unlocked = toCentavos(updatedPaid) >= toCentavos(invoice.amount);
-      if (unlocked || input.action === "reverse") await db.collection<NotificationDocument>(collections.notifications).insertOne({
-        _id: new ObjectId(), userId: invoice.customerId,
-        title: unlocked ? "Your house design is unlocked" : "Design access requires payment",
-        body: unlocked ? "Full payment of your design fee was verified. Open My House Design to view and download your completed images." : "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
-        href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
-      }, { session });
-    }
-    if (invoice.projectId && invoice.milestoneId && (input.action === "verify" || input.action === "reverse")) {
-      await syncMilestoneProject(db, session, invoice, updatedPaid, input.action, now);
+    if (input.action === "reverse") {
+      if (invoice.designRequestId) {
+        await db.collection<NotificationDocument>(collections.notifications).insertOne({
+          _id: new ObjectId(), userId: invoice.customerId, title: "Design access requires payment",
+          body: "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
+          href: "/customer/house-design", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
+        }, { session });
+      }
+      if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "reverse", now);
     }
     await audit(db, session, actor, `payment.${input.action}`, "payment", payment._id, {
-      reference: payment.reference, amount: payment.amount, ...("reason" in input ? { reason: input.reason } : {}),
+      reference: payment.reference, amount: payment.amount, reason: input.reason,
     });
-    await notifyCustomer(db, session, payment.customerId,
-      input.action === "verify" ? "Payment verified — receipt available" : input.action === "reject" ? "Payment rejected" : "Payment reversed",
-      `${payment.reference} for ${invoice.invoiceNumber}.${"reason" in input ? ` ${input.reason}` : " Your receipt is available in Billing."}`, payment._id);
+    await notifyCustomer(db, session, payment.customerId, input.action === "reject" ? "Payment rejected" : "Payment reversed",
+      `${payment.reference} for ${invoice.invoiceNumber}. ${input.reason}`, payment._id);
   });
 }
 
@@ -463,6 +490,8 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
       amount: payment.amount, method: payment.method, status: payment.status, paidAt: payment.paidAt.toISOString(),
       transactionReference: payment.transactionReference ?? "", notes: payment.notes ?? "", hasProof: proofIds.has(payment._id.toHexString()),
       reviewNote: payment.reviewNote, receiptNumber: payment.receipt?.number, reversalReason: payment.reversalReason,
+      ...(payment.gateway === "paymongo" && payment.gatewayMethod && payment.gatewaySessionId
+        ? { gateway: { provider: "paymongo" as const, method: payment.gatewayMethod, sessionId: payment.gatewaySessionId, livemode: payment.gatewayLivemode ?? false } } : {}),
     })),
     activity: activity.map((item) => ({ id: item._id.toHexString(), action: item.action, actorName: item.actorName, date: item.createdAt.toISOString() })),
   };

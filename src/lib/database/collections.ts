@@ -20,6 +20,7 @@ import type { AddressDetails, ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot } from "@/types/billing";
 import type { RequestedHouseDesign } from "@/types/design-requests";
 import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
+import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -36,6 +37,7 @@ export const collections = {
   approvals: "approvals",
   invoices: "invoices",
   payments: "payments",
+  paymentCheckouts: "payment_checkouts",
   documents: "documents",
   notifications: "notifications",
   schedules: "schedules",
@@ -322,6 +324,37 @@ export type PaymentDocument = {
   reversedByName?: string;
   reversalReason?: string;
   receipt?: ReceiptSnapshot;
+  /** Set for online payments received through the (simulated) PayMongo gateway. */
+  gateway?: "paymongo";
+  gatewayMethod?: PaymongoMethod;
+  gatewaySessionId?: string;
+  /** False for simulated/test-mode gateway payments. */
+  gatewayLivemode?: boolean;
+};
+
+/** A PayMongo-style checkout session for paying one invoice online. */
+export type PaymentCheckoutDocument = {
+  _id: ObjectId;
+  sessionId: string;
+  customerId: ObjectId;
+  invoiceId: ObjectId;
+  amount: number;
+  description: string;
+  returnPath: string;
+  status: CheckoutStatus;
+  method?: PaymongoMethod;
+  /** PayMongo payment id, also stored as the PaymentDocument's transactionReference. */
+  paymentId?: string;
+  billingPaymentId?: ObjectId;
+  heldForReview?: boolean;
+  failureReason?: string;
+  /** Ids of webhook events already processed, so redelivered events are ignored. */
+  processedEventIds: string[];
+  livemode: false;
+  expiresAt: Date;
+  completedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type DocumentRecord = {

@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download, FileText, Plus, RefreshCw, Search, WalletCards, Clock3, ReceiptText } from "lucide-react";
+import { ArrowRight, CircleCheck, CircleX, Download, FileText, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
-import { InvoiceActionDialog, InvoiceForm, PaymentForm, PaymentReview, type BillingMutation } from "@/components/billing/billing-forms";
+import { InvoiceActionDialog, InvoiceForm, PayOnlineDialog, PaymentForm, PaymentReview, type BillingMutation } from "@/components/billing/billing-forms";
 import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { manilaDate, sumMoney } from "@/lib/billing";
+import type { PaymongoCheckoutDto } from "@/types/paymongo";
 import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 
 const emptyData: BillingData = { designRequests: [], projects: [], invoices: [], payments: [], activity: [] };
@@ -17,6 +18,7 @@ type Dialog =
   | { type: "invoice"; invoice: BillingInvoice }
   | { type: "invoice-action"; invoice: BillingInvoice; action: "issue" | "void" | "remind" }
   | { type: "payment-form"; invoice?: BillingInvoice }
+  | { type: "pay-online"; invoice: BillingInvoice }
   | { type: "payment"; payment: BillingPayment }
   | { type: "account"; customerId: string; customerName: string };
 
@@ -31,6 +33,63 @@ function exportCsv(filename: string, rows: (string | number)[][]) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+const checkoutPollMs = 2000;
+const checkoutPollMaxMs = 30_000;
+
+/** Shown after the customer returns from the (simulated) PayMongo checkout; polls the session while it is still open. */
+function CheckoutReturnBanner({ sessionId, onResolved, onDismiss }: { sessionId: string; onResolved: () => void; onDismiss: () => void }) {
+  const [checkout, setCheckout] = useState<PaymongoCheckoutDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+  const resolvedRef = useRef(onResolved);
+  useEffect(() => { resolvedRef.current = onResolved; });
+  useEffect(() => {
+    const controller = new AbortController();
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/payments/paymongo/checkout/${encodeURIComponent(sessionId)}`, { cache: "no-store", signal: controller.signal });
+        const result = await billingJson<{ checkout: PaymongoCheckoutDto }>(response);
+        if (controller.signal.aborted) return;
+        setCheckout(result.checkout); setError(null);
+        if (result.checkout.status !== "open") { resolvedRef.current(); return; }
+      } catch (reason: unknown) {
+        if (controller.signal.aborted) return;
+        setError(reason instanceof Error ? reason.message : "Unable to check this payment."); return;
+      }
+      if (Date.now() - started >= checkoutPollMaxMs) { setTimedOut(true); return; }
+      timer = setTimeout(() => void poll(), checkoutPollMs);
+    };
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [sessionId]);
+  const status = checkout?.status;
+  const good = status === "paid";
+  const bad = status === "failed";
+  const message = error ? error
+    : !checkout || status === "open" ? (timedOut ? "We are still waiting for confirmation of your online payment. Refresh in a moment to see the result." : "Confirming your online payment…")
+    : status === "paid" ? (checkout.heldForReview ? "Payment received — the Billing Clerk will review it." : "Payment received — receipt available.")
+    : status === "failed" ? `Payment failed: ${checkout.failureReason ?? "the payment could not be completed."}`
+    : status === "cancelled" ? "Checkout cancelled." : "Checkout expired.";
+  const Icon = good ? CircleCheck : bad || error ? CircleX : RefreshCw;
+  return <div role="status" className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${bad || error ? "border-red-200 bg-red-50 text-red-800" : good ? "border-rose-200 bg-rose-50 text-stone-900" : "border-stone-200 bg-stone-50 text-stone-700"}`}>
+    <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${!checkout && !error ? "animate-spin" : ""}`} />
+    <div className="min-w-0 flex-1"><p className="font-medium">{message}</p>
+      {checkout && <p className="mt-1 text-xs text-stone-500">{checkout.invoiceNumber} · {formatPeso(checkout.amount)}</p>}
+      {good && !checkout?.heldForReview && checkout?.billingPaymentId && <Link className="mt-2 inline-block text-sm font-semibold text-red-700 underline underline-offset-4" href={`/customer/receipts/${checkout.billingPaymentId}`}>View receipt</Link>}
+    </div>
+    <button type="button" aria-label="Dismiss payment message" className="shrink-0 rounded-md p-1 text-stone-500 hover:bg-white/70" onClick={onDismiss}><X className="h-4 w-4" /></button>
+  </div>;
+}
+
+function clearCheckoutParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("checkout")) return;
+  url.searchParams.delete("checkout");
+  window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+}
+
 export function BillingWorkspace({ section = "Dashboard", customer = false }: { section?: BillingSection; customer?: boolean }) {
   const [data, setData] = useState<BillingData>(emptyData);
   const [loading, setLoading] = useState(true);
@@ -42,6 +101,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const linkedInvoiceOpened = useRef(false);
   const load = useCallback((signal?: AbortSignal) => {
     return fetch("/api/billing", { cache: "no-store", signal })
@@ -49,9 +109,11 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
       .then((result) => { if (!signal?.aborted) {
         setData(result); setError(null);
         if (customer && !linkedInvoiceOpened.current) {
-          const id = new URLSearchParams(window.location.search).get("invoice");
-          const invoice = result.invoices.find((item) => item.id === id);
+          const params = new URLSearchParams(window.location.search);
+          const invoice = result.invoices.find((item) => item.id === params.get("invoice"));
           if (invoice) setDialog({ type: "invoice", invoice });
+          const returned = params.get("checkout");
+          if (returned) setCheckoutId(returned);
           linkedInvoiceOpened.current = true;
         }
       } })
@@ -63,6 +125,8 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
     void load(controller.signal);
     return () => controller.abort();
   }, [load]);
+  const checkoutResolved = useCallback(() => { clearCheckoutParam(); setLoading(true); void load(); }, [load]);
+  const dismissCheckout = useCallback(() => { clearCheckoutParam(); setCheckoutId(null); }, []);
   const mutate: BillingMutation = async (url, method, body) => {
     await billingJson(await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     setSuccess("Record saved successfully.");
@@ -120,6 +184,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
         {(customer || section === "Payments") && <Button disabled={loading || Boolean(error) || !unpaid.length} onClick={() => setDialog({ type: "payment-form" })}><Plus className="mr-2 h-4 w-4" />{customer ? "Submit payment" : "Record payment"}</Button>}
       </div>
     </div>
+    {customer && checkoutId && <CheckoutReturnBanner key={checkoutId} sessionId={checkoutId} onResolved={checkoutResolved} onDismiss={dismissCheckout} />}
     <BillingErrorMessage message={error} />
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">{success}</p>}
     {loading && <p role="status" className="text-sm text-stone-500">Loading billing records…</p>}
@@ -175,6 +240,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
     </>}
     {dialog?.type === "invoice-form" && <InvoiceForm projects={data.projects} designRequests={data.designRequests} designRequestId={dialog.designRequestId} invoice={dialog.invoice} mutate={mutate} onClose={close} />}
     {dialog?.type === "payment-form" && <PaymentForm invoices={data.invoices} selectedInvoice={dialog.invoice} customer={customer} mutate={mutate} onClose={close} />}
+    {dialog?.type === "pay-online" && <PayOnlineDialog invoice={dialog.invoice} onClose={close} />}
     {dialog?.type === "invoice-action" && <InvoiceActionDialog invoice={dialog.invoice} action={dialog.action} mutate={mutate} onClose={close} />}
     {dialog?.type === "payment" && <PaymentReview payment={dialog.payment} customer={customer} mutate={mutate} onClose={close} />}
     {dialog?.type === "invoice" && <BillingDialog title={dialog.invoice.invoiceNumber} onClose={close}>
@@ -187,7 +253,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
           {customer && dialog.invoice.designRequestId && <Button asChild><Link href="/customer/house-design">Open My House Design</Link></Button>}
           <Button variant="outline" asChild><a target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/invoices/${dialog.invoice.id}`}>Print / download invoice</a></Button>
           {!customer && ["Draft", "Ready"].includes(dialog.invoice.status) && <><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", invoice: dialog.invoice })}>Edit draft</Button><Button onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "issue" })}>Issue invoice</Button></>}
-          {!["Draft", "Ready", "Void"].includes(dialog.invoice.status) && dialog.invoice.balance > 0 && <><Button onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>{customer ? "Submit payment" : "Record payment"}</Button>{!customer && <Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button>}</>}
+          {!["Draft", "Ready", "Void"].includes(dialog.invoice.status) && dialog.invoice.balance > 0 && <>{customer && <Button onClick={() => setDialog({ type: "pay-online", invoice: dialog.invoice })}><Smartphone className="mr-2 h-4 w-4" />Pay online</Button>}<Button variant={customer ? "outline" : "default"} onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>{customer ? "Submit payment" : "Record payment"}</Button>{!customer && <Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button>}</>}
           {!customer && dialog.invoice.status !== "Void" && <Button variant="ghost" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "void" })}>Void invoice</Button>}
         </div>
         <div className="border-t border-stone-200 pt-4"><h3 className="mb-4 font-semibold">Payments for this invoice</h3><div className="px-5"><PaymentTable payments={data.payments.filter((payment) => payment.invoiceId === dialog.invoice.id)} customer={customer} onView={viewPayment} /></div></div>

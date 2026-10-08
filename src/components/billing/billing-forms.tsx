@@ -3,12 +3,15 @@
 import { useState, type FormEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { CreditCard } from "lucide-react";
 import { PesoInput } from "@/components/ui/peso-input";
 import { formatPeso } from "@/lib/house-design-data";
-import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field } from "@/components/billing/billing-primitives";
+import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
+import { GatewayPills } from "@/components/billing/billing-tables";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
 import { manilaDate } from "@/lib/billing";
 import type { PaymentMilestoneDto } from "@/types/construction";
+import { PAYMONGO_MIN_AMOUNT, type CreateCheckoutInput, type PaymongoCheckoutDto } from "@/types/paymongo";
 import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type PaymentMethod } from "@/types/billing";
 
 export type BillingMutation = (url: string, method: "POST" | "PATCH", body: unknown) => Promise<void>;
@@ -167,6 +170,35 @@ export function PaymentForm({ invoices, selectedInvoice, customer, mutate, onClo
   </BillingDialog>;
 }
 
+/** Starts a simulated PayMongo checkout for an invoice and sends the customer to the test checkout page. */
+export function PayOnlineDialog({ invoice, onClose }: { invoice: BillingInvoice; onClose: () => void }) {
+  const minimum = Math.min(PAYMONGO_MIN_AMOUNT, invoice.balance);
+  const [amount, setAmount] = useState(String(invoice.balance));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const value = Number(amount);
+  const valid = amount !== "" && Number.isFinite(value) && value >= minimum && value <= invoice.balance;
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setBusy(true); setError(null);
+    try {
+      const input: CreateCheckoutInput = { invoiceId: invoice.id, amount: Math.round(value * 100) / 100, returnPath: "/customer/billing" };
+      const response = await fetch("/api/payments/paymongo/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+      const { checkout } = await billingJson<{ checkout: PaymongoCheckoutDto }>(response);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error) { setError(errorText(error)); setBusy(false); }
+  }
+  return <BillingDialog title="Pay online" onClose={onClose} busy={busy}>
+    <form onSubmit={submit} className="space-y-4">
+      <BillingErrorMessage message={error} />
+      <div><p className="font-semibold">{invoice.invoiceNumber} · {invoice.label}</p><p className="mt-1 text-sm text-stone-600">Remaining invoice balance: <strong className="text-stone-950">{formatPeso(invoice.balance)}</strong></p></div>
+      <label className="block text-sm font-medium">Amount to pay (PHP)<PesoInput required min={minimum} max={invoice.balance} step="0.01" wrapperClassName="mt-1.5" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+      <p className="text-xs leading-5 text-stone-500">Minimum online payment is {formatPeso(minimum)}. Partial payments are allowed, but design images only unlock once the fee is fully paid.</p>
+      <p className="rounded-lg bg-rose-50 p-3 text-sm leading-6 text-stone-700">This is a test checkout. You will choose a payment method on the next page; no real money is charged.</p>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy || !valid}><CreditCard className="mr-2 h-4 w-4" />{busy ? "Starting checkout…" : "Continue to checkout"}</Button></div>
+    </form>
+  </BillingDialog>;
+}
+
 export function InvoiceActionDialog({ invoice, action, mutate, onClose }: {
   invoice: BillingInvoice; action: "issue" | "void" | "remind"; mutate: BillingMutation; onClose: () => void;
 }) {
@@ -207,7 +239,8 @@ export function PaymentReview({ payment, customer, mutate, onClose }: {
     }}>
       <BillingErrorMessage message={error} />
       <div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{payment.reference}</p><p className="mt-1 text-sm text-stone-600">{payment.customerName} · {payment.invoiceNumber}</p></div><BillingBadge status={payment.status} /></div>
-      <div className="rounded-lg bg-stone-50 p-4"><p className="text-2xl font-semibold tracking-tight">{formatPeso(payment.amount)}</p><p className="mt-2 text-sm text-stone-600">{payment.method} · {billingDate(payment.paidAt)}</p><p className="mt-1 break-all text-sm">Reference: {payment.transactionReference || "Cash collection"}</p></div>
+      <div className="rounded-lg bg-stone-50 p-4"><p className="text-2xl font-semibold tracking-tight">{formatPeso(payment.amount)}</p><p className="mt-2 text-sm text-stone-600">{payment.method} · {billingDate(payment.paidAt)}</p><GatewayPills payment={payment} /><p className="mt-1 break-all text-sm">Reference: {payment.transactionReference || "Cash collection"}</p></div>
+      {payment.gateway && payment.status === "Pending" && <p className="rounded-lg bg-rose-50 p-3 text-sm leading-6 text-stone-700">{customer ? "Paid online. The Billing Clerk will review this payment before it is applied to your invoice." : "Paid online, but held for review because it exceeded the remaining balance or the invoice changed. Verify or reject it below."}</p>}
       {payment.notes && <p className="whitespace-pre-wrap text-sm text-stone-600">{payment.notes}</p>}
       {payment.hasProof && <div><p className="mb-2 text-sm font-medium">Submitted proof</p><a href={`/api/billing/payments/${payment.id}/proof`} target="_blank" rel="noreferrer" className="text-sm text-red-700 underline">Open full image</a><Image unoptimized src={`/api/billing/payments/${payment.id}/proof`} alt="Submitted payment proof" width={600} height={400} className="mt-3 max-h-80 w-full rounded-lg border border-stone-200 object-contain" /></div>}
       {payment.reviewNote && <p className="text-sm text-red-800">Review note: {payment.reviewNote}</p>}

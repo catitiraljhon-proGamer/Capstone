@@ -1,4 +1,5 @@
 import type { PaymentMilestoneDto } from "@/types/construction";
+import type { PaymongoMethod } from "@/types/paymongo";
 
 export const paymentMethods = ["Cash", "Bank transfer", "Card", "E-wallet", "Check"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
@@ -61,6 +62,8 @@ export type BillingPayment = {
   reviewNote?: string;
   receiptNumber?: string;
   reversalReason?: string;
+  /** Present for online payments made through the (simulated) PayMongo checkout. */
+  gateway?: { provider: "paymongo"; method: PaymongoMethod; sessionId: string; livemode: boolean };
 };
 
 export type BillingProject = {

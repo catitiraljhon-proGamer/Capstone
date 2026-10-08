@@ -60,7 +60,7 @@ function NextPayment({ milestone }: { milestone: PaymentMilestoneDto | null }) {
           </p>
         </div>
         {milestone.invoice ? (
-          <Button asChild className="min-h-11 w-full sm:w-auto"><Link href={`/customer/billing?invoice=${encodeURIComponent(milestone.invoice.id)}`}>Pay now</Link></Button>
+          <Button asChild className="min-h-11 w-full sm:w-auto"><Link href={`/customer/billing?invoice=${encodeURIComponent(milestone.invoice.id)}`}>Pay now — online or upload proof</Link></Button>
         ) : null}
       </div>
       {!milestone.invoice && (
