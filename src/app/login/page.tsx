@@ -44,6 +44,11 @@ export default async function LoginPage({
     <SignInPage
       key={`${link?.email ?? "login"}:${twoFactorPending}:${error}`}
       initialError={error}
+      initialNotice={
+        params.two_factor_enabled === "1"
+          ? "Two-factor authentication is on. Sign in again with your password and the 6-digit code from your authenticator app."
+          : ""
+      }
       googleLinkEmail={link?.email}
       initialRememberMe={link?.rememberMe}
       twoFactorPending={twoFactorPending}

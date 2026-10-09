@@ -4,7 +4,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
-import { Building2, Eye, EyeOff } from "lucide-react";
+import { Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useState } from "react";
@@ -23,6 +23,8 @@ interface SignInPageProps {
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
   initialError?: string;
+  /** Shown above the form, e.g. after 2FA setup signs the user out. */
+  initialNotice?: string;
   googleLinkEmail?: string;
   initialRememberMe?: boolean;
   /** A password or Google sign-in already passed and awaits a 2FA code. */
@@ -79,6 +81,7 @@ export function SignInPage({
   onGoogleSignIn,
   onResetPassword,
   initialError = "",
+  initialNotice = "",
   googleLinkEmail,
   initialRememberMe = false,
   twoFactorPending = false,
@@ -173,6 +176,16 @@ export function SignInPage({
 
               {needsTwoFactor ? (
                 <TwoFactorChallenge onRestart={restartSignIn} />
+              ) : null}
+
+              {!needsTwoFactor && initialNotice ? (
+                <div
+                  role="status"
+                  className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-stone-700"
+                >
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+                  {initialNotice}
+                </div>
               ) : null}
 
               {!needsTwoFactor && googleLinkEmail ? (

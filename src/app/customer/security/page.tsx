@@ -1,5 +1,4 @@
 import { CustomerSecurityPage } from "@/components/customer/customer-dashboard";
-import { twoFactorContinuePath } from "@/lib/two-factor-policy";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,11 +7,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function SecurityPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const { next } = await searchParams;
-  return <CustomerSecurityPage continueTo={twoFactorContinuePath("customer", next)} />;
+export default function SecurityPage() {
+  return <CustomerSecurityPage />;
 }

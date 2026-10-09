@@ -37,12 +37,7 @@ export async function proxy(request: NextRequest) {
       payload.twoFactor !== true &&
       !isOpenBeforeTwoFactor(role, request.nextUrl.pathname)
     ) {
-      const setupUrl = new URL(twoFactorSetupPaths[role], request.url);
-      setupUrl.searchParams.set(
-        "next",
-        `${request.nextUrl.pathname}${request.nextUrl.search}`,
-      );
-      return NextResponse.redirect(setupUrl);
+      return NextResponse.redirect(new URL(twoFactorSetupPaths[role], request.url));
     }
 
     return NextResponse.next();

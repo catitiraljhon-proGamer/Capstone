@@ -10,7 +10,6 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { createSessionToken, sessionCookieName } from "@/lib/server/session";
-import { twoFactorContinuePath } from "@/lib/two-factor-policy";
 import { proxy } from "@/proxy";
 import {
   currentTotpStep,
@@ -350,10 +349,7 @@ async function proxyRequest(
 
 test("accounts without 2FA can only open their setup page, and customers their details first", async () => {
   const blocked = await proxyRequest("/admin/projects?tab=open", { role: "admin" });
-  assert.equal(
-    blocked.headers.get("location"),
-    `${origin}/admin/security?next=%2Fadmin%2Fprojects%3Ftab%3Dopen`,
-  );
+  assert.equal(blocked.headers.get("location"), `${origin}/admin/security`);
   for (const [path, role] of [
     ["/admin/security", "admin"],
     ["/billing-clerk/security", "billing-clerk"],
@@ -365,13 +361,4 @@ test("accounts without 2FA can only open their setup page, and customers their d
   }
   const enrolled = await proxyRequest("/admin/projects", { role: "admin", twoFactor: true });
   assert.equal(enrolled.headers.get("location"), null);
-});
-
-test("the setup page only continues to paths inside the user's own portal", () => {
-  assert.equal(twoFactorContinuePath("admin", undefined), undefined);
-  assert.equal(twoFactorContinuePath("admin", "/admin/projects?tab=open"), "/admin/projects?tab=open");
-  assert.equal(twoFactorContinuePath("admin", "/admin"), "/admin");
-  for (const unsafe of ["//evil.example", "/customer/billing", "/administrator", "/admin/security", "https://evil.example"]) {
-    assert.equal(twoFactorContinuePath("admin", unsafe), "/admin", unsafe);
-  }
 });

@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, buttonVariants } from "@/components/ui/button";
-import { ArrowRight, Copy, Download, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Copy, Download, KeyRound, LogOut, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 type TwoFactorStatus = {
@@ -31,7 +32,19 @@ async function fetchStatus() {
   return payload;
 }
 
-function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
+/** After setup the server has already ended the session; this only leaves the page. */
+const signedOutAfterSetupPath = "/login?two_factor_enabled=1";
+
+function RecoveryCodes({
+  codes,
+  onDone,
+  signsOut = false,
+}: {
+  codes: string[];
+  onDone: () => void;
+  /** Set right after 2FA is turned on: saving the codes ends with signing out. */
+  signsOut?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const text = codes.join("\n");
 
@@ -65,6 +78,12 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
           If you lose your phone, each code lets you sign in once. They are
           shown only now, so keep them somewhere safe.
         </p>
+        {signsOut ? (
+          <p className="mt-2 text-sm font-semibold leading-6 text-red-700">
+            Two-factor authentication is now on. You&apos;ll be signed out after
+            this step. Sign in again with your password and a 6-digit code.
+          </p>
+        ) : null}
       </div>
       <ul className="grid grid-cols-2 gap-2 font-mono text-sm text-stone-950">
         {codes.map((code) => (
@@ -83,22 +102,26 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
           Download
         </Button>
         <Button type="button" onClick={onDone}>
-          I saved these codes
+          {signsOut ? (
+            <>
+              <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
+              I saved these, sign me out
+            </>
+          ) : (
+            "I saved these codes"
+          )}
         </Button>
       </div>
     </div>
   );
 }
 
-type TwoFactorSettingsProps = {
-  /** Where to go once 2FA is on, when the user was sent here to set it up. */
-  continueTo?: string;
-};
-
-export function TwoFactorSettings({ continueTo }: TwoFactorSettingsProps) {
+export function TwoFactorSettings() {
+  const router = useRouter();
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [setup, setSetup] = useState<{ qrCode: string; secret: string } | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [isSignedOut, setIsSignedOut] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -154,7 +177,8 @@ export function TwoFactorSettings({ continueTo }: TwoFactorSettingsProps) {
       setSetup(null);
       setCode("");
       setRecoveryCodes(result.recoveryCodes);
-      setStatus(await fetchStatus());
+      setIsSignedOut(true);
+      setStatus((current) => current && { ...current, enabled: true });
     });
   };
 
@@ -210,17 +234,27 @@ export function TwoFactorSettings({ continueTo }: TwoFactorSettingsProps) {
           <div role="status" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
             <div>
-              <p className="font-semibold text-stone-950">Required before you continue</p>
+              <p className="font-semibold text-stone-950">Required and mandatory</p>
               <p className="mt-1 text-sm leading-6 text-stone-600">
-                Turn on two-factor authentication to open the rest of the
-                system. It takes about a minute with your phone.
+                Turn on two-factor authentication to use the system. Once it
+                is on, you&apos;ll be signed out automatically. Sign in again
+                with your password and the 6-digit code from your
+                authenticator app.
               </p>
             </div>
           </div>
         ) : null}
 
         {recoveryCodes ? (
-          <RecoveryCodes codes={recoveryCodes} onDone={() => setRecoveryCodes(null)} />
+          <RecoveryCodes
+            codes={recoveryCodes}
+            signsOut={isSignedOut}
+            onDone={() =>
+              isSignedOut
+                ? router.replace(signedOutAfterSetupPath)
+                : setRecoveryCodes(null)
+            }
+          />
         ) : null}
 
         {status && !status.enabled && !setup ? (
@@ -346,13 +380,6 @@ export function TwoFactorSettings({ continueTo }: TwoFactorSettingsProps) {
               </form>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {continueTo ? (
-                  // A full page load makes the proxy read the refreshed session.
-                  <a href={continueTo} className={buttonVariants()}>
-                    Continue
-                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                  </a>
-                ) : null}
                 <Button
                   type="button"
                   variant="outline"

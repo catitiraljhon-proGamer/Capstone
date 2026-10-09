@@ -601,10 +601,10 @@ export function CustomerProfilePage() {
   );
 }
 
-export function CustomerSecurityPage({ continueTo }: { continueTo?: string }) {
+export function CustomerSecurityPage() {
   return (
     <CustomerShell activeSection="security" title="Security" description="Protect your account with two-factor authentication.">
-      <div className="max-w-3xl"><TwoFactorSettings continueTo={continueTo} /></div>
+      <div className="max-w-3xl"><TwoFactorSettings /></div>
     </CustomerShell>
   );
 }

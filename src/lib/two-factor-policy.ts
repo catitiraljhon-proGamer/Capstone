@@ -1,4 +1,4 @@
-import { completeProfilePath, roleHomePaths, type UserRole } from "@/types/domain";
+import { completeProfilePath, type UserRole } from "@/types/domain";
 
 /**
  * Every account must turn on two-factor authentication before it can use the
@@ -16,25 +16,4 @@ export function isOpenBeforeTwoFactor(role: UserRole, pathname: string) {
     pathname === twoFactorSetupPaths[role] ||
     (role === "customer" && pathname === completeProfilePath)
   );
-}
-
-/**
- * Reads the setup page's `next` search param. Only an in-portal path for the
- * role is kept; anything else falls back to its home. No param means the user
- * opened the page directly, so there is nowhere to continue to.
- */
-export function twoFactorContinuePath(
-  role: UserRole,
-  value: string | string[] | undefined,
-) {
-  if (typeof value !== "string") return undefined;
-  const home = roleHomePaths[role];
-  if (
-    value.startsWith("//") ||
-    (value !== home && !value.startsWith(`${home}/`)) ||
-    value.startsWith(twoFactorSetupPaths[role])
-  ) {
-    return home;
-  }
-  return value;
 }

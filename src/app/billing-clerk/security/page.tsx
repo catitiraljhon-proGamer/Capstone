@@ -1,5 +1,4 @@
 import { BillingClerkSecurityPage } from "@/components/staff/staff-dashboard";
-import { twoFactorContinuePath } from "@/lib/two-factor-policy";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,15 +7,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function BillingClerkSecurity({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const { next } = await searchParams;
-  return (
-    <BillingClerkSecurityPage
-      continueTo={twoFactorContinuePath("billing-clerk", next)}
-    />
-  );
+export default function BillingClerkSecurity() {
+  return <BillingClerkSecurityPage />;
 }

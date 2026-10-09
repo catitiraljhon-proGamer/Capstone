@@ -7,7 +7,7 @@ import {
   rateLimitPolicies,
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
-import { syncSessionTwoFactor } from "@/lib/server/session";
+import { clearSessionCookie } from "@/lib/server/session";
 import { verifyTotp } from "@/lib/server/totp";
 import {
   decryptTwoFactorSecret,
@@ -77,6 +77,8 @@ export async function POST(request: Request) {
       },
       {
         $set: { twoFactor, updatedAt: new Date() },
+        // Signs out every session, so the next sign-in proves the new factor.
+        $inc: { authVersion: 1 },
         $unset: { twoFactorSetup: "" },
       },
     );
@@ -97,7 +99,7 @@ export async function POST(request: Request) {
       { recoveryCodes: codes },
       { headers: { "Cache-Control": "no-store" } },
     );
-    await syncSessionTwoFactor(response, { ...user, twoFactor });
+    clearSessionCookie(response);
     return response;
   } catch (error) {
     return apiError(error);

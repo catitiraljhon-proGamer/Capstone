@@ -60,6 +60,16 @@ async function setSessionCookie(
   return sessionUser;
 }
 
+export function clearSessionCookie(response: NextResponse) {
+  response.cookies.set(sessionCookieName, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+}
+
 /** Signs a session for a fully authenticated user and sets its cookie. */
 export async function startSession(
   response: NextResponse,
