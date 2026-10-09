@@ -6,7 +6,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
-import { createClientSchema, toClientDetails } from "@/lib/server/clients";
+import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
 import {
   clientIp,
   formatRetryAfter,
@@ -16,7 +16,6 @@ import {
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
 import { startSession, toSessionUser } from "@/lib/server/session";
-import { roleHomePaths } from "@/types/domain";
 import { hash } from "bcryptjs";
 import { MongoServerError, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -117,7 +116,7 @@ export async function POST(request: Request) {
 
     const sessionUser = toSessionUser(user);
     const response = NextResponse.json(
-      { user: sessionUser, redirectTo: roleHomePaths.customer },
+      { user: sessionUser, redirectTo: signInDestination(user) },
       { status: 201 },
     );
     await startSession(response, user, false);

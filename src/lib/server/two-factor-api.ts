@@ -20,7 +20,7 @@ export const twoFactorCodeSchema = z.object({
 
 /** Loads the signed-in user's full record for account security changes. */
 export async function requireAccountUser() {
-  const session = await requireSession();
+  const session = await requireSession(undefined, { allowWithoutTwoFactor: true });
   if (!session) return null;
   const db = await getDatabase();
   const user = await db

@@ -7,6 +7,7 @@ import {
   rateLimitPolicies,
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
+import { syncSessionTwoFactor } from "@/lib/server/session";
 import { verifyTotp } from "@/lib/server/totp";
 import {
   decryptTwoFactorSecret,
@@ -62,6 +63,12 @@ export async function POST(request: Request) {
     }
 
     const { codes, stored } = generateRecoveryCodes();
+    const twoFactor = {
+      secret: setup.secret,
+      enabledAt: new Date(),
+      lastUsedStep: step,
+      recoveryCodes: stored,
+    };
     const result = await db.collection<UserDocument>(collections.users).updateOne(
       {
         _id: user._id,
@@ -69,15 +76,7 @@ export async function POST(request: Request) {
         "twoFactorSetup.secret": setup.secret,
       },
       {
-        $set: {
-          twoFactor: {
-            secret: setup.secret,
-            enabledAt: new Date(),
-            lastUsedStep: step,
-            recoveryCodes: stored,
-          },
-          updatedAt: new Date(),
-        },
+        $set: { twoFactor, updatedAt: new Date() },
         $unset: { twoFactorSetup: "" },
       },
     );
@@ -94,10 +93,12 @@ export async function POST(request: Request) {
       entityType: "user",
       entityId: user._id,
     });
-    return NextResponse.json(
+    const response = NextResponse.json(
       { recoveryCodes: codes },
       { headers: { "Cache-Control": "no-store" } },
     );
+    await syncSessionTwoFactor(response, { ...user, twoFactor });
+    return response;
   } catch (error) {
     return apiError(error);
   }

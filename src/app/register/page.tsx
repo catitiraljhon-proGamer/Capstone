@@ -15,7 +15,7 @@ export default async function RegisterPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await readSession();
+  const session = await readSession({ allowWithoutTwoFactor: true });
 
   if (session) {
     redirect(roleHomePaths[session.role]);

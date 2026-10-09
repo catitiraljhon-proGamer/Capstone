@@ -471,7 +471,7 @@ export function BillingClerkSectionPage({ activeLabel, title, description }: { a
   return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={<BillingWorkspace section={activeLabel} />} />;
 }
 
-export function BillingClerkSecurityPage() {
+export function BillingClerkSecurityPage({ continueTo }: { continueTo?: string }) {
   return (
     <StaffDashboard
       role="Billing Clerk"
@@ -484,7 +484,7 @@ export function BillingClerkSecurityPage() {
       queueTitle=""
       queueItems={[]}
       activityItems={[]}
-      mainContent={<div className="max-w-3xl"><TwoFactorSettings /></div>}
+      mainContent={<div className="max-w-3xl"><TwoFactorSettings continueTo={continueTo} /></div>}
     />
   );
 }

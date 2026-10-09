@@ -40,3 +40,6 @@ export const roleHomePaths: Record<UserRole, string> = {
   "billing-clerk": "/billing-clerk",
   admin: "/admin",
 };
+
+/** Customers missing required client details fill them in here before anything else. */
+export const completeProfilePath = "/customer/complete-profile";

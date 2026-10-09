@@ -2,7 +2,8 @@ import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import type { ClientDetails, ClientDto, ClientListPayload } from "@/types/clients";
-import { roleHomePaths, type SessionUser } from "@/types/domain";
+import { twoFactorSetupPaths } from "@/lib/two-factor-policy";
+import { completeProfilePath, roleHomePaths, type SessionUser } from "@/types/domain";
 import { hash } from "bcryptjs";
 import { type Db, type Filter, ObjectId } from "mongodb";
 import { z } from "zod";
@@ -55,8 +56,6 @@ function objectId(id: string) {
   return new ObjectId(id);
 }
 
-export const completeProfilePath = "/customer/complete-profile";
-
 /** Stored records count as complete when the required fields exist, including legacy text-only addresses. */
 const storedProfileSchema = z.object({
   name: nameSchema,
@@ -80,11 +79,15 @@ export function toClientDetails(input: Omit<z.output<typeof clientProfileSchema>
   };
 }
 
-/** Customers missing required client details (e.g. new Google sign-ups) fill them in first. */
+/**
+ * Customers missing required client details (e.g. new Google sign-ups) fill
+ * them in first; every account then turns on 2FA before using the portal.
+ */
 export function signInDestination(user: UserDocument) {
-  return user.role === "customer" && !isClientProfileComplete(user)
-    ? completeProfilePath
-    : roleHomePaths[user.role];
+  if (user.role === "customer" && !isClientProfileComplete(user)) {
+    return completeProfilePath;
+  }
+  return user.twoFactor ? roleHomePaths[user.role] : twoFactorSetupPaths[user.role];
 }
 
 export function toClientDto(user: UserDocument): ClientDto {

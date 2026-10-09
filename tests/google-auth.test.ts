@@ -446,13 +446,14 @@ test("returning Google users retain their role, profile and 30-day remember-me s
   const response = await googleCallback(
     await callbackRequest("login", true, { email: "changed@gmail.com" }),
   );
-  assert.equal(response.headers.get("location"), `${origin}/billing-clerk`);
+  assert.equal(response.headers.get("location"), `${origin}/billing-clerk/security`);
   const cookie = response.cookies.get(sessionCookieName)!;
   assert.equal(cookie.maxAge, 30 * 24 * 60 * 60);
   const { payload } = await jwtVerify(cookie.value, getAuthSecret());
   assert.equal(payload.name, "Saved Name");
   assert.equal(payload.email, account.email);
   assert.equal(payload.authVersion, 3);
+  assert.equal(payload.twoFactor, false);
   assert.equal(await db.collection("users").countDocuments(), 1);
   assert.equal(
     await db.collection("audit_logs").countDocuments({ action: "auth.login" }),
@@ -485,7 +486,7 @@ test("Google sign-in for a 2FA account asks for a code before any session exists
   );
 });
 
-test("returning Google customers with complete client details go straight to the dashboard", async () => {
+test("returning Google customers with complete client details go straight to two-factor setup", async () => {
   await db.collection<UserDocument>("users").insertOne(
     user({
       googleSub: profile.sub,
@@ -498,7 +499,7 @@ test("returning Google customers with complete client details go straight to the
     }),
   );
   const response = await googleCallback(await callbackRequest());
-  assert.equal(response.headers.get("location"), `${origin}/customer`);
+  assert.equal(response.headers.get("location"), `${origin}/customer/security`);
 });
 
 test("Google login also registers a first-time customer", async () => {
@@ -558,7 +559,7 @@ test("existing password accounts require proof before Google can be connected", 
     }),
   );
   assert.equal(correct.status, 200);
-  assert.equal((await correct.json()).redirectTo, "/admin");
+  assert.equal((await correct.json()).redirectTo, "/admin/security");
   assert.equal(
     (await db.collection("users").findOne({ _id: account._id }))?.googleSub,
     profile.sub,
@@ -622,7 +623,7 @@ test("Google-only accounts reject password login cleanly; existing password logi
     loginRequest(account.email, "Existing-password-123"),
   );
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).redirectTo, "/billing-clerk");
+  assert.equal((await response.json()).redirectTo, "/billing-clerk/security");
 });
 
 test("simultaneous first-time Google requests create only one account", async () => {

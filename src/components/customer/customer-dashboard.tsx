@@ -36,6 +36,7 @@ import {
   Menu,
   ReceiptText,
   User,
+  UserLock,
   UserRound,
 } from "lucide-react";
 import Image from "next/image";
@@ -51,6 +52,7 @@ type CustomerSection =
   | "billing"
   | "documents"
   | "profile"
+  | "security"
   | "support";
 
 const houseImage = "/House/image.png";
@@ -67,6 +69,7 @@ const customerNav: {
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
   { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
   { label: "My Profile", icon: UserRound, href: "/customer/profile", section: "profile" },
+  { label: "Security", icon: UserLock, href: "/customer/security", section: "security" },
   { label: "Support", icon: HelpCircle, href: "/customer/support", section: "support" },
 ];
 
@@ -594,7 +597,14 @@ export function CustomerProfilePage() {
         <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
         <div className="mt-5"><ClientProfileForm /></div>
       </Panel>
-      <div className="mt-6 max-w-3xl"><TwoFactorSettings /></div>
+    </CustomerShell>
+  );
+}
+
+export function CustomerSecurityPage({ continueTo }: { continueTo?: string }) {
+  return (
+    <CustomerShell activeSection="security" title="Security" description="Protect your account with two-factor authentication.">
+      <div className="max-w-3xl"><TwoFactorSettings continueTo={continueTo} /></div>
     </CustomerShell>
   );
 }

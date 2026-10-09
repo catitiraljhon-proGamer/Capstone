@@ -1,22 +1,18 @@
-import { BillingClerkSecurityPage } from "@/components/staff/staff-dashboard";
+import { CustomerSecurityPage } from "@/components/customer/customer-dashboard";
 import { twoFactorContinuePath } from "@/lib/two-factor-policy";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Security | G4 Builders Inc",
-  description: "Billing clerk account security settings.",
+  description: "Customer account security settings.",
   robots: { index: false, follow: false },
 };
 
-export default async function BillingClerkSecurity({
+export default async function SecurityPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { next } = await searchParams;
-  return (
-    <BillingClerkSecurityPage
-      continueTo={twoFactorContinuePath("billing-clerk", next)}
-    />
-  );
+  return <CustomerSecurityPage continueTo={twoFactorContinuePath("customer", next)} />;
 }

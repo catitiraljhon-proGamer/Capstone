@@ -4,7 +4,7 @@ import { readSession, sessionCookieName } from "@/lib/server/session";
 import { NextResponse } from "next/server";
 
 export async function DELETE() {
-  const session = await readSession();
+  const session = await readSession({ allowWithoutTwoFactor: true });
   if (session) {
     try {
       const db = await getDatabase();

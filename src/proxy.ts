@@ -1,3 +1,4 @@
+import { isOpenBeforeTwoFactor, twoFactorSetupPaths } from "@/lib/two-factor-policy";
 import { roleHomePaths, type UserRole } from "@/types/domain";
 import { jwtVerify } from "jose";
 import type { NextRequest } from "next/server";
@@ -30,6 +31,18 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(
         new URL(sessionRole ? roleHomePaths[sessionRole] : "/login", request.url),
       );
+    }
+
+    if (
+      payload.twoFactor !== true &&
+      !isOpenBeforeTwoFactor(role, request.nextUrl.pathname)
+    ) {
+      const setupUrl = new URL(twoFactorSetupPaths[role], request.url);
+      setupUrl.searchParams.set(
+        "next",
+        `${request.nextUrl.pathname}${request.nextUrl.search}`,
+      );
+      return NextResponse.redirect(setupUrl);
     }
 
     return NextResponse.next();

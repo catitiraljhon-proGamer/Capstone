@@ -93,7 +93,7 @@ test("customer registration saves a complete record visible in the Client Module
   }));
   assert.equal(response.status, 201);
   const payload = await response.json();
-  assert.equal(payload.redirectTo, "/customer");
+  assert.equal(payload.redirectTo, "/customer/security");
   assert.ok(response.cookies.get(sessionCookieName)?.value);
   const saved = await db.collection<UserDocument>("users").findOne({ email: registrationInput.email });
   assert.ok(saved);

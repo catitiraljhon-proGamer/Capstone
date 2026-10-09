@@ -9,7 +9,9 @@ import {
   type RateLimitDocument,
   type UserDocument,
 } from "@/lib/database/collections";
-import { sessionCookieName } from "@/lib/server/session";
+import { createSessionToken, sessionCookieName } from "@/lib/server/session";
+import { twoFactorContinuePath } from "@/lib/two-factor-policy";
+import { proxy } from "@/proxy";
 import {
   currentTotpStep,
   decodeBase32,
@@ -324,4 +326,52 @@ test("full design galleries require staff access or accepted Finished Designs te
     String(record?.details.termsSnapshot),
     /Case 3: Building a design[^\n]*\nLaw: RA 8293 \(Intellectual Property Code of the Philippines\), Section 186/,
   );
+});
+
+async function proxyRequest(
+  path: string,
+  session: { role: "admin" | "billing-clerk" | "customer"; twoFactor?: boolean },
+) {
+  const token = await createSessionToken(
+    {
+      id: new ObjectId().toHexString(),
+      email: "user@example.com",
+      name: "User",
+      role: session.role,
+      authVersion: 0,
+      twoFactor: session.twoFactor ?? false,
+    },
+    "1h",
+  );
+  const request = new NextRequest(`${origin}${path}`);
+  request.cookies.set(sessionCookieName, token);
+  return proxy(request);
+}
+
+test("accounts without 2FA can only open their setup page, and customers their details first", async () => {
+  const blocked = await proxyRequest("/admin/projects?tab=open", { role: "admin" });
+  assert.equal(
+    blocked.headers.get("location"),
+    `${origin}/admin/security?next=%2Fadmin%2Fprojects%3Ftab%3Dopen`,
+  );
+  for (const [path, role] of [
+    ["/admin/security", "admin"],
+    ["/billing-clerk/security", "billing-clerk"],
+    ["/customer/security", "customer"],
+    ["/customer/complete-profile", "customer"],
+  ] as const) {
+    const response = await proxyRequest(path, { role });
+    assert.equal(response.headers.get("location"), null, path);
+  }
+  const enrolled = await proxyRequest("/admin/projects", { role: "admin", twoFactor: true });
+  assert.equal(enrolled.headers.get("location"), null);
+});
+
+test("the setup page only continues to paths inside the user's own portal", () => {
+  assert.equal(twoFactorContinuePath("admin", undefined), undefined);
+  assert.equal(twoFactorContinuePath("admin", "/admin/projects?tab=open"), "/admin/projects?tab=open");
+  assert.equal(twoFactorContinuePath("admin", "/admin"), "/admin");
+  for (const unsafe of ["//evil.example", "/customer/billing", "/administrator", "/admin/security", "https://evil.example"]) {
+    assert.equal(twoFactorContinuePath("admin", unsafe), "/admin", unsafe);
+  }
 });

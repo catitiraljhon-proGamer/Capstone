@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Copy, Download, KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { ArrowRight, Copy, Download, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 type TwoFactorStatus = {
@@ -9,8 +9,6 @@ type TwoFactorStatus = {
   enabledAt: string | null;
   recoveryCodesRemaining: number;
 };
-
-type PendingAction = "disable" | "regenerate" | null;
 
 const codeInputClass =
   "w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-center text-base font-semibold tracking-[0.25em] text-stone-950 outline-none transition placeholder:font-normal placeholder:tracking-normal placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 sm:max-w-56";
@@ -92,11 +90,16 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void 
   );
 }
 
-export function TwoFactorSettings() {
+type TwoFactorSettingsProps = {
+  /** Where to go once 2FA is on, when the user was sent here to set it up. */
+  continueTo?: string;
+};
+
+export function TwoFactorSettings({ continueTo }: TwoFactorSettingsProps) {
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [setup, setSetup] = useState<{ qrCode: string; secret: string } | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isWorking, setIsWorking] = useState(false);
@@ -155,19 +158,15 @@ export function TwoFactorSettings() {
     });
   };
 
-  const confirmAction = (event: FormEvent<HTMLFormElement>) => {
+  const confirmRegenerate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void run(async () => {
-      if (pendingAction === "disable") {
-        await postJson("/api/auth/two-factor/disable", { code });
-      } else {
-        const result = await postJson<{ recoveryCodes: string[] }>(
-          "/api/auth/two-factor/recovery-codes",
-          { code },
-        );
-        setRecoveryCodes(result.recoveryCodes);
-      }
-      setPendingAction(null);
+      const result = await postJson<{ recoveryCodes: string[] }>(
+        "/api/auth/two-factor/recovery-codes",
+        { code },
+      );
+      setRecoveryCodes(result.recoveryCodes);
+      setIsRegenerating(false);
       setCode("");
       setStatus(await fetchStatus());
     });
@@ -187,6 +186,7 @@ export function TwoFactorSettings() {
             <p className="mt-1 text-sm leading-6 text-stone-600">
               Require a code from an authenticator app, such as Google
               Authenticator or Microsoft Authenticator, each time you sign in.
+              Every G4 Builders Inc account needs it.
             </p>
           </div>
         </div>
@@ -204,6 +204,19 @@ export function TwoFactorSettings() {
       <div className="mt-5 space-y-4">
         {!status && !errorMessage ? (
           <p className="text-sm text-stone-500">Loading security settings…</p>
+        ) : null}
+
+        {status && !status.enabled ? (
+          <div role="status" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-stone-950">Required before you continue</p>
+              <p className="mt-1 text-sm leading-6 text-stone-600">
+                Turn on two-factor authentication to open the rest of the
+                system. It takes about a minute with your phone.
+              </p>
+            </div>
+          </div>
         ) : null}
 
         {recoveryCodes ? (
@@ -298,12 +311,11 @@ export function TwoFactorSettings() {
               </div>
             </dl>
 
-            {pendingAction ? (
-              <form onSubmit={confirmAction} className="space-y-3 rounded-xl border border-stone-200 p-4">
+            {isRegenerating ? (
+              <form onSubmit={confirmRegenerate} className="space-y-3 rounded-xl border border-stone-200 p-4">
                 <label htmlFor="two-factor-confirm-code" className="block text-sm font-medium text-stone-700">
-                  {pendingAction === "disable"
-                    ? "Enter a code from your authenticator app (or a recovery code) to turn off two-factor authentication."
-                    : "Enter a code from your authenticator app to create new recovery codes. Your old codes will stop working."}
+                  Enter a code from your authenticator app to create new
+                  recovery codes. Your old codes will stop working.
                 </label>
                 <input
                   id="two-factor-confirm-code"
@@ -318,17 +330,13 @@ export function TwoFactorSettings() {
                 />
                 <div className="flex flex-wrap gap-2">
                   <Button type="submit" disabled={isWorking}>
-                    {isWorking
-                      ? "Checking…"
-                      : pendingAction === "disable"
-                        ? "Turn off"
-                        : "Create new codes"}
+                    {isWorking ? "Checking…" : "Create new codes"}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      setPendingAction(null);
+                      setIsRegenerating(false);
                       resetForm();
                     }}
                   >
@@ -338,27 +346,23 @@ export function TwoFactorSettings() {
               </form>
             ) : (
               <div className="flex flex-wrap gap-2">
+                {continueTo ? (
+                  // A full page load makes the proxy read the refreshed session.
+                  <a href={continueTo} className={buttonVariants()}>
+                    Continue
+                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                  </a>
+                ) : null}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     resetForm();
-                    setPendingAction("regenerate");
+                    setIsRegenerating(true);
                   }}
                 >
                   <KeyRound className="mr-2 h-4 w-4" aria-hidden="true" />
                   New recovery codes
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    resetForm();
-                    setPendingAction("disable");
-                  }}
-                >
-                  <ShieldOff className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Turn off
                 </Button>
               </div>
             )}
