@@ -20,7 +20,6 @@ import { HouseDesignGallery } from "@/components/house-designs/house-design-gall
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
-import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
@@ -490,46 +489,47 @@ function FinishedDesignsBrowser() {
                 protectedView
               />
 
-              <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="mt-5">
+                <h1 className="text-2xl font-semibold tracking-tight text-stone-950">
+                  {selectedDesign.name}
+                </h1>
+                <p className="mt-1 text-sm text-stone-600">
+                  {selectedDesign.notes}
+                </p>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                  <div className="rounded-lg border border-stone-200 p-4">
+                    <dt className="text-xs font-semibold uppercase text-stone-500">
+                      House Type
+                    </dt>
+                    <dd className="mt-1 font-semibold text-stone-950">
+                      {selectedDesign.houseType}
+                    </dd>
+                  </div>
+                  <div className="rounded-lg border border-stone-200 p-4">
+                    <dt className="text-xs font-semibold uppercase text-stone-500">
+                      Floor Area
+                    </dt>
+                    <dd className="mt-1 font-semibold text-stone-950">
+                      {selectedDesign.area} sqm
+                    </dd>
+                  </div>
+                  <div className="rounded-lg border border-stone-200 p-4">
+                    <dt className="text-xs font-semibold uppercase text-stone-500">
+                      Rooms
+                    </dt>
+                    <dd className="mt-1 font-semibold text-stone-950">
+                      {selectedDesign.rooms}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-4 border-t border-stone-200 pt-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-stone-950">
-                    {selectedDesign.name}
-                  </h1>
-                  <p className="mt-1 text-sm text-stone-600">
-                    {selectedDesign.notes}
-                  </p>
-                  <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                    <div className="rounded-lg border border-stone-200 p-4">
-                      <dt className="text-xs font-semibold uppercase text-stone-500">
-                        House Type
-                      </dt>
-                      <dd className="mt-1 font-semibold text-stone-950">
-                        {selectedDesign.houseType}
-                      </dd>
-                    </div>
-                    <div className="rounded-lg border border-stone-200 p-4">
-                      <dt className="text-xs font-semibold uppercase text-stone-500">
-                        Floor Area
-                      </dt>
-                      <dd className="mt-1 font-semibold text-stone-950">
-                        {selectedDesign.area} sqm
-                      </dd>
-                    </div>
-                    <div className="rounded-lg border border-stone-200 p-4">
-                      <dt className="text-xs font-semibold uppercase text-stone-500">
-                        Rooms
-                      </dt>
-                      <dd className="mt-1 font-semibold text-stone-950">
-                        {selectedDesign.rooms}
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="rounded-xl border border-stone-200 bg-white p-5 text-right shadow-sm">
                   <p className="text-sm font-semibold text-stone-500">
-                    Estimated Project Cost
+                    Total Estimated Price
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-red-700">
+                  <p className="mt-1 text-3xl font-semibold tracking-tight text-red-700">
                     {formatPeso(
                       getExteriorEstimate(
                         selectedDesign,
@@ -539,22 +539,11 @@ function FinishedDesignsBrowser() {
                         .revisedEstimate,
                     )}
                   </p>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600">
+                    Request this design as shown or include your preferred changes.
+                    The design fee is billed separately from the construction estimate.
+                  </p>
                 </div>
-              </div>
-
-              <div className="mt-6">
-                <ProjectExteriorEstimatePanel
-                  design={selectedDesign}
-                  selections={materialSelections}
-                  exteriorItems={catalog.exteriorItems}
-                />
-              </div>
-
-              <div className="mt-6 flex flex-col gap-4 border-t border-stone-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="max-w-xl text-sm leading-6 text-stone-600">
-                  Request this design as shown or include your preferred changes.
-                  The design fee is billed separately from the construction estimate.
-                </p>
                 <Link href={`/customer/design-requests?design=${encodeURIComponent(selectedDesign.id)}`} className="inline-flex shrink-0 justify-center rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Request This Design</Link>
               </div>
             </div>
