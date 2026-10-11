@@ -4,7 +4,6 @@ import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu"
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { NotificationBell } from "@/components/customer/customer-notification-bell";
-import { LogoutButton } from "@/components/ui/logout-button";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
@@ -122,9 +121,6 @@ function StaffSidebar({
           </Link>
         ))}
       </nav>
-      <div className="shrink-0 px-4 pb-6">
-        <LogoutButton onLogout={onNavigate} />
-      </div>
     </>
   );
 }

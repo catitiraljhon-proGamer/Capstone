@@ -20,7 +20,6 @@ import { CustomerDesignRequests } from "@/components/customer/customer-design-re
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
 import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu";
-import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
 import { useCustomerDashboardData } from "@/lib/customer-dashboard-data";
@@ -118,9 +117,6 @@ function SidebarContent({
           </Link>
         ))}
       </nav>
-      <div className="shrink-0 px-4 pb-6">
-        <LogoutButton onLogout={onNavigate} />
-      </div>
     </>
   );
 }
