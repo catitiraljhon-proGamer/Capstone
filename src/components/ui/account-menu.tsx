@@ -1,16 +1,26 @@
 "use client";
 
 import { LogoutButton } from "@/components/ui/logout-button";
-import { ChevronDown, User, UserLock, UserRound } from "lucide-react";
+import { ChevronDown, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import type { ComponentType } from "react";
 
-const accountLinks = [
-  { label: "My Profile", icon: UserRound, href: "/customer/profile" },
-  { label: "Security", icon: UserLock, href: "/customer/security" },
-];
+export type AccountMenuLink = {
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  href: string;
+};
 
-export function CustomerAccountMenu({ name }: { name: string }) {
+export function AccountMenu({
+  name,
+  role,
+  links,
+}: {
+  name: string;
+  role: string;
+  links: AccountMenuLink[];
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const [isOpen, setIsOpen] = useState(false);
@@ -51,7 +61,7 @@ export function CustomerAccountMenu({ name }: { name: string }) {
         </span>
         <span className="hidden min-w-0 md:block">
           <span className="block truncate text-sm font-semibold" title={name}>{name}</span>
-          <span className="block text-xs text-stone-500">Customer</span>
+          <span className="block text-xs text-stone-500">{role}</span>
         </span>
         <ChevronDown
           aria-hidden="true"
@@ -68,7 +78,7 @@ export function CustomerAccountMenu({ name }: { name: string }) {
           Signed in as <span className="font-semibold text-stone-950">{name}</span>
         </p>
         <nav aria-label="Account">
-          {accountLinks.map((item) => (
+          {links.map((item) => (
             <Link
               key={item.href}
               href={item.href}

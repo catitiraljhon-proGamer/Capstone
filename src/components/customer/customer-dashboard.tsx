@@ -18,8 +18,8 @@ import {
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
-import { CustomerAccountMenu } from "@/components/customer/customer-account-menu";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
+import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
@@ -33,6 +33,8 @@ import {
   Home,
   Menu,
   ReceiptText,
+  UserLock,
+  UserRound,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -62,6 +64,11 @@ const customerNav: {
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
   { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
+];
+
+const customerAccountLinks: AccountMenuLink[] = [
+  { label: "My Profile", icon: UserRound, href: "/customer/profile" },
+  { label: "Security", icon: UserLock, href: "/customer/security" },
 ];
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -163,7 +170,7 @@ function CustomerShell({
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <CustomerNotificationBell />
-              <CustomerAccountMenu name={user?.name ?? "Customer"} />
+              <AccountMenu name={user?.name ?? "Customer"} role="Customer" links={customerAccountLinks} />
             </div>
             <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
           </div>

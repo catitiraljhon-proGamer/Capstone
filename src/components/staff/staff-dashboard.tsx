@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { NotificationBell } from "@/components/customer/customer-notification-bell";
@@ -21,7 +22,6 @@ import {
   Menu,
   ReceiptText,
   ShieldCheck,
-  User,
   UserLock,
   Users,
   WalletCards,
@@ -59,7 +59,6 @@ const clerkNav = [
   { label: "Invoices", icon: FileText, href: "/billing-clerk/invoices" },
   { label: "Customer Accounts", icon: Users, href: "/billing-clerk/customer-accounts" },
   { label: "Reports", icon: ClipboardCheck, href: "/billing-clerk/reports" },
-  { label: "Security", icon: UserLock, href: "/billing-clerk/security" },
 ];
 
 const adminNav = [
@@ -73,8 +72,12 @@ const adminNav = [
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
   { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },
-  { label: "Security", icon: UserLock, href: "/admin/security" },
 ];
+
+const securityHref: Record<StaffDashboardProps["role"], string> = {
+  Admin: "/admin/security",
+  "Billing Clerk": "/billing-clerk/security",
+};
 
 const setActiveNav = (
   items: StaffDashboardProps["navItems"],
@@ -142,6 +145,7 @@ function StaffDashboard({
 }: StaffDashboardProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useSessionUser();
+  const accountLinks: AccountMenuLink[] = [{ label: "Security", icon: UserLock, href: securityHref[role] }];
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-950">
@@ -155,7 +159,7 @@ function StaffDashboard({
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-40 border-b border-stone-200 bg-white/95 backdrop-blur">
-          <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 md:grid-cols-[minmax(0,1fr)_auto_auto] lg:px-8">
+          <div className="grid min-h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -172,19 +176,11 @@ function StaffDashboard({
                 <p className="mt-1 hidden text-sm text-stone-600 sm:block">{description}</p>
               </div>
             </div>
-            <div className="shrink-0">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <NotificationBell />
+              <AccountMenu name={user?.name ?? name} role={role} links={accountLinks} />
             </div>
             <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
-            <div role="group" aria-label="Signed-in user" className="col-span-2 flex min-w-0 items-center gap-3 border-t border-stone-200 pt-3 md:col-span-1 md:max-w-52 md:border-0 md:pt-0">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-stone-200 text-stone-500 md:h-12 md:w-12">
-                <User className="h-5 w-5 md:h-6 md:w-6" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold break-words md:truncate" title={user?.name ?? name}>{user?.name ?? name}</p>
-                <p className="text-xs text-stone-500">{role}</p>
-              </div>
-            </div>
           </div>
         </header>
 
