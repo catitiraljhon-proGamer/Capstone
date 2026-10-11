@@ -143,8 +143,8 @@ export function SignInPage({
         return;
       }
 
-      router.push(payload.redirectTo);
-      router.refresh();
+      // Full page load drops prefetched pages cached before sign-in (e.g. old 2FA redirects).
+      window.location.assign(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
     } finally {

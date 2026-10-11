@@ -1,7 +1,6 @@
 "use client";
 
 import { LoaderCircle, LogOut } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -103,7 +102,6 @@ function LogoutConfirmation({
 }
 
 export function LogoutButton({ onLogout }: { onLogout?: () => void }) {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,8 +117,8 @@ export function LogoutButton({ onLogout }: { onLogout?: () => void }) {
       if (!response.ok) throw new Error("Unable to log out. Please try again.");
       setIsOpen(false);
       onLogout?.();
-      router.replace("/login");
-      router.refresh();
+      // Full page load so no signed-in pages stay cached for the next account.
+      window.location.replace("/login");
     } catch {
       setError("Unable to log out. Please check your connection and try again.");
       requestPending.current = false;

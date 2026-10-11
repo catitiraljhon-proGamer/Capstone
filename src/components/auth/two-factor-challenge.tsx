@@ -1,7 +1,6 @@
 "use client";
 
 import { ShieldCheck } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 type TwoFactorChallengeProps = {
@@ -9,7 +8,6 @@ type TwoFactorChallengeProps = {
 };
 
 export function TwoFactorChallenge({ onRestart }: TwoFactorChallengeProps) {
-  const router = useRouter();
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [code, setCode] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -39,8 +37,8 @@ export function TwoFactorChallenge({ onRestart }: TwoFactorChallengeProps) {
         setCode("");
         return;
       }
-      router.push(payload.redirectTo);
-      router.refresh();
+      // Full page load drops prefetched pages cached before sign-in (e.g. old 2FA redirects).
+      window.location.assign(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
     } finally {

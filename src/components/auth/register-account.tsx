@@ -9,7 +9,6 @@ import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { CheckCircle2, Eye, EyeOff, HardHat } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 const benefits = [
@@ -24,7 +23,6 @@ export function RegisterAccountPage({
 }: {
   initialError?: string;
 }) {
-  const router = useRouter();
   const [showPasswords, setShowPasswords] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [googleError, setGoogleError] = useState(initialError);
@@ -71,8 +69,7 @@ export function RegisterAccountPage({
         return;
       }
 
-      router.replace(payload.redirectTo);
-      router.refresh();
+      window.location.replace(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
     } finally {

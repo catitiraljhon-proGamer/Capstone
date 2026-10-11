@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Copy, Download, KeyRound, LogOut, ShieldAlert, ShieldCheck } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 type TwoFactorStatus = {
@@ -117,7 +116,6 @@ function RecoveryCodes({
 }
 
 export function TwoFactorSettings() {
-  const router = useRouter();
   const [status, setStatus] = useState<TwoFactorStatus | null>(null);
   const [setup, setSetup] = useState<{ qrCode: string; secret: string } | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
@@ -251,7 +249,7 @@ export function TwoFactorSettings() {
             signsOut={isSignedOut}
             onDone={() =>
               isSignedOut
-                ? router.replace(signedOutAfterSetupPath)
+                ? window.location.replace(signedOutAfterSetupPath)
                 : setRecoveryCodes(null)
             }
           />
