@@ -19,13 +19,13 @@ import {
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
+import { CustomerAccountMenu } from "@/components/customer/customer-account-menu";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
 import { LogoutButton } from "@/components/ui/logout-button";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
 import { useCustomerDashboardData } from "@/lib/customer-dashboard-data";
 import {
-  ChevronDown,
   ClipboardList,
   CreditCard,
   FilePlus2,
@@ -35,7 +35,6 @@ import {
   Home,
   Menu,
   ReceiptText,
-  User,
   UserLock,
   UserRound,
 } from "lucide-react";
@@ -172,16 +171,7 @@ function CustomerShell({
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <CustomerNotificationBell />
-              <div className="hidden max-w-52 items-center gap-3 md:flex">
-                <div className="grid h-12 w-12 place-items-center rounded-full bg-stone-200 text-stone-500">
-                  <User className="h-6 w-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold" title={user?.name ?? "Customer"}>{user?.name ?? "Customer"}</p>
-                  <p className="text-xs text-stone-500">Customer</p>
-                </div>
-                <ChevronDown className="hidden h-4 w-4 text-stone-400 sm:block" />
-              </div>
+              <CustomerAccountMenu name={user?.name ?? "Customer"} />
             </div>
             <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
           </div>
