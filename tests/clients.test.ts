@@ -63,6 +63,12 @@ test("contact numbers must be Philippine mobile numbers and are saved in one for
   assert.match(phContactNumberError("0917 123 456")!, /11 digits \(you entered 10\)/);
   assert.match(phContactNumberError("+1 415 555 0100")!, /Philippine/);
   assert.equal(sanitizePhContactNumberInput("+63 917abc123!4567"), "+63 9171234567");
+  // Digits stop at a full number: 11 for 09…, 12 (63 + 10) for +63….
+  assert.equal(sanitizePhContactNumberInput("090513350699999"), "09051335069");
+  assert.equal(sanitizePhContactNumberInput("0905 133 5069 999"), "0905 133 5069 ");
+  assert.equal(sanitizePhContactNumberInput("+639051335069999"), "+639051335069");
+  assert.equal(sanitizePhContactNumberInput("+63 905 133 5069 9"), "+63 905 133 5069");
+  assert.equal(sanitizePhContactNumberInput("0917 "), "0917 ");
 });
 
 test("validates required contact details and overposted account fields", () => {

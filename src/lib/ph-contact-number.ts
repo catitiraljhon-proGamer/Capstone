@@ -8,11 +8,29 @@ export const phContactNumberExample = "0917 123 4567 or +63 917 123 4567";
 /** Longest accepted entry, "+63 917-123-4567" with separators. */
 export const phContactNumberMaxLength = 16;
 
-/** Drops characters that can never be part of a number: anything except digits, spaces, hyphens, and one leading +. */
+/** Most digits a number can hold: 11 for 09XX XXX XXXX, 12 (63 + 10) for +63 9XX XXX XXXX. */
+const maxLocalDigits = 11;
+const maxInternationalDigits = 12;
+
+/**
+ * Cleans what is typed or pasted: keeps only digits, spaces, hyphens, and one
+ * leading +, and stops accepting digits once the number is full (11 for 09…,
+ * 12 for +63…).
+ */
 export function sanitizePhContactNumberInput(raw: string) {
   const leadingPlus = raw.trimStart().startsWith("+");
   const body = raw.replace(/[^0-9 -]/g, "");
-  return (leadingPlus ? `+${body.trimStart()}` : body).slice(0, phContactNumberMaxLength);
+  const maxDigits = leadingPlus ? maxInternationalDigits : maxLocalDigits;
+  let digits = 0;
+  let kept = "";
+  for (const character of leadingPlus ? body.trimStart() : body) {
+    if (/\d/.test(character)) {
+      if (digits === maxDigits) continue;
+      digits += 1;
+    }
+    kept += character;
+  }
+  return (leadingPlus ? `+${kept}` : kept).slice(0, phContactNumberMaxLength);
 }
 
 /** Returns a message describing what is wrong, or null when the number is valid. */
