@@ -7,6 +7,7 @@ import {
   countOpenDesignRequests,
   designRequestLimitMessage,
   maxOpenDesignRequests,
+  maxRoomCount,
 } from "@/lib/design-request-limit";
 import {
   embeddedImageAccept,
@@ -217,8 +218,8 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
   const fieldErrors: Record<string, string | null> = {
     floorArea: hasDesignSelection ? null : numberError(floorArea, { label: "Floor area", max: 100_000, unit: " sq m" }) ??
       (Number(floorArea) <= 0 ? "Floor area must be more than 0 sq m." : null),
-    bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0 }),
-    bathrooms: hasDesignSelection ? null : numberError(bathrooms, { label: "Number of bathrooms", integer: true, min: 0 }),
+    bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount }),
+    bathrooms: hasDesignSelection ? null : numberError(bathrooms, { label: "Number of bathrooms", integer: true, min: 0, max: maxRoomCount }),
     finish: hasDesignSelection || catalog.finishes.includes(finish) ? null : "Choose a finish level.",
     notes: textError(notes, {
       label: "Description",
@@ -433,12 +434,13 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
                   id={fieldIds.bedrooms}
                   type="number"
                   min="0"
+                  max={maxRoomCount}
                   step="1"
                   value={bedrooms}
                   onChange={(event) => setBedrooms(event.target.value)}
                   onBlur={() => touch("bedrooms")}
                   required
-                  placeholder="Enter number of bedrooms"
+                  placeholder={`0 to ${maxRoomCount} bedrooms`}
                   {...describe("bedrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -454,12 +456,13 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
                   id={fieldIds.bathrooms}
                   type="number"
                   min="0"
+                  max={maxRoomCount}
                   step="1"
                   value={bathrooms}
                   onChange={(event) => setBathrooms(event.target.value)}
                   onBlur={() => touch("bathrooms")}
                   required
-                  placeholder="Enter number of bathrooms"
+                  placeholder={`0 to ${maxRoomCount} bathrooms`}
                   {...describe("bathrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />

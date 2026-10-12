@@ -121,6 +121,9 @@ test("custom design requests still require requirements and inspiration images",
   const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };
   await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, bedrooms: 101 }), /Bedrooms cannot be more than 100/);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, bathrooms: 101 }), /Bathrooms cannot be more than 100/);
+  assert.equal((await createDesignRequest(db, customer, { ...input, bedrooms: 100, bathrooms: 100 })).rooms, "100 bedrooms, 100 bathrooms");
   const request = await createDesignRequest(db, customer, input);
   assert.equal(request.selectedDesign, undefined);
   assert.equal(request.rooms, "2 bedrooms, 1 bathroom");

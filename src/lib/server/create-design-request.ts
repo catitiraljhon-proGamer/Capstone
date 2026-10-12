@@ -13,6 +13,7 @@ import { manilaDate } from "@/lib/billing";
 import {
   designRequestLimitMessage,
   maxOpenDesignRequests,
+  maxRoomCount,
   openDesignRequestStatuses,
 } from "@/lib/design-request-limit";
 import { recordAuditLog } from "@/lib/server/audit";
@@ -42,8 +43,8 @@ const inputSchema = z.union([
   }).strict(),
   z.object({
     floorArea: z.number().finite().positive().max(100_000),
-    bedrooms: z.number().int().nonnegative(),
-    bathrooms: z.number().int().nonnegative(),
+    bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
+    bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
     finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
     notes: z.string().trim().min(1).max(4_000),
     inspirationImages: embeddedImagesSchema,
