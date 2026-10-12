@@ -87,6 +87,35 @@ test("selected designs reject unavailable records, forged specifications, unauth
   assert.equal(await db.collection("notifications").countDocuments(), 0);
 });
 
+test("customers can have at most three design requests waiting for review", async () => {
+  const design = await publishedHouseDesign();
+  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
+  const customerId = new ObjectId(customer.id);
+  const now = new Date();
+  const existing = (status: DesignRequestDocument["status"]): DesignRequestDocument => ({
+    _id: new ObjectId(), customerId, floorArea: 80, rooms: "2 bedrooms", finish: "Standard", notes: "Earlier request",
+    inspirationImages: [], status, createdAt: now, updatedAt: now,
+  });
+  // Decided requests do not count toward the limit.
+  await db.collection<DesignRequestDocument>("design_requests").insertMany([
+    existing("Pending"), existing("In review"), existing("Approved"), existing("Rejected"), existing("Completed"),
+  ]);
+  const third = await createDesignRequest(db, customer, input);
+  assert.equal(third.status, "Pending");
+
+  await assert.rejects(createDesignRequest(db, customer, input), (error: unknown) =>
+    isError(409)(error) && /3 design requests waiting for review/.test((error as Error).message));
+  assert.equal(await db.collection("design_requests").countDocuments({ customerId }), 6);
+
+  // Once the admin decides on one, the customer can request again.
+  await db.collection("design_requests").updateOne({ _id: new ObjectId(third.id) }, { $set: { status: "Rejected" } });
+  assert.equal((await createDesignRequest(db, customer, input)).status, "Pending");
+
+  const otherAcceptance = await acceptDesignRequestTerms(db, other, { accepted: true, version: designRequestTerms.version });
+  assert.equal((await createDesignRequest(db, other, { ...input, termsAcceptanceId: otherAcceptance.id })).status, "Pending");
+});
+
 test("custom design requests still require requirements and inspiration images", async () => {
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
   const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };

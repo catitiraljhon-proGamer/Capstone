@@ -4,6 +4,11 @@ import type { HouseDesignFinish } from "@/lib/house-design-data";
 import { DesignRequestTermsDialog } from "@/components/customer/design-request-terms-dialog";
 import type { DesignTermsAcceptance } from "@/lib/design-request-terms";
 import {
+  countOpenDesignRequests,
+  designRequestLimitMessage,
+  maxOpenDesignRequests,
+} from "@/lib/design-request-limit";
+import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
@@ -15,6 +20,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { DesignRequestDto } from "@/types/design-requests";
 import {
+  Hourglass,
   ImagePlus,
   Send,
   X,
@@ -191,6 +197,9 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
     }
   };
 
+  const openRequestCount = countOpenDesignRequests(requests);
+  const limitReached = !isLoading && openRequestCount >= maxOpenDesignRequests;
+
   const preferredDateError = dateError(preferredDate, {
     label: "Preferred Date",
     min: minDate,
@@ -243,6 +252,10 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (limitReached) {
+      setError(designRequestLimitMessage);
+      return;
+    }
     if (hasDesignSelection && !selectedDesign) {
       setError("Choose an available design from Finished Designs before submitting your request.");
       return;
@@ -345,7 +358,16 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
           </button>
         </div>
 
-        {error ? (
+        {limitReached || error === designRequestLimitMessage ? (
+          <div role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
+            <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-red-900">Request limit reached</p>
+              <p className="mt-1 leading-6 text-stone-700">{designRequestLimitMessage}</p>
+            </div>
+          </div>
+        ) : null}
+        {error && error !== designRequestLimitMessage ? (
           <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </p>
@@ -620,12 +642,17 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
 
           <button
             type="submit"
-            disabled={isSubmitting || isReadingImage || (hasDesignSelection && (isCatalogLoading || !selectedDesign))}
+            disabled={limitReached || isSubmitting || isReadingImage || (hasDesignSelection && (isCatalogLoading || !selectedDesign))}
             className="mt-5 inline-flex items-center gap-2 rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-60"
           >
             <Send className="h-4 w-4" />
             {isSubmitting ? "Sending to admin…" : hasDesignSelection ? "Submit Design Request" : "Submit for Feasibility Review"}
           </button>
+          {!isLoading ? (
+            <p className="mt-2 text-xs text-stone-500">
+              {openRequestCount} of {maxOpenDesignRequests} requests waiting for review. You can have up to {maxOpenDesignRequests} at a time.
+            </p>
+          ) : null}
         </form>
       </section>
 

@@ -10,6 +10,11 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { manilaDate } from "@/lib/billing";
+import {
+  designRequestLimitMessage,
+  maxOpenDesignRequests,
+  openDesignRequestStatuses,
+} from "@/lib/design-request-limit";
 import { recordAuditLog } from "@/lib/server/audit";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { BillingError } from "@/lib/server/billing";
@@ -52,6 +57,11 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   if (actor.role !== "customer") {
     throw new BillingError("Only customers can submit design requests.", 403);
   }
+  const customerId = new ObjectId(actor.id);
+  const openRequests = await db.collection<DesignRequestDocument>(collections.designRequests).countDocuments({
+    customerId, status: { $in: [...openDesignRequestStatuses] },
+  });
+  if (openRequests >= maxOpenDesignRequests) throw new BillingError(designRequestLimitMessage, 409);
   const input = inputSchema.parse(raw);
   const today = manilaDate();
   if (input.preferredDate <= today) throw new BillingError("Choose a Preferred Date after today.", 400);
@@ -60,7 +70,6 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     throw new BillingError("The Needed By date must be on or after the Preferred Date.", 400);
   }
   const termsAcceptance = await requireDesignRequestTerms(db, actor, input.termsAcceptanceId);
-  const customerId = new ObjectId(actor.id);
   let details: Pick<DesignRequestDocument,
     "floorArea" | "rooms" | "finish" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign"
   >;
