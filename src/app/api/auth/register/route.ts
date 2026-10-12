@@ -7,7 +7,11 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
 import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
-import { checkEmailVerificationCode, EmailVerificationError } from "@/lib/server/email-verification";
+import {
+  checkEmailVerificationCode,
+  EmailVerificationError,
+  registrationEmailSchema,
+} from "@/lib/server/email-verification";
 import {
   clientIp,
   formatRetryAfter,
@@ -23,6 +27,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 const registrationSchema = createClientSchema.extend({
+  email: registrationEmailSchema,
   name: z
     .string()
     .trim()

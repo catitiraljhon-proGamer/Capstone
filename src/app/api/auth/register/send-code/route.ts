@@ -1,12 +1,12 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
-import { createClientSchema } from "@/lib/server/clients";
 import { isEmailConfigured, sendEmail, verificationCodeEmail } from "@/lib/server/email";
 import {
   clearEmailVerification,
   EmailVerificationError,
   issueEmailVerificationCode,
+  registrationEmailSchema,
   verificationCodeMinutes,
   verificationResendSeconds,
 } from "@/lib/server/email-verification";
@@ -23,7 +23,7 @@ import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const sendCodeSchema = z.object({ email: createClientSchema.shape.email }).strict();
+const sendCodeSchema = z.object({ email: registrationEmailSchema }).strict();
 
 export async function POST(request: Request) {
   try {

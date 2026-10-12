@@ -3,7 +3,7 @@
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { emailError, useClientFormValidation } from "@/components/clients/client-information-form";
+import { registrationEmailError, useClientFormValidation } from "@/components/clients/client-information-form";
 import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
@@ -44,6 +44,8 @@ export function RegisterAccountPage({
   const normalizedEmail = email.trim().toLowerCase();
   const codeMatchesEmail = Boolean(codeSentTo) && codeSentTo === normalizedEmail;
   const emailField = describe("email");
+  // The field's own validation may already show the same message.
+  const sendCodeMessage = sendCodeError !== fieldError("email") ? sendCodeError : "";
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -54,7 +56,7 @@ export function RegisterAccountPage({
   const sendCode = async () => {
     if (isSendingCode || (codeMatchesEmail && resendIn > 0)) return;
     setSendCodeError("");
-    const problem = emailError(email);
+    const problem = registrationEmailError(email);
     if (problem) {
       setSendCodeError(problem);
       emailRef.current?.focus();
@@ -246,14 +248,14 @@ export function RegisterAccountPage({
                   autoComplete="email"
                   maxLength={254}
                   required
-                  placeholder="name@example.com"
+                  placeholder="yourname@gmail.com"
                   value={email}
                   onChange={(event) => {
                     setEmail(event.target.value);
                     setSendCodeError("");
                   }}
-                  aria-invalid={emailField["aria-invalid"] ?? (sendCodeError ? true : undefined)}
-                  aria-describedby={[emailField["aria-describedby"], sendCodeError ? "send-code-error" : undefined, "email-hint"]
+                  aria-invalid={emailField["aria-invalid"] ?? (sendCodeMessage ? true : undefined)}
+                  aria-describedby={[emailField["aria-describedby"], sendCodeMessage ? "send-code-error" : undefined, "email-hint"]
                     .filter(Boolean)
                     .join(" ")}
                   className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
@@ -274,10 +276,10 @@ export function RegisterAccountPage({
                 </button>
               </div>
               <p id="email-hint" className="text-xs text-stone-500">
-                We will email you a 6-digit code to confirm this address belongs to you.
+                Use your Gmail address (@gmail.com). We will email you a 6-digit code to confirm it belongs to you.
               </p>
               <FieldError id={errorId("email")} message={fieldError("email")} />
-              <FieldError id="send-code-error" message={sendCodeError} />
+              <FieldError id="send-code-error" message={sendCodeMessage} />
             </div>
 
             {codeMatchesEmail ? (

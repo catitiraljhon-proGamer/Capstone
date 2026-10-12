@@ -12,6 +12,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { textError } from "@/lib/form-validation";
+import { gmailAddressMessage, isGmailAddress } from "@/lib/gmail";
 import { phContactNumberError, phContactNumberExample } from "@/lib/ph-contact-number";
 import type { ClientDto } from "@/types/clients";
 
@@ -34,12 +35,17 @@ type FieldErrors = Record<string, string | null | undefined>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function emailError(raw: string) {
+function emailError(raw: string) {
   const text = raw.trim();
   if (!text) return "Enter the email address.";
   if (text.length > 254) return "Email address must be 254 characters or fewer.";
   if (!emailPattern.test(text)) return "Enter a valid email address, for example name@example.com.";
   return null;
+}
+
+/** Self-registration additionally requires a Gmail address. */
+export function registrationEmailError(raw: string) {
+  return emailError(raw) ?? (isGmailAddress(raw) ? null : gmailAddressMessage);
 }
 
 function passwordError(raw: string) {
@@ -62,6 +68,7 @@ export function clientFieldErrors(values: Record<string, string>, mode: ClientFo
     errors.password = passwordError(values.password ?? "");
   }
   if (mode === "register") {
+    errors.email = registrationEmailError(values.email ?? "");
     errors.confirmPassword = !values.confirmPassword
       ? "Re-enter the password to confirm it."
       : values.confirmPassword !== values.password ? "The passwords do not match." : null;

@@ -23,7 +23,7 @@ const storedAddressDetails = { ...addressInput, province: "Batangas", city: "Bal
 const formattedAddress = "123 Example Street, Brgy. Baclaran, Balayan, Batangas 4213";
 const details = { name: "Test Client", contactNumber: "+63 917 123 4567", addressDetails: addressInput, occupation: "Engineer" };
 const password = "Test-password-2026";
-const registrationInput = { ...details, email: "new@example.test", password };
+const registrationInput = { ...details, email: "new.client@gmail.com", password };
 // Issued fresh for registrationInput.email before every test.
 let verificationCode = "";
 
@@ -99,10 +99,10 @@ test("existing users remain readable with incomplete information and no exposed 
 });
 
 test("admin creates a customer account with hashed password and saved client information", async () => {
-  const dto = await createClient(db, admin, { ...details, email: "  NEW@EXAMPLE.TEST  ", password });
+  const dto = await createClient(db, admin, { ...details, email: "  NEW.CLIENT@GMAIL.COM  ", password });
   const saved = await db.collection<UserDocument>("users").findOne({ _id: new ObjectId(dto.id) });
   assert.ok(saved);
-  assert.equal(saved.email, "new@example.test");
+  assert.equal(saved.email, "new.client@gmail.com");
   assert.equal(saved.role, "customer");
   assert.equal(saved.status, "active");
   assert.equal(await compare(password, saved.passwordHash!), true);
@@ -119,7 +119,7 @@ test("customer registration saves a complete record visible in the Client Module
     _id: new ObjectId(admin.id), name: admin.name, email: admin.email, role: "admin",
   }));
   const response = await registerCustomer(registrationRequest({
-    ...registrationInput, name: `  ${details.name}  `, email: "  NEW@EXAMPLE.TEST  ",
+    ...registrationInput, name: `  ${details.name}  `, email: "  NEW.CLIENT@GMAIL.COM  ",
     contactNumber: `  ${details.contactNumber}  `, addressDetails: { ...addressInput, street: `  ${addressInput.street}  ` },
     occupation: `  ${details.occupation}  `,
   }));
@@ -185,7 +185,7 @@ test("registration rejects incomplete or invalid client details and injected acc
 test("duplicate registration cannot duplicate or overwrite a client record", async () => {
   assert.equal((await registerCustomer(registrationRequest(registrationInput))).status, 201);
   const response = await registerCustomer(registrationRequest({
-    ...registrationInput, email: "  NEW@EXAMPLE.TEST  ", name: "Replacement Name", addressDetails: { ...addressInput, street: "Replacement Street" },
+    ...registrationInput, email: "  NEW.CLIENT@GMAIL.COM  ", name: "Replacement Name", addressDetails: { ...addressInput, street: "Replacement Street" },
   }));
   assert.equal(response.status, 409);
   assert.equal(response.cookies.get(sessionCookieName), undefined);
@@ -215,7 +215,7 @@ test("registration requires the latest unexpired code sent to that email address
   assert.equal(wrong.status, 400);
   assert.match((await wrong.json()).error, /incorrect/);
   // A code sent to one address cannot register a different, made-up address.
-  const otherAddress = await registerCustomer(registrationRequest({ ...registrationInput, email: "made-up@example.test" }));
+  const otherAddress = await registerCustomer(registrationRequest({ ...registrationInput, email: "made-up@gmail.com" }));
   assert.equal(otherAddress.status, 400);
   await db.collection<{ _id: string }>("email_verifications").updateOne(
     { _id: registrationInput.email }, { $set: { expiresAt: new Date(Date.now() - 1000) } },
@@ -238,27 +238,38 @@ test("a verification code stops working after five wrong attempts", async () => 
   assert.equal(await db.collection("users").countDocuments(), 0);
 });
 
+test("self-registration accepts only Gmail addresses", async () => {
+  for (const email of ["someone@example.com", "someone@yahoo.com", "someone@gmail.co", "someone@mail.gmail.com"]) {
+    const sent = await sendVerificationCode(sendCodeRequest(email));
+    assert.equal(sent.status, 400, email);
+    assert.match((await sent.json()).error, /@gmail\.com/);
+    assert.equal((await registerCustomer(registrationRequest({ ...registrationInput, email }))).status, 400, email);
+  }
+  assert.equal(await db.collection<{ _id: string }>("email_verifications").countDocuments({ _id: { $ne: registrationInput.email } }), 0);
+  assert.equal(await db.collection("users").countDocuments(), 0);
+});
+
 test("verification codes go only to addresses without an account, at most once a minute, and are stored hashed", async () => {
   const logged: string[] = [];
   mock.method(console, "info", (message: string) => logged.push(message));
   try {
-    const sent = await sendVerificationCode(sendCodeRequest("  Fresh@Example.TEST "));
+    const sent = await sendVerificationCode(sendCodeRequest("  Fresh@Gmail.COM "));
     assert.equal(sent.status, 200);
-    const code = logged.at(-1)?.match(/fresh@example\.test: (\d{6})$/)?.[1];
+    const code = logged.at(-1)?.match(/fresh@gmail\.com: (\d{6})$/)?.[1];
     assert.ok(code);
-    const stored = await db.collection<{ _id: string }>("email_verifications").findOne({ _id: "fresh@example.test" });
+    const stored = await db.collection<{ _id: string }>("email_verifications").findOne({ _id: "fresh@gmail.com" });
     assert.ok(stored);
     assert.equal(JSON.stringify(stored).includes(code), false);
 
-    const tooSoon = await sendVerificationCode(sendCodeRequest("fresh@example.test"));
+    const tooSoon = await sendVerificationCode(sendCodeRequest("fresh@gmail.com"));
     assert.equal(tooSoon.status, 429);
     assert.ok((await tooSoon.json()).retryAfterSeconds > 0);
 
-    await db.collection<UserDocument>("users").insertOne(legacyUser({ email: "taken@example.test" }));
-    assert.equal((await sendVerificationCode(sendCodeRequest("taken@example.test"))).status, 409);
+    await db.collection<UserDocument>("users").insertOne(legacyUser({ email: "taken@gmail.com" }));
+    assert.equal((await sendVerificationCode(sendCodeRequest("taken@gmail.com"))).status, 409);
     assert.equal((await sendVerificationCode(sendCodeRequest("not-an-email"))).status, 400);
 
-    const registered = await registerCustomer(registrationRequest({ ...registrationInput, email: "fresh@example.test", verificationCode: code }));
+    const registered = await registerCustomer(registrationRequest({ ...registrationInput, email: "fresh@gmail.com", verificationCode: code }));
     assert.equal(registered.status, 201);
   } finally {
     mock.restoreAll();
@@ -272,14 +283,14 @@ test("one address cannot be flooded with verification emails from many networks"
     for (let request = 0; request < 5; request += 1) {
       // Step past the one-minute resend wait each time.
       await db.collection<{ _id: string }>("email_verifications").updateOne(
-        { _id: "inbox@example.test" }, { $set: { sentAt: new Date(realNow - 120_000) } },
+        { _id: "inbox@gmail.com" }, { $set: { sentAt: new Date(realNow - 120_000) } },
       );
-      assert.equal((await sendVerificationCode(sendCodeRequest("inbox@example.test", `198.51.100.${request}`))).status, 200);
+      assert.equal((await sendVerificationCode(sendCodeRequest("inbox@gmail.com", `198.51.100.${request}`))).status, 200);
     }
     await db.collection<{ _id: string }>("email_verifications").updateOne(
-      { _id: "inbox@example.test" }, { $set: { sentAt: new Date(realNow - 120_000) } },
+      { _id: "inbox@gmail.com" }, { $set: { sentAt: new Date(realNow - 120_000) } },
     );
-    assert.equal((await sendVerificationCode(sendCodeRequest("inbox@example.test", "198.51.100.99"))).status, 429);
+    assert.equal((await sendVerificationCode(sendCodeRequest("inbox@gmail.com", "198.51.100.99"))).status, 429);
   } finally {
     mock.restoreAll();
   }

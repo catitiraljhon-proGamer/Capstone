@@ -1,11 +1,16 @@
 import { collections, type EmailVerificationDocument } from "@/lib/database/collections";
+import { gmailAddressMessage, isGmailAddress } from "@/lib/gmail";
 import { getAuthSecret } from "@/lib/server/auth-secret";
+import { createClientSchema } from "@/lib/server/clients";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { type Db, MongoServerError } from "mongodb";
 
 export const verificationCodeMinutes = 10;
 export const verificationResendSeconds = 60;
 const maxCodeAttempts = 5;
+
+/** Self-registration email: a valid, normalized Gmail address. */
+export const registrationEmailSchema = createClientSchema.shape.email.refine(isGmailAddress, gmailAddressMessage);
 
 export class EmailVerificationError extends Error {
   constructor(
