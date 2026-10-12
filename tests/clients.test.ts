@@ -10,6 +10,7 @@ import { assertClientMutation, clientApiError } from "@/lib/server/client-api";
 import type { SessionUser } from "@/types/domain";
 import { POST as registerCustomer } from "@/app/api/auth/register/route";
 import { sessionCookieName } from "@/lib/server/session";
+import { phContactNumberError, sanitizePhContactNumberInput } from "@/lib/ph-contact-number";
 
 let mongo: MongoMemoryServer;
 let db: Db;
@@ -50,9 +51,23 @@ after(async () => {
   await mongo?.stop();
 });
 
+const invalidPhoneNumbers = ["+1 415 555 0100", "0917 123 456", "0917 123 45678", "+63 917 123 456", "+63 817 123 4567", "9171234567", "(0917) 123 4567", "0917abc4567", "02 8123 4567"];
+
+test("contact numbers must be Philippine mobile numbers and are saved in one format", () => {
+  for (const contactNumber of ["09171234567", "0917 123 4567", "0917-123-4567", "+639171234567", "+63 917 123 4567", "+63-917-123-4567"]) {
+    assert.equal(clientProfileSchema.parse({ ...details, contactNumber }).contactNumber, "+63 917 123 4567", contactNumber);
+  }
+  for (const contactNumber of invalidPhoneNumbers) {
+    assert.ok(phContactNumberError(contactNumber), contactNumber);
+  }
+  assert.match(phContactNumberError("0917 123 456")!, /11 digits \(you entered 10\)/);
+  assert.match(phContactNumberError("+1 415 555 0100")!, /Philippine/);
+  assert.equal(sanitizePhContactNumberInput("+63 917abc123!4567"), "+63 9171234567");
+});
+
 test("validates required contact details and overposted account fields", () => {
   assert.equal(clientProfileSchema.parse({ ...details, occupation: "  " }).occupation, "");
-  for (const change of [{ age: 35 }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, postalCode: "421" } }, { addressDetails: { ...addressInput, cityCode: "0401014000" } }, { addressDetails: { ...addressInput, provinceCode: "1300000000" } }, { address: "Free text address" }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
+  for (const change of [{ age: 35 }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, ...invalidPhoneNumbers.map((contactNumber) => ({ contactNumber })), { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, postalCode: "421" } }, { addressDetails: { ...addressInput, cityCode: "0401014000" } }, { addressDetails: { ...addressInput, provinceCode: "1300000000" } }, { address: "Free text address" }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
     assert.equal(clientProfileSchema.safeParse({ ...details, ...change }).success, false, JSON.stringify(change));
   }
 });
@@ -133,7 +148,7 @@ test("registration permits an omitted occupation", async () => {
 test("registration rejects incomplete or invalid client details and injected account fields before creating an account", async () => {
   const invalidChanges = [
     { age: 35 },
-    { contactNumber: undefined }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" },
+    { contactNumber: undefined }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "+1 415 555 0100" }, { contactNumber: "0917 123 456" },
     { addressDetails: undefined }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, barangayCode: "0401014001" } }, { occupation: "a".repeat(101) },
     { role: "admin" }, { status: "disabled" }, { passwordHash: "injected" },
   ];

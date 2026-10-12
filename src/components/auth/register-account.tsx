@@ -4,9 +4,11 @@ import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { useClientFormValidation } from "@/components/clients/client-information-form";
+import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
+import { phContactNumberExample } from "@/lib/ph-contact-number";
 import { CheckCircle2, Eye, EyeOff, HardHat } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
@@ -175,18 +177,14 @@ export function RegisterAccountPage({
               <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
                 Contact number <RequiredIndicator />
               </label>
-              <input
+              <ContactNumberInput
                 id="contactNumber"
-                name="contactNumber"
-                type="tel"
-                autoComplete="tel"
-                minLength={7}
-                maxLength={25}
                 required
                 placeholder="0917 123 4567"
                 {...describe("contactNumber")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
+              <p className="text-xs text-stone-500">Philippine mobile number: {phContactNumberExample}.</p>
               <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
             </div>
 

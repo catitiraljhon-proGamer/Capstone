@@ -10,7 +10,9 @@ import {
 } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
+import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { textError } from "@/lib/form-validation";
+import { phContactNumberError, phContactNumberExample } from "@/lib/ph-contact-number";
 import type { ClientDto } from "@/types/clients";
 
 export type ClientFormInput = {
@@ -32,16 +34,6 @@ type FieldErrors = Record<string, string | null | undefined>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function contactNumberError(raw: string) {
-  const text = raw.trim();
-  if (!text) return "Enter the contact number.";
-  if (text.length > 25) return "Contact number must be 25 characters or fewer.";
-  if (!/^\+?[0-9 ()-]+$/.test(text)) return "Use digits, spaces, parentheses, hyphens, and an optional leading + (for example 0917 123 4567).";
-  const digits = text.replace(/\D/g, "").length;
-  if (digits < 7 || digits > 15) return "The contact number must contain 7 to 15 digits (for example 0917 123 4567).";
-  return null;
-}
-
 function emailError(raw: string) {
   const text = raw.trim();
   if (!text) return "Enter the email address.";
@@ -61,7 +53,7 @@ function passwordError(raw: string) {
 export function clientFieldErrors(values: Record<string, string>, mode: ClientFormMode): FieldErrors {
   const errors: FieldErrors = {
     name: textError(values.name ?? "", { label: "Full name", min: 2, max: 100 }),
-    contactNumber: contactNumberError(values.contactNumber ?? ""),
+    contactNumber: phContactNumberError(values.contactNumber ?? ""),
     occupation: textError(values.occupation ?? "", { label: "Occupation", required: false, max: 100 }),
     ...addressFieldErrors(values),
   };
@@ -204,8 +196,8 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
             Contact number <RequiredIndicator />
-            <input name="contactNumber" type="tel" autoComplete="tel" required minLength={7} maxLength={25} placeholder="Enter contact number" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
-            <span className="mt-1 block text-xs font-normal text-stone-500">Example: 0917 123 4567 or +63 917 123 4567.</span>
+            <ContactNumberInput required placeholder="0917 123 4567" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
+            <span className="mt-1 block text-xs font-normal text-stone-500">Philippine mobile number: {phContactNumberExample}.</span>
           </label>
           <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
         </div>

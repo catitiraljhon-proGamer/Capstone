@@ -1,6 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
+import { formatPhContactNumber, phContactNumberError } from "@/lib/ph-contact-number";
 import type { ClientDetails, ClientDto, ClientListPayload } from "@/types/clients";
 import { completeProfilePath, roleHomePaths, type SessionUser } from "@/types/domain";
 import { hash } from "bcryptjs";
@@ -8,12 +9,13 @@ import { type Db, type Filter, ObjectId } from "mongodb";
 import { z } from "zod";
 
 const nameSchema = z.string().trim().min(2, "Enter the client's full name.").max(100);
-const contactNumberSchema = z.string().trim().min(7, "Enter a valid contact number.").max(25)
-  .regex(/^\+?[0-9 ()-]+$/, "Use digits, spaces, parentheses, hyphens, and an optional leading +.")
-  .refine((value) => {
-    const digits = value.replace(/\D/g, "");
-    return digits.length >= 7 && digits.length <= 15;
-  }, "The contact number must contain 7 to 15 digits.");
+/** Philippine mobile numbers only; saved as "+63 917 123 4567". */
+const contactNumberSchema = z.string().trim()
+  .superRefine((value, context) => {
+    const message = phContactNumberError(value);
+    if (message) context.addIssue({ code: "custom", message });
+  })
+  .transform(formatPhContactNumber);
 
 export const clientProfileSchema = z.object({
   name: nameSchema,

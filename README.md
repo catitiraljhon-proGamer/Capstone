@@ -59,7 +59,8 @@ contract limits. No production records are used by these tests.
 
 ## Client registration and records
 
-Email registration collects full name, email, contact number, complete address,
+Email registration collects full name, email, Philippine mobile number (`09XX XXX XXXX`
+or `+63 9XX XXX XXXX`, saved as `+63 9XX XXX XXXX`), complete address,
 and optional occupation. These details are saved with the customer account and
 appear automatically in the admin Client Module (`/admin/clients`) and the customer's
 profile (`/customer/profile`). Both views use the same record, including later edits.
