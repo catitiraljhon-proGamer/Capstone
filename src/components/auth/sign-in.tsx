@@ -3,10 +3,8 @@
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
-import { Building2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useState } from "react";
 
 export interface Testimonial {
@@ -23,12 +21,8 @@ interface SignInPageProps {
   onGoogleSignIn?: () => void;
   onResetPassword?: () => void;
   initialError?: string;
-  /** Shown above the form, e.g. after 2FA setup signs the user out. */
-  initialNotice?: string;
   googleLinkEmail?: string;
   initialRememberMe?: boolean;
-  /** A password or Google sign-in already passed and awaits a 2FA code. */
-  twoFactorPending?: boolean;
 }
 
 const defaultTestimonials: Testimonial[] = [
@@ -81,23 +75,13 @@ export function SignInPage({
   onGoogleSignIn,
   onResetPassword,
   initialError = "",
-  initialNotice = "",
   googleLinkEmail,
   initialRememberMe = false,
-  twoFactorPending = false,
 }: SignInPageProps) {
-  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(initialRememberMe);
-  const [needsTwoFactor, setNeedsTwoFactor] = useState(twoFactorPending);
-
-  const restartSignIn = () => {
-    setNeedsTwoFactor(false);
-    setErrorMessage("Your sign-in step expired or was cancelled. Sign in again.");
-    router.replace("/login");
-  };
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     if (onSignIn) {
@@ -130,20 +114,14 @@ export function SignInPage({
       const payload = (await response.json()) as {
         error?: string;
         redirectTo?: string;
-        twoFactorRequired?: boolean;
       };
-
-      if (response.ok && payload.twoFactorRequired) {
-        setNeedsTwoFactor(true);
-        return;
-      }
 
       if (!response.ok || !payload.redirectTo) {
         setErrorMessage(payload.error ?? "Unable to sign in.");
         return;
       }
 
-      // Full page load drops prefetched pages cached before sign-in (e.g. old 2FA redirects).
+      // Full page load drops prefetched pages cached before sign-in.
       window.location.assign(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
@@ -174,21 +152,7 @@ export function SignInPage({
                 </p>
               </div>
 
-              {needsTwoFactor ? (
-                <TwoFactorChallenge onRestart={restartSignIn} />
-              ) : null}
-
-              {!needsTwoFactor && initialNotice ? (
-                <div
-                  role="status"
-                  className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-stone-700"
-                >
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
-                  {initialNotice}
-                </div>
-              ) : null}
-
-              {!needsTwoFactor && googleLinkEmail ? (
+              {googleLinkEmail ? (
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 break-words text-stone-700">
                   An account already exists for{" "}
                   <strong>{googleLinkEmail}</strong>. Enter your G4 Builders
@@ -202,112 +166,110 @@ export function SignInPage({
                 </div>
               ) : null}
 
-              {!needsTwoFactor ? (
-                <form className="space-y-5" onSubmit={handleSignIn}>
-                  <div className="animate-element animate-delay-300 space-y-2">
-                    <label
-                      htmlFor="email"
-                      className="text-sm font-medium text-stone-600"
-                    >
-                      Email Address
-                    </label>
-                    <InputShell>
+              <form className="space-y-5" onSubmit={handleSignIn}>
+                <div className="animate-element animate-delay-300 space-y-2">
+                  <label
+                    htmlFor="email"
+                    className="text-sm font-medium text-stone-600"
+                  >
+                    Email Address
+                  </label>
+                  <InputShell>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      autoComplete="email"
+                      defaultValue={googleLinkEmail ?? ""}
+                      readOnly={Boolean(googleLinkEmail)}
+                      required
+                      className="w-full rounded-xl bg-transparent p-4 text-sm text-stone-950 outline-none placeholder:text-stone-400"
+                    />
+                  </InputShell>
+                </div>
+
+                <div className="animate-element animate-delay-400 space-y-2">
+                  <label
+                    htmlFor="password"
+                    className="text-sm font-medium text-stone-600"
+                  >
+                    Password
+                  </label>
+                  <InputShell>
+                    <div className="relative">
                       <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="name@example.com"
-                        autoComplete="email"
-                        defaultValue={googleLinkEmail ?? ""}
-                        readOnly={Boolean(googleLinkEmail)}
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
                         required
-                        className="w-full rounded-xl bg-transparent p-4 text-sm text-stone-950 outline-none placeholder:text-stone-400"
+                        className="w-full rounded-xl bg-transparent p-4 pr-12 text-sm text-stone-950 outline-none placeholder:text-stone-400"
                       />
-                    </InputShell>
-                  </div>
-
-                  <div className="animate-element animate-delay-400 space-y-2">
-                    <label
-                      htmlFor="password"
-                      className="text-sm font-medium text-stone-600"
-                    >
-                      Password
-                    </label>
-                    <InputShell>
-                      <div className="relative">
-                        <input
-                          id="password"
-                          name="password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
-                          autoComplete="current-password"
-                          required
-                          className="w-full rounded-xl bg-transparent p-4 pr-12 text-sm text-stone-950 outline-none placeholder:text-stone-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((value) => !value)}
-                          className="absolute inset-y-0 right-1 flex w-11 items-center justify-center text-stone-500 transition hover:text-stone-950"
-                          aria-label={
-                            showPassword ? "Hide password" : "Show password"
-                          }
-                        >
-                          {showPassword ? (
-                            <Eye className="h-5 w-5" />
-                          ) : (
-                            <EyeOff className="h-5 w-5" />
-                          )}
-                        </button>
-                      </div>
-                    </InputShell>
-                  </div>
-
-                  <div className="animate-element animate-delay-500 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-stone-700">
-                      <input
-                        type="checkbox"
-                        name="rememberMe"
-                        checked={rememberMe}
-                        onChange={(event) => setRememberMe(event.target.checked)}
-                        className="h-4 w-4 rounded border-stone-300 accent-red-700"
-                      />
-                      Keep me signed in
-                    </label>
-                    {onResetPassword ? (
                       <button
                         type="button"
-                        onClick={onResetPassword}
-                        className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute inset-y-0 right-1 flex w-11 items-center justify-center text-stone-500 transition hover:text-stone-950"
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
-                        Reset password
+                        {showPassword ? (
+                          <Eye className="h-5 w-5" />
+                        ) : (
+                          <EyeOff className="h-5 w-5" />
+                        )}
                       </button>
-                    ) : null}
-                  </div>
+                    </div>
+                  </InputShell>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="animate-element animate-delay-600 w-full rounded-xl bg-red-700 py-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
-                  >
-                    {isSubmitting
-                      ? "Signing in…"
-                      : googleLinkEmail
-                        ? "Connect Google and sign in"
-                        : "Sign In"}
-                  </button>
-
-                  {errorMessage ? (
-                    <p
-                      role="alert"
-                      className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                <div className="animate-element animate-delay-500 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm">
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-stone-700">
+                    <input
+                      type="checkbox"
+                      name="rememberMe"
+                      checked={rememberMe}
+                      onChange={(event) => setRememberMe(event.target.checked)}
+                      className="h-4 w-4 rounded border-stone-300 accent-red-700"
+                    />
+                    Keep me signed in
+                  </label>
+                  {onResetPassword ? (
+                    <button
+                      type="button"
+                      onClick={onResetPassword}
+                      className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
                     >
-                      {errorMessage}
-                    </p>
+                      Reset password
+                    </button>
                   ) : null}
-                </form>
-              ) : null}
+                </div>
 
-              {!needsTwoFactor && !googleLinkEmail ? (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="animate-element animate-delay-600 w-full rounded-xl bg-red-700 py-4 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                >
+                  {isSubmitting
+                    ? "Signing in…"
+                    : googleLinkEmail
+                      ? "Connect Google and sign in"
+                      : "Sign In"}
+                </button>
+
+                {errorMessage ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                  >
+                    {errorMessage}
+                  </p>
+                ) : null}
+              </form>
+
+              {!googleLinkEmail ? (
                 <>
                   <div className="animate-element animate-delay-700 relative flex items-center justify-center">
                     <span className="w-full border-t border-stone-200" />

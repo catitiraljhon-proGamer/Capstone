@@ -18,8 +18,6 @@ export const rateLimitPolicies = {
   loginAccount: { maxAttempts: 5, windowMs: 15 * minute, lockMs: 15 * minute, maxLockMs: 24 * 60 * minute },
   /** Wrong passwords from one network address, across any emails. */
   loginIp: { maxAttempts: 20, windowMs: 15 * minute, lockMs: 15 * minute, maxLockMs: 24 * 60 * minute },
-  /** Wrong authenticator or recovery codes for one account. */
-  twoFactor: { maxAttempts: 5, windowMs: 15 * minute, lockMs: 15 * minute, maxLockMs: 24 * 60 * minute },
   /** Accounts created from one network address. */
   register: { maxAttempts: 10, windowMs: 60 * minute, lockMs: 60 * minute, maxLockMs: 24 * 60 * minute },
 } satisfies Record<string, RateLimitPolicy>;
@@ -40,7 +38,6 @@ function hashed(value: string) {
 export const rateLimitKeys = {
   loginAccount: (email: string) => `login:account:${hashed(email.trim().toLowerCase())}`,
   loginIp: (ip: string) => `login:ip:${hashed(ip)}`,
-  twoFactor: (userId: string) => `2fa:user:${userId}`,
   register: (ip: string) => `register:ip:${hashed(ip)}`,
 };
 

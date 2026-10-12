@@ -2,14 +2,12 @@ import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import type { ClientDetails, ClientDto, ClientListPayload } from "@/types/clients";
-import { twoFactorSetupPaths } from "@/lib/two-factor-policy";
 import { completeProfilePath, roleHomePaths, type SessionUser } from "@/types/domain";
 import { hash } from "bcryptjs";
 import { type Db, type Filter, ObjectId } from "mongodb";
 import { z } from "zod";
 
 const nameSchema = z.string().trim().min(2, "Enter the client's full name.").max(100);
-const ageSchema = z.number().int("Age must be a whole number.").min(0).max(120, "Enter an age between 0 and 120.");
 const contactNumberSchema = z.string().trim().min(7, "Enter a valid contact number.").max(25)
   .regex(/^\+?[0-9 ()-]+$/, "Use digits, spaces, parentheses, hyphens, and an optional leading +.")
   .refine((value) => {
@@ -19,7 +17,6 @@ const contactNumberSchema = z.string().trim().min(7, "Enter a valid contact numb
 
 export const clientProfileSchema = z.object({
   name: nameSchema,
-  age: ageSchema,
   contactNumber: contactNumberSchema,
   addressDetails: addressDetailsSchema,
   occupation: z.string().trim().max(100).default(""),
@@ -59,7 +56,6 @@ function objectId(id: string) {
 /** Stored records count as complete when the required fields exist, including legacy text-only addresses. */
 const storedProfileSchema = z.object({
   name: nameSchema,
-  age: ageSchema,
   contactNumber: contactNumberSchema,
   address: z.string().trim().min(5),
 });
@@ -71,7 +67,6 @@ export function isClientProfileComplete(user: UserDocument) {
 /** Builds the stored client details, including the full address line, from validated input. */
 export function toClientDetails(input: Omit<z.output<typeof clientProfileSchema>, "name">): ClientDetails {
   return {
-    age: input.age,
     contactNumber: input.contactNumber,
     occupation: input.occupation,
     addressDetails: input.addressDetails,
@@ -79,22 +74,18 @@ export function toClientDetails(input: Omit<z.output<typeof clientProfileSchema>
   };
 }
 
-/**
- * Customers missing required client details (e.g. new Google sign-ups) fill
- * them in first; every account then turns on 2FA before using the portal.
- */
+/** Customers missing required client details (e.g. new Google sign-ups) fill them in first. */
 export function signInDestination(user: UserDocument) {
   if (user.role === "customer" && !isClientProfileComplete(user)) {
     return completeProfilePath;
   }
-  return user.twoFactor ? roleHomePaths[user.role] : twoFactorSetupPaths[user.role];
+  return roleHomePaths[user.role];
 }
 
 export function toClientDto(user: UserDocument): ClientDto {
   const details = user.clientDetails;
   return {
     id: user._id.toHexString(), name: user.name, email: user.email,
-    age: details?.age ?? null,
     contactNumber: details?.contactNumber ?? "",
     address: details?.address ?? "",
     addressDetails: details?.addressDetails ?? null,
@@ -144,7 +135,7 @@ export async function updateClient(db: Db, actor: SessionUser, id: string, rawIn
   );
   if (!updated) throw new ClientRequestError("Client record not found.", 404);
   await recordAuditLog({ db, actor, action: "client.updated", entityType: "user", entityId: updated._id,
-    details: { fields: "name, age, contactNumber, address, occupation" } });
+    details: { fields: "name, contactNumber, address, occupation" } });
   return toClientDto(updated);
 }
 

@@ -1,13 +1,12 @@
 "use client";
 
-import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu";
+import { AccountMenu } from "@/components/ui/account-menu";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { NotificationBell } from "@/components/customer/customer-notification-bell";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
 import { useSessionUser } from "@/lib/session-store";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
-import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import type { BillingSection } from "@/types/billing";
 import {
   Calculator,
@@ -21,7 +20,6 @@ import {
   Menu,
   ReceiptText,
   ShieldCheck,
-  UserLock,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -72,11 +70,6 @@ const adminNav = [
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
   { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },
 ];
-
-const securityHref: Record<StaffDashboardProps["role"], string> = {
-  Admin: "/admin/security",
-  "Billing Clerk": "/billing-clerk/security",
-};
 
 const setActiveNav = (
   items: StaffDashboardProps["navItems"],
@@ -141,7 +134,6 @@ function StaffDashboard({
 }: StaffDashboardProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useSessionUser();
-  const accountLinks: AccountMenuLink[] = [{ label: "Security", icon: UserLock, href: securityHref[role] }];
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-950">
@@ -174,7 +166,7 @@ function StaffDashboard({
             </div>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <NotificationBell />
-              <AccountMenu name={user?.name ?? name} role={role} links={accountLinks} />
+              <AccountMenu name={user?.name ?? name} role={role} />
             </div>
             <p className="col-span-2 text-xs leading-5 text-stone-600 sm:hidden">{description}</p>
           </div>
@@ -461,24 +453,6 @@ export function AdminDashboard() {
 
 export function BillingClerkSectionPage({ activeLabel, title, description }: { activeLabel: BillingSection; title: string; description: string }) {
   return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={<BillingWorkspace section={activeLabel} />} />;
-}
-
-export function BillingClerkSecurityPage() {
-  return (
-    <StaffDashboard
-      role="Billing Clerk"
-      name="Billing Clerk"
-      title="Security"
-      description="Protect your account with two-factor authentication."
-      navItems={setActiveNav(clerkNav, "Security")}
-      metrics={[]}
-      primaryPanel={null}
-      queueTitle=""
-      queueItems={[]}
-      activityItems={[]}
-      mainContent={<div className="max-w-3xl"><TwoFactorSettings /></div>}
-    />
-  );
 }
 
 export function AdminSectionPage({

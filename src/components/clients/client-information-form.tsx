@@ -10,12 +10,11 @@ import {
 } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
-import { numberError, textError } from "@/lib/form-validation";
+import { textError } from "@/lib/form-validation";
 import type { ClientDto } from "@/types/clients";
 
 export type ClientFormInput = {
   name: string;
-  age: number;
   contactNumber: string;
   occupation: string;
   addressDetails: AddressDetailsInput;
@@ -62,7 +61,6 @@ function passwordError(raw: string) {
 export function clientFieldErrors(values: Record<string, string>, mode: ClientFormMode): FieldErrors {
   const errors: FieldErrors = {
     name: textError(values.name ?? "", { label: "Full name", min: 2, max: 100 }),
-    age: numberError(values.age ?? "", { label: "Age", integer: true, min: 0, max: 120, unit: " years" }),
     contactNumber: contactNumberError(values.contactNumber ?? ""),
     occupation: textError(values.occupation ?? "", { label: "Occupation", required: false, max: 100 }),
     ...addressFieldErrors(values),
@@ -173,7 +171,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
     setError("");
     try {
       await onSave({
-        name: value("name"), age: Number(value("age")),
+        name: value("name"),
         contactNumber: value("contactNumber"), addressDetails: readAddressDetails(data), occupation: value("occupation"),
         ...(creating ? { email: value("email"), password: value("password") } : {}),
       });
@@ -194,13 +192,6 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
             <input name="name" autoComplete="name" required minLength={2} maxLength={100} placeholder="Enter full name" defaultValue={client?.name ?? ""} className={fieldClass} {...describe("name")} />
           </label>
           <FieldError id={errorId("name")} message={fieldError("name")} />
-        </div>
-        <div className="min-w-0">
-          <label className="block text-sm font-medium text-stone-700">
-            Age (years) <RequiredIndicator />
-            <input name="age" type="number" inputMode="numeric" required min={0} max={120} step={1} placeholder="Enter age in years" defaultValue={client?.age ?? ""} className={fieldClass} {...describe("age")} />
-          </label>
-          <FieldError id={errorId("age")} message={fieldError("age")} />
         </div>
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">

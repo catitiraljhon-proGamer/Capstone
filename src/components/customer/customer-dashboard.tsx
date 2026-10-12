@@ -1,6 +1,5 @@
 "use client";
 
-import { TwoFactorSettings } from "@/components/auth/two-factor-settings";
 import { FinishedDesignsTermsGate } from "@/components/customer/finished-designs-terms-gate";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -32,7 +31,6 @@ import {
   Home,
   Menu,
   ReceiptText,
-  UserLock,
   UserRound,
 } from "lucide-react";
 import Image from "next/image";
@@ -47,8 +45,7 @@ type CustomerSection =
   | "requests"
   | "billing"
   | "documents"
-  | "profile"
-  | "security";
+  | "profile";
 
 const houseImage = "/House/image.png";
 
@@ -67,7 +64,6 @@ const customerNav: {
 
 const customerAccountLinks: AccountMenuLink[] = [
   { label: "My Profile", icon: UserRound, href: "/customer/profile" },
-  { label: "Security", icon: UserLock, href: "/customer/security" },
 ];
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -582,14 +578,6 @@ export function CustomerProfilePage() {
         <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
         <div className="mt-5"><ClientProfileForm /></div>
       </Panel>
-    </CustomerShell>
-  );
-}
-
-export function CustomerSecurityPage() {
-  return (
-    <CustomerShell activeSection="security" title="Security" description="Protect your account with two-factor authentication.">
-      <div className="max-w-3xl"><TwoFactorSettings /></div>
     </CustomerShell>
   );
 }

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CompleteProfilePage() {
-  const session = await readSession({ allowWithoutTwoFactor: true });
+  const session = await readSession();
   if (!session) redirect("/login");
   if (session.role !== "customer") redirect(roleHomePaths[session.role]);
 

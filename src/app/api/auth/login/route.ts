@@ -23,11 +23,6 @@ import {
   type RateLimitStatus,
 } from "@/lib/server/rate-limit";
 import { startSession, toSessionUser } from "@/lib/server/session";
-import {
-  createTwoFactorChallenge,
-  twoFactorChallengeCookieName,
-  twoFactorChallengeCookieOptions,
-} from "@/lib/server/two-factor";
 import { compare } from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -132,26 +127,6 @@ export async function POST(request: NextRequest) {
       );
       if (!link) throw new GoogleAuthError("expired");
       await linkGoogleAccount(db, user, link);
-    }
-
-    if (user.twoFactor) {
-      const response = NextResponse.json({ twoFactorRequired: true });
-      response.cookies.set(
-        twoFactorChallengeCookieName,
-        await createTwoFactorChallenge({
-          userId: user._id.toHexString(),
-          authVersion: user.authVersion ?? 0,
-          rememberMe: input.rememberMe,
-          provider: "password",
-          linkedGoogle: input.linkGoogle,
-        }),
-        twoFactorChallengeCookieOptions,
-      );
-      response.cookies.set(googleLinkCookieName, "", {
-        ...googleCookieOptions,
-        maxAge: 0,
-      });
-      return response;
     }
 
     const sessionUser = toSessionUser(user);

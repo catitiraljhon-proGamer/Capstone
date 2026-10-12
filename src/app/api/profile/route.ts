@@ -18,8 +18,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    // Customers complete their details before turning on 2FA.
-    const actor = await readSession({ allowWithoutTwoFactor: true });
+    const actor = await readSession();
     if (!actor) return unauthorized();
     if (actor.role !== "customer") return forbidden();
     assertClientMutation(request);

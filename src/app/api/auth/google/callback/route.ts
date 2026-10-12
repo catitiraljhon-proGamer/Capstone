@@ -13,11 +13,6 @@ import {
   readGoogleFlow,
 } from "@/lib/server/google-oauth";
 import { startSession } from "@/lib/server/session";
-import {
-  createTwoFactorChallenge,
-  twoFactorChallengeCookieName,
-  twoFactorChallengeCookieOptions,
-} from "@/lib/server/two-factor";
 import { MongoError, MongoNetworkError, MongoServerSelectionError } from "mongodb";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -82,24 +77,6 @@ export async function GET(request: NextRequest) {
           rememberMe: flow.rememberMe,
         }),
         googleCookieOptions,
-      );
-      return response;
-    }
-
-    if (user.twoFactor) {
-      const response = redirectResponse(
-        new URL("/login?two_factor=1", origin),
-      );
-      response.cookies.set(
-        twoFactorChallengeCookieName,
-        await createTwoFactorChallenge({
-          userId: user._id.toHexString(),
-          authVersion: user.authVersion ?? 0,
-          rememberMe: flow.rememberMe,
-          provider: "google",
-          linkedGoogle: false,
-        }),
-        twoFactorChallengeCookieOptions,
       );
       return response;
     }

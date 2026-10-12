@@ -15,11 +15,11 @@ export type AccountMenuLink = {
 export function AccountMenu({
   name,
   role,
-  links,
+  links = [],
 }: {
   name: string;
   role: string;
-  links: AccountMenuLink[];
+  links?: AccountMenuLink[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -77,22 +77,22 @@ export function AccountMenu({
         <p className="mb-1 truncate border-b border-stone-200 px-4 pt-2 pb-3 text-xs text-stone-500 md:hidden">
           Signed in as <span className="font-semibold text-stone-950">{name}</span>
         </p>
-        <nav aria-label="Account">
-          {links.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setIsOpen(false)}
-              className="flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium text-stone-600 transition hover:bg-red-50 hover:text-red-800"
-            >
-              <item.icon aria-hidden="true" className="h-5 w-5" />
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="mt-1 border-t border-stone-200 pt-1">
-          <LogoutButton onLogout={() => setIsOpen(false)} />
-        </div>
+        {links.length > 0 ? (
+          <nav aria-label="Account" className="mb-1 border-b border-stone-200 pb-1">
+            {links.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium text-stone-600 transition hover:bg-red-50 hover:text-red-800"
+              >
+                <item.icon aria-hidden="true" className="h-5 w-5" />
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
+        <LogoutButton onLogout={() => setIsOpen(false)} />
       </div>
     </div>
   );

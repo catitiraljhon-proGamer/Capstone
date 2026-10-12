@@ -13,7 +13,6 @@ export type AddressDetails = {
 };
 
 export type ClientDetails = {
-  age: number;
   contactNumber: string;
   /** Full address line; built from addressDetails for records saved with the dropdowns. */
   address: string;
@@ -26,7 +25,6 @@ export type ClientDto = {
   id: string;
   name: string;
   email: string;
-  age: number | null;
   contactNumber: string;
   address: string;
   addressDetails: AddressDetails | null;

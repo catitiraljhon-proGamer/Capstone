@@ -28,12 +28,6 @@ import {
 } from "@/lib/server/google-oauth";
 import { resolveGoogleAccount } from "@/lib/server/google-accounts";
 import { sessionCookieName } from "@/lib/server/session";
-import {
-  encryptTwoFactorSecret,
-  readTwoFactorChallenge,
-  twoFactorChallengeCookieName,
-} from "@/lib/server/two-factor";
-import { generateTotpSecret } from "@/lib/server/totp";
 import { GET as startGoogle } from "@/app/api/auth/google/route";
 import { GET as googleCallback } from "@/app/api/auth/google/callback/route";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
@@ -446,14 +440,13 @@ test("returning Google users retain their role, profile and 30-day remember-me s
   const response = await googleCallback(
     await callbackRequest("login", true, { email: "changed@gmail.com" }),
   );
-  assert.equal(response.headers.get("location"), `${origin}/billing-clerk/security`);
+  assert.equal(response.headers.get("location"), `${origin}/billing-clerk`);
   const cookie = response.cookies.get(sessionCookieName)!;
   assert.equal(cookie.maxAge, 30 * 24 * 60 * 60);
   const { payload } = await jwtVerify(cookie.value, getAuthSecret());
   assert.equal(payload.name, "Saved Name");
   assert.equal(payload.email, account.email);
   assert.equal(payload.authVersion, 3);
-  assert.equal(payload.twoFactor, false);
   assert.equal(await db.collection("users").countDocuments(), 1);
   assert.equal(
     await db.collection("audit_logs").countDocuments({ action: "auth.login" }),
@@ -461,37 +454,11 @@ test("returning Google users retain their role, profile and 30-day remember-me s
   );
 });
 
-test("Google sign-in for a 2FA account asks for a code before any session exists", async () => {
-  const account = user({
-    googleSub: profile.sub,
-    twoFactor: {
-      secret: encryptTwoFactorSecret(generateTotpSecret()),
-      enabledAt: new Date(),
-      recoveryCodes: [],
-    },
-  });
-  await db.collection<UserDocument>("users").insertOne(account);
-  const response = await googleCallback(await callbackRequest("login", true));
-  assert.equal(response.headers.get("location"), `${origin}/login?two_factor=1`);
-  assert.equal(response.cookies.get(sessionCookieName), undefined);
-  const challenge = await readTwoFactorChallenge(
-    response.cookies.get(twoFactorChallengeCookieName)?.value,
-  );
-  assert.equal(challenge?.userId, account._id.toHexString());
-  assert.equal(challenge?.provider, "google");
-  assert.equal(challenge?.rememberMe, true);
-  assert.equal(
-    await db.collection("audit_logs").countDocuments({ action: "auth.login" }),
-    0,
-  );
-});
-
-test("returning Google customers with complete client details go straight to two-factor setup", async () => {
+test("returning Google customers with complete client details go straight to their dashboard", async () => {
   await db.collection<UserDocument>("users").insertOne(
     user({
       googleSub: profile.sub,
       clientDetails: {
-        age: 34,
         contactNumber: "0917 123 4567",
         address: "12 Rizal Street, Barangay Uno, Quezon City, Metro Manila 1100",
         occupation: "",
@@ -499,7 +466,7 @@ test("returning Google customers with complete client details go straight to two
     }),
   );
   const response = await googleCallback(await callbackRequest());
-  assert.equal(response.headers.get("location"), `${origin}/customer/security`);
+  assert.equal(response.headers.get("location"), `${origin}/customer`);
 });
 
 test("Google login also registers a first-time customer", async () => {
@@ -559,7 +526,7 @@ test("existing password accounts require proof before Google can be connected", 
     }),
   );
   assert.equal(correct.status, 200);
-  assert.equal((await correct.json()).redirectTo, "/admin/security");
+  assert.equal((await correct.json()).redirectTo, "/admin");
   assert.equal(
     (await db.collection("users").findOne({ _id: account._id }))?.googleSub,
     profile.sub,
@@ -623,7 +590,7 @@ test("Google-only accounts reject password login cleanly; existing password logi
     loginRequest(account.email, "Existing-password-123"),
   );
   assert.equal(response.status, 200);
-  assert.equal((await response.json()).redirectTo, "/billing-clerk/security");
+  assert.equal((await response.json()).redirectTo, "/billing-clerk");
 });
 
 test("simultaneous first-time Google requests create only one account", async () => {

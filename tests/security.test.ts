@@ -11,22 +11,6 @@ import {
 } from "@/lib/database/collections";
 import { createSessionToken, sessionCookieName } from "@/lib/server/session";
 import { proxy } from "@/proxy";
-import {
-  currentTotpStep,
-  decodeBase32,
-  encodeBase32,
-  generateTotp,
-  generateTotpSecret,
-  verifyTotp,
-} from "@/lib/server/totp";
-import {
-  consumeTwoFactorCode,
-  createTwoFactorChallenge,
-  decryptTwoFactorSecret,
-  encryptTwoFactorSecret,
-  generateRecoveryCodes,
-  twoFactorChallengeCookieName,
-} from "@/lib/server/two-factor";
 import { finishedDesignsTerms } from "@/lib/finished-designs-terms";
 import {
   acceptFinishedDesignsTerms,
@@ -34,7 +18,6 @@ import {
   hasAcceptedFinishedDesignsTerms,
 } from "@/lib/server/finished-designs-terms";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
-import { POST as verifyTwoFactor } from "@/app/api/auth/two-factor/verify/route";
 
 const origin = "http://localhost:3000";
 const password = "Correct-password-123";
@@ -98,53 +81,6 @@ function login(email: string, attempt: string, ip = "203.0.113.10") {
     }),
   );
 }
-
-function verify(code: string, challengeCookie: string) {
-  return verifyTwoFactor(
-    new NextRequest(`${origin}/api/auth/two-factor/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        cookie: `${twoFactorChallengeCookieName}=${challengeCookie}`,
-      },
-      body: JSON.stringify({ code }),
-    }),
-  );
-}
-
-test("TOTP matches the RFC 6238 SHA-1 reference values", () => {
-  const secret = encodeBase32(Buffer.from("12345678901234567890"));
-  assert.equal(secret, "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
-  assert.deepEqual(decodeBase32(secret), Buffer.from("12345678901234567890"));
-  // RFC values are 8 digits; authenticator apps show the last 6.
-  assert.equal(generateTotp(secret, currentTotpStep(59 * 1000)), "287082");
-  assert.equal(generateTotp(secret, currentTotpStep(1111111109 * 1000)), "081804");
-  assert.equal(generateTotp(secret, currentTotpStep(2000000000 * 1000)), "279037");
-});
-
-test("TOTP verification allows one step of clock drift and rejects replays", () => {
-  const secret = generateTotpSecret();
-  const now = Date.now();
-  const step = currentTotpStep(now);
-  assert.equal(verifyTotp(secret, generateTotp(secret, step), { now }), step);
-  assert.equal(verifyTotp(secret, generateTotp(secret, step - 1), { now }), step - 1);
-  assert.equal(verifyTotp(secret, generateTotp(secret, step + 1), { now }), step + 1);
-  assert.equal(verifyTotp(secret, generateTotp(secret, step - 2), { now }), null);
-  assert.equal(verifyTotp(secret, generateTotp(secret, step), { now, afterStep: step }), null);
-  assert.equal(verifyTotp(secret, "12345", { now }), null);
-  assert.equal(verifyTotp(secret, "abcdef", { now }), null);
-});
-
-test("authenticator secrets are encrypted and tampering is detected", () => {
-  const secret = generateTotpSecret();
-  const encrypted = encryptTwoFactorSecret(secret);
-  assert.equal(encrypted.includes(secret), false);
-  assert.notEqual(encryptTwoFactorSecret(secret), encrypted);
-  assert.equal(decryptTwoFactorSecret(encrypted), secret);
-  const [iv, tag, body] = encrypted.split(".");
-  const flipped = `${body[0] === "A" ? "B" : "A"}${body.slice(1)}`;
-  assert.throws(() => decryptTwoFactorSecret([iv, tag, flipped].join(".")));
-});
 
 test("five wrong passwords lock the account, even for the correct password", async () => {
   const user = await insertUser();
@@ -212,93 +148,6 @@ test("repeated lockouts double the lock time", async () => {
   assert.equal(second.headers.get("retry-after"), String(30 * 60));
 });
 
-test("2FA accounts get a challenge, not a session, after the password", async () => {
-  const secret = generateTotpSecret();
-  const user = await insertUser({
-    twoFactor: {
-      secret: encryptTwoFactorSecret(secret),
-      enabledAt: new Date(),
-      recoveryCodes: [],
-    },
-  });
-  const response = await login(user.email, password);
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { twoFactorRequired: true });
-  assert.equal(response.cookies.get(sessionCookieName), undefined);
-  const challenge = response.cookies.get(twoFactorChallengeCookieName)!.value;
-
-  const wrong = await verify("000000", challenge);
-  assert.equal(wrong.status, 401);
-  assert.equal(wrong.cookies.get(sessionCookieName), undefined);
-
-  const code = generateTotp(secret, currentTotpStep());
-  const accepted = await verify(code, challenge);
-  assert.equal(accepted.status, 200);
-  assert.equal((await accepted.json()).redirectTo, "/billing-clerk");
-  assert.ok(accepted.cookies.get(sessionCookieName)?.value);
-  assert.equal(
-    await db.collection("audit_logs").countDocuments({ action: "auth.login", "details.twoFactor": "authenticator" }),
-    1,
-  );
-
-  // The same code cannot be used again, even with a fresh challenge.
-  const replay = await verify(code, challenge);
-  assert.equal(replay.status, 401);
-});
-
-test("recovery codes work exactly once", async () => {
-  const { codes, stored } = generateRecoveryCodes();
-  assert.equal(codes.length, 8);
-  assert.equal(new Set(codes).size, 8);
-  const user = await insertUser({
-    twoFactor: {
-      secret: encryptTwoFactorSecret(generateTotpSecret()),
-      enabledAt: new Date(),
-      recoveryCodes: stored,
-    },
-  });
-  assert.equal(await consumeTwoFactorCode(db, user, codes[0].toUpperCase()), "recovery");
-  const reloaded = await db.collection<UserDocument>("users").findOne({ _id: user._id });
-  assert.equal(await consumeTwoFactorCode(db, reloaded!, codes[0]), null);
-  assert.equal(
-    reloaded!.twoFactor!.recoveryCodes.filter((code) => code.usedAt).length,
-    1,
-  );
-});
-
-test("wrong 2FA codes are limited and expired challenges are refused", async () => {
-  const user = await insertUser({
-    twoFactor: {
-      secret: encryptTwoFactorSecret(generateTotpSecret()),
-      enabledAt: new Date(),
-      recoveryCodes: [],
-    },
-  });
-  const challenge = await createTwoFactorChallenge({
-    userId: user._id.toHexString(),
-    authVersion: 0,
-    rememberMe: false,
-    provider: "password",
-    linkedGoogle: false,
-  });
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    assert.equal((await verify("111111", challenge)).status, 401);
-  }
-  assert.equal((await verify("111111", challenge)).status, 429);
-
-  const missing = await verify("111111", "not-a-valid-challenge");
-  assert.equal(missing.status, 401);
-  assert.equal((await missing.json()).restart, true);
-
-  // Changing the password (authVersion) invalidates challenges in flight.
-  await db
-    .collection<UserDocument>("users")
-    .updateOne({ _id: user._id }, { $set: { authVersion: 1 } });
-  await db.collection("rate_limits").deleteMany({});
-  const stale = await verify("111111", challenge);
-  assert.equal((await stale.json()).restart, true);
-});
-
 test("full design galleries require staff access or accepted Finished Designs terms", async () => {
   const customer = await insertUser({ role: "customer", email: "viewer@example.com" });
   const session = { id: customer._id.toHexString(), email: customer.email, name: customer.name, role: customer.role };
@@ -329,7 +178,7 @@ test("full design galleries require staff access or accepted Finished Designs te
 
 async function proxyRequest(
   path: string,
-  session: { role: "admin" | "billing-clerk" | "customer"; twoFactor?: boolean },
+  session: { role: "admin" | "billing-clerk" | "customer" },
 ) {
   const token = await createSessionToken(
     {
@@ -338,7 +187,6 @@ async function proxyRequest(
       name: "User",
       role: session.role,
       authVersion: 0,
-      twoFactor: session.twoFactor ?? false,
     },
     "1h",
   );
@@ -347,18 +195,16 @@ async function proxyRequest(
   return proxy(request);
 }
 
-test("accounts without 2FA can only open their setup page, and customers their details first", async () => {
-  const blocked = await proxyRequest("/admin/projects?tab=open", { role: "admin" });
-  assert.equal(blocked.headers.get("location"), `${origin}/admin/security`);
+test("signed-in accounts open their own portal and are sent home from another role's", async () => {
   for (const [path, role] of [
-    ["/admin/security", "admin"],
-    ["/billing-clerk/security", "billing-clerk"],
-    ["/customer/security", "customer"],
+    ["/admin/projects?tab=open", "admin"],
+    ["/billing-clerk/invoices", "billing-clerk"],
+    ["/customer", "customer"],
     ["/customer/complete-profile", "customer"],
   ] as const) {
     const response = await proxyRequest(path, { role });
     assert.equal(response.headers.get("location"), null, path);
   }
-  const enrolled = await proxyRequest("/admin/projects", { role: "admin", twoFactor: true });
-  assert.equal(enrolled.headers.get("location"), null);
+  const wrongRole = await proxyRequest("/admin/projects", { role: "customer" });
+  assert.equal(wrongRole.headers.get("location"), `${origin}/customer`);
 });

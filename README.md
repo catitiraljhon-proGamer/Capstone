@@ -59,7 +59,7 @@ contract limits. No production records are used by these tests.
 
 ## Client registration and records
 
-Email registration collects full name, email, age, contact number, complete address,
+Email registration collects full name, email, contact number, complete address,
 and optional occupation. These details are saved with the customer account and
 appear automatically in the admin Client Module (`/admin/clients`) and the customer's
 profile (`/customer/profile`). Both views use the same record, including later edits.
@@ -139,7 +139,7 @@ audit logs are reused. Google access/refresh tokens are not stored.
 Without these environment values, email/password authentication remains available
 and the Google button returns a friendly availability message.
 
-## Sign-in protection and two-factor authentication
+## Sign-in protection
 
 Password sign-in is throttled to stop guessing and brute-force attacks:
 
@@ -153,19 +153,6 @@ Password sign-in is throttled to stop guessing and brute-force attacks:
   correct password is entered. Lockouts appear in Audit Logs.
 - Ten registration attempts per network address per hour are allowed.
 - Counters live in the `rate_limits` collection and expire automatically.
-
-Every account can turn on two-factor authentication (2FA) with an
-authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.):
-customers from **My Profile**, admins and billing clerks from **Security** in the
-sidebar. After the password or Google sign-in, the user must enter the current
-6-digit code or one of eight single-use recovery codes. Codes cannot be reused,
-five wrong codes lock the step for 15 minutes, and turning 2FA off or creating
-new recovery codes requires a current code.
-
-Authenticator secrets are encrypted with a key derived from `AUTH_SECRET`, and
-recovery codes are stored only as hashes. Changing `AUTH_SECRET` signs everyone
-out and makes existing 2FA setups unreadable; users would then need an admin to
-clear `twoFactor` on their user record and set 2FA up again.
 
 ## Finished Designs protection
 
@@ -192,7 +179,7 @@ the terms, watermark, and limited previews are the protection.
 - `projects`, `design_requests`, `cost_estimates`, `approvals`: project and estimation workflow
 - `invoices`, `payments`: billing and multiple-payment records
 - `documents`, `notifications`, `audit_logs`: supporting records and traceability
-- `rate_limits`: temporary failed sign-in, 2FA, and registration counters
+- `rate_limits`: temporary failed sign-in and registration counters
 
 Indexes are created when the application first connects. Seed data lives under `database/seeds` so it is bootstrap input, not a runtime fallback.
 
@@ -209,8 +196,8 @@ npm run build
 ```
 
 `test:clients` covers client permissions, registration details, and duplicate accounts
-using a temporary MongoDB instance. `test:security` covers sign-in lockouts, the
-authenticator code algorithm, recovery codes, and the 2FA sign-in step. `test:auth` uses a temporary MongoDB instance and signed test identities, without
+using a temporary MongoDB instance. `test:security` covers sign-in lockouts and
+role-based route protection. `test:auth` uses a temporary MongoDB instance and signed test identities, without
 reading `.env.local`, contacting Google, or changing your application database.
 The test MongoDB binary is downloaded automatically on first use. A real Google
 account round trip still requires the OAuth configuration above.

@@ -18,7 +18,7 @@ const admin: SessionUser = { id: new ObjectId().toHexString(), name: "Test Admin
 const addressInput = { provinceCode: "0401000000", cityCode: "0401003000", barangayCode: "0401003001", barangay: "Baclaran", street: "123 Example Street", postalCode: "4213" };
 const storedAddressDetails = { ...addressInput, province: "Batangas", city: "Balayan" };
 const formattedAddress = "123 Example Street, Brgy. Baclaran, Balayan, Batangas 4213";
-const details = { name: "Test Client", age: 35, contactNumber: "+63 917 123 4567", addressDetails: addressInput, occupation: "Engineer" };
+const details = { name: "Test Client", contactNumber: "+63 917 123 4567", addressDetails: addressInput, occupation: "Engineer" };
 const password = "Test-password-2026";
 const registrationInput = { ...details, email: "new@example.test", password };
 
@@ -50,17 +50,15 @@ after(async () => {
   await mongo?.stop();
 });
 
-test("validates ages, required contact details, and overposted account fields", () => {
-  assert.equal(clientProfileSchema.parse({ ...details, age: 0 }).age, 0);
+test("validates required contact details and overposted account fields", () => {
   assert.equal(clientProfileSchema.parse({ ...details, occupation: "  " }).occupation, "");
-  for (const change of [{ age: -1 }, { age: 121 }, { age: 1.5 }, { age: "35" }, { age: null }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, postalCode: "421" } }, { addressDetails: { ...addressInput, cityCode: "0401014000" } }, { addressDetails: { ...addressInput, provinceCode: "1300000000" } }, { address: "Free text address" }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
+  for (const change of [{ age: 35 }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" }, { contactNumber: "1".repeat(16) }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, postalCode: "421" } }, { addressDetails: { ...addressInput, cityCode: "0401014000" } }, { addressDetails: { ...addressInput, provinceCode: "1300000000" } }, { address: "Free text address" }, { name: " " }, { role: "admin" }, { email: "changed@example.test" }, { passwordHash: "injected" }]) {
     assert.equal(clientProfileSchema.safeParse({ ...details, ...change }).success, false, JSON.stringify(change));
   }
 });
 
 test("existing users remain readable with incomplete information and no exposed credentials", () => {
   const dto = toClientDto(legacyUser());
-  assert.equal(dto.age, null);
   assert.equal(dto.contactNumber, "");
   assert.equal(dto.profileComplete, false);
   for (const key of ["passwordHash", "googleSub", "authVersion"]) assert.equal(key in dto, false);
@@ -93,7 +91,7 @@ test("customer registration saves a complete record visible in the Client Module
   }));
   assert.equal(response.status, 201);
   const payload = await response.json();
-  assert.equal(payload.redirectTo, "/customer/security");
+  assert.equal(payload.redirectTo, "/customer");
   assert.ok(response.cookies.get(sessionCookieName)?.value);
   const saved = await db.collection<UserDocument>("users").findOne({ email: registrationInput.email });
   assert.ok(saved);
@@ -101,7 +99,7 @@ test("customer registration saves a complete record visible in the Client Module
   assert.equal(saved.status, "active");
   assert.equal(await compare(password, saved.passwordHash!), true);
   assert.deepEqual(saved.clientDetails, {
-    age: details.age, contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation,
+    contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation,
     addressDetails: storedAddressDetails,
   });
   const listed = await listClients(db, admin, { q: registrationInput.email });
@@ -124,18 +122,17 @@ test("customer registration saves a complete record visible in the Client Module
   assert.equal(JSON.stringify(audit).includes(password), false);
 });
 
-test("registration permits an omitted occupation and keeps age zero", async () => {
-  const response = await registerCustomer(registrationRequest({ ...registrationInput, occupation: undefined, age: 0 }));
+test("registration permits an omitted occupation", async () => {
+  const response = await registerCustomer(registrationRequest({ ...registrationInput, occupation: undefined }));
   assert.equal(response.status, 201);
   const { clients } = await listClients(db, admin, {});
-  assert.equal(clients[0].age, 0);
   assert.equal(clients[0].occupation, "");
   assert.equal(clients[0].profileComplete, true);
 });
 
 test("registration rejects incomplete or invalid client details and injected account fields before creating an account", async () => {
   const invalidChanges = [
-    { age: undefined }, { age: null }, { age: "35" }, { age: -1 }, { age: 121 }, { age: 1.5 },
+    { age: 35 },
     { contactNumber: undefined }, { contactNumber: "abcdefg" }, { contactNumber: "123--456" },
     { addressDetails: undefined }, { addressDetails: { ...addressInput, street: "   " } }, { addressDetails: { ...addressInput, barangayCode: "0401014001" } }, { occupation: "a".repeat(101) },
     { role: "admin" }, { status: "disabled" }, { passwordHash: "injected" },
@@ -181,7 +178,6 @@ test("customer updates only their profile and the administrator reads the same s
   await updateClient(db, actor, actor.id, details);
   const dto = await getClient(db, admin, actor.id);
   assert.equal(dto.name, details.name);
-  assert.equal(dto.age, details.age);
   assert.equal(dto.profileComplete, true);
   const saved = await db.collection<UserDocument>("users").findOne({ _id: original._id });
   for (const field of ["email", "role", "status", "googleSub", "passwordHash", "authVersion"] as const) assert.equal(saved?.[field], original[field]);
@@ -218,7 +214,7 @@ test("client APIs cannot modify staff accounts, invalid ids, or unknown account 
 
 test("client searches are literal, paginated, and exclude staff", async () => {
   await db.collection<UserDocument>("users").insertMany([
-    legacyUser({ name: "Literal [.*]", email: "literal@example.test", clientDetails: { age: 35, contactNumber: "09171234567", address: "Sample Address", occupation: "" } }),
+    legacyUser({ name: "Literal [.*]", email: "literal@example.test", clientDetails: { contactNumber: "09171234567", address: "Sample Address", occupation: "" } }),
     legacyUser({ email: "second@example.test" }),
     legacyUser({ email: "staff@example.test", role: "admin" }),
   ]);
@@ -251,7 +247,7 @@ test("client writes reject cross-origin requests and non-JSON forms", () => {
 });
 
 test("archiving and unarchiving preserve client identity, account access, and project and billing records", async () => {
-  const original = legacyUser({ clientDetails: { age: details.age, contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation, addressDetails: storedAddressDetails } });
+  const original = legacyUser({ clientDetails: { contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation, addressDetails: storedAddressDetails } });
   await db.collection<UserDocument>("users").insertOne(original);
   const project = { _id: new ObjectId(), customerId: original._id, reference: "TEST-PROJECT" };
   const invoice = { _id: new ObjectId(), customerId: original._id, projectId: project._id, invoiceNumber: "TEST-INVOICE" };

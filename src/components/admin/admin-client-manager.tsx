@@ -124,7 +124,6 @@ export function AdminClientManager() {
             <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2><span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.archivedAt ? "Archived" : client.status === "active" ? "Active" : "Disabled"}</span></div>
             <p className="mt-1 text-sm break-all text-stone-500">{client.email}</p>
             <dl className="mt-5 space-y-3 text-sm">
-              <div><dt className="text-xs text-stone-500">Age</dt><dd className="mt-1">{client.age === null ? "Not provided" : `${client.age} years`}</dd></div>
               <div><dt className="text-xs text-stone-500">Contact number</dt><dd className="mt-1 break-words">{client.contactNumber || "Not provided"}</dd></div>
               <div><dt className="text-xs text-stone-500">Complete address</dt><dd className="mt-1 whitespace-pre-wrap break-words">{client.address || "Not provided"}</dd></div>
               <div><dt className="text-xs text-stone-500">Occupation</dt><dd className="mt-1 break-words">{client.occupation || "Not provided"}</dd></div>

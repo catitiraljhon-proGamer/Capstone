@@ -45,7 +45,6 @@ export function RegisterAccountPage({
       .trim()
       .toLowerCase();
     const password = String(formData.get("password") ?? "");
-    const age = Number(formData.get("age"));
     const contactNumber = String(formData.get("contactNumber") ?? "").trim();
     const addressDetails = readAddressDetails(formData);
     const occupation = String(formData.get("occupation") ?? "").trim();
@@ -56,7 +55,7 @@ export function RegisterAccountPage({
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, age, contactNumber, addressDetails, occupation }),
+        body: JSON.stringify({ name, email, password, contactNumber, addressDetails, occupation }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -115,7 +114,7 @@ export function RegisterAccountPage({
             ) : null}
             <GoogleAuthButton mode="register" disabled={isSubmitting} />
             <p className="text-xs leading-5 text-stone-500">
-              Registering with Google? Add your age, contact number, and address
+              Registering with Google? Add your contact number and address
               in your client profile after signing in.
             </p>
             <div className="flex items-center gap-4 text-sm text-stone-500">
@@ -172,44 +171,23 @@ export function RegisterAccountPage({
               <FieldError id={errorId("email")} message={fieldError("email")} />
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="age" className="text-sm font-medium text-stone-700">
-                  Age (years) <RequiredIndicator />
-                </label>
-                <input
-                  id="age"
-                  name="age"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={120}
-                  step={1}
-                  required
-                  placeholder="Enter your age"
-                  {...describe("age")}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
-                />
-                <FieldError id={errorId("age")} message={fieldError("age")} />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
-                  Contact number <RequiredIndicator />
-                </label>
-                <input
-                  id="contactNumber"
-                  name="contactNumber"
-                  type="tel"
-                  autoComplete="tel"
-                  minLength={7}
-                  maxLength={25}
-                  required
-                  placeholder="0917 123 4567"
-                  {...describe("contactNumber")}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
-                />
-                <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
-              </div>
+            <div className="space-y-2">
+              <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
+                Contact number <RequiredIndicator />
+              </label>
+              <input
+                id="contactNumber"
+                name="contactNumber"
+                type="tel"
+                autoComplete="tel"
+                minLength={7}
+                maxLength={25}
+                required
+                placeholder="0917 123 4567"
+                {...describe("contactNumber")}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
+              />
+              <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
             </div>
 
             <PhAddressFields

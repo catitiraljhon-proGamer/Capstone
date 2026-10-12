@@ -4,10 +4,6 @@ import {
   googleLinkCookieName,
   readGoogleLink,
 } from "@/lib/server/google-oauth";
-import {
-  readTwoFactorChallenge,
-  twoFactorChallengeCookieName,
-} from "@/lib/server/two-factor";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 
@@ -27,31 +23,17 @@ export default async function LoginPage({
     params.google_link === "1"
       ? await readGoogleLink(cookieStore.get(googleLinkCookieName)?.value)
       : null;
-  const twoFactorPending =
-    params.two_factor === "1" &&
-    Boolean(
-      await readTwoFactorChallenge(
-        cookieStore.get(twoFactorChallengeCookieName)?.value,
-      ),
-    );
   const error =
     googleAuthErrorMessage(params.google_error) ||
-    ((params.google_link === "1" && !link) ||
-    (params.two_factor === "1" && !twoFactorPending)
+    (params.google_link === "1" && !link
       ? googleAuthErrorMessage("expired")
       : "");
   return (
     <SignInPage
-      key={`${link?.email ?? "login"}:${twoFactorPending}:${error}`}
+      key={`${link?.email ?? "login"}:${error}`}
       initialError={error}
-      initialNotice={
-        params.two_factor_enabled === "1"
-          ? "Two-factor authentication is on. Sign in again with your password and the 6-digit code from your authenticator app."
-          : ""
-      }
       googleLinkEmail={link?.email}
       initialRememberMe={link?.rememberMe}
-      twoFactorPending={twoFactorPending}
     />
   );
 }

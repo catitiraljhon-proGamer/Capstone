@@ -10,7 +10,7 @@ import type { NextResponse } from "next/server";
 export const sessionCookieName = "g4_session";
 
 export async function createSessionToken(
-  user: SessionUser & { authVersion: number; twoFactor: boolean },
+  user: SessionUser & { authVersion: number },
   expiresIn: string,
 ) {
   return new SignJWT({
@@ -18,7 +18,6 @@ export async function createSessionToken(
     name: user.name,
     role: user.role,
     authVersion: user.authVersion,
-    twoFactor: user.twoFactor,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
@@ -46,7 +45,6 @@ async function setSessionCookie(
     {
       ...sessionUser,
       authVersion: user.authVersion ?? 0,
-      twoFactor: Boolean(user.twoFactor),
     },
     `${maxAge}s`,
   );
@@ -95,26 +93,7 @@ async function readSessionPayload() {
   }
 }
 
-/**
- * Re-signs the current session when its 2FA claim no longer matches the
- * account, so the proxy sees the change without a new sign-in. The original
- * expiry is kept.
- */
-export async function syncSessionTwoFactor(response: NextResponse, user: UserDocument) {
-  const payload = await readSessionPayload();
-  if (!payload || payload.twoFactor === Boolean(user.twoFactor)) return;
-  const maxAge = (payload.exp ?? 0) - Math.floor(Date.now() / 1000);
-  if (maxAge > 0) await setSessionCookie(response, user, maxAge);
-}
-
-type ReadSessionOptions = {
-  /** Lets accounts without 2FA through; only for signing out and setting up 2FA. */
-  allowWithoutTwoFactor?: boolean;
-};
-
-export async function readSession(
-  options: ReadSessionOptions = {},
-): Promise<SessionUser | null> {
+export async function readSession(): Promise<SessionUser | null> {
   const payload = await readSessionPayload();
 
   if (!payload) {
@@ -146,7 +125,6 @@ export async function readSession(
           name: 1,
           role: 1,
           authVersion: 1,
-          "twoFactor.enabledAt": 1,
         },
       },
     );
@@ -154,8 +132,7 @@ export async function readSession(
     if (
       !user ||
       user.role !== role ||
-      (user.authVersion ?? 0) !== tokenAuthVersion ||
-      (!user.twoFactor && !options.allowWithoutTwoFactor)
+      (user.authVersion ?? 0) !== tokenAuthVersion
     ) {
       return null;
     }
@@ -171,11 +148,8 @@ export async function readSession(
   }
 }
 
-export async function requireSession(
-  roles?: UserRole[],
-  options?: ReadSessionOptions,
-) {
-  const session = await readSession(options);
+export async function requireSession(roles?: UserRole[]) {
+  const session = await readSession();
 
   if (!session || (roles && !roles.includes(session.role))) {
     return null;
