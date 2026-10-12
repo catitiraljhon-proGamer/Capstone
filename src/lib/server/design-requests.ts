@@ -4,6 +4,7 @@ import { collections, type ApprovalDocument, type AuditLogDocument, type DesignR
 import { invoiceState, sumMoney, toCentavos } from "@/lib/billing";
 import { BillingError, billingTransaction } from "@/lib/server/billing";
 import { embeddedImagesSchema } from "@/lib/server/embedded-images";
+import { insertNotifications } from "@/lib/server/notifications";
 import type { DesignRequestDto } from "@/types/design-requests";
 import type { SessionUser } from "@/types/domain";
 
@@ -83,11 +84,11 @@ export async function deliverDesign(db: Db, actor: SessionUser, id: string, raw:
       completedDesignImages: input.images, status: "Completed", completedAt: now,
       completedBy: requestId(actor.id), completedByName: actor.name, updatedAt: now,
     } }, { session });
-    await db.collection<NotificationDocument>(collections.notifications).insertOne({
+    await insertNotifications(db, [{
       _id: new ObjectId(), userId: design.customerId, title: "Your requested design is ready",
       body: "Your finished design is in Dream House. The Billing Clerk will issue the design fee; viewing and downloading unlock after full payment is verified.",
       href: "/customer/dream-house", kind: "design-request-completed", entityId: design._id, createdAt: now,
-    }, { session });
+    }], session);
     const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
     if (clerks.length) await db.collection<NotificationDocument>(collections.notifications).insertMany(clerks.map((clerk) => ({
       _id: new ObjectId(), userId: clerk._id, title: "Design fee ready for billing",

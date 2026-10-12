@@ -4,11 +4,11 @@ import {
   type DesignRequestDocument,
   type DocumentRecord,
   type EstimateDocument,
-  type NotificationDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
+import { insertNotifications } from "@/lib/server/notifications";
 import { readSession } from "@/lib/server/session";
 import type { ApprovalRecordType } from "@/types/approvals";
 import { ObjectId } from "mongodb";
@@ -162,9 +162,8 @@ export async function PATCH(
     const isFeasibleDesign =
       existing.recordType === "Design request" && input.decision === "Approved";
     await Promise.all([
-      db
-        .collection<NotificationDocument>(collections.notifications)
-        .insertOne({
+      insertNotifications(db, [
+        {
           _id: new ObjectId(),
           userId: existing.customerId,
           title: isFeasibleDesign
@@ -181,7 +180,8 @@ export async function PATCH(
           kind: "approval-decision",
           entityId: existing._id,
           createdAt: now,
-        }),
+        },
+      ]),
       recordAuditLog({
         db,
         actor: session,

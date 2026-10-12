@@ -34,7 +34,7 @@ type FieldErrors = Record<string, string | null | undefined>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function emailError(raw: string) {
+export function emailError(raw: string) {
   const text = raw.trim();
   if (!text) return "Enter the email address.";
   if (text.length > 254) return "Email address must be 254 characters or fewer.";

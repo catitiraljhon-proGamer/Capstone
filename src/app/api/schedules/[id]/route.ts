@@ -1,11 +1,11 @@
 import {
   collections,
   type AuditLogDocument,
-  type NotificationDocument,
   type ScheduleDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
+import { insertNotifications } from "@/lib/server/notifications";
 import { scheduleStatusSchema, toScheduleDto } from "@/lib/server/schedules";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
@@ -55,14 +55,14 @@ export async function PATCH(
         },
         createdAt: now,
       }),
-      db.collection<NotificationDocument>(collections.notifications).insertOne({
+      insertNotifications(db, [{
         _id: new ObjectId(),
         userId: document.clientId,
         title: "Schedule status updated",
         body: `${document.title}: ${changes.status}.`,
         href: "/customer/notifications",
         createdAt: now,
-      }),
+      }]),
     ]);
 
     return NextResponse.json({ schedule: toScheduleDto(document) });

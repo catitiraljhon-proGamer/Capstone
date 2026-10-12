@@ -43,6 +43,7 @@ export const collections = {
   schedules: "schedules",
   auditLogs: "audit_logs",
   rateLimits: "rate_limits",
+  emailVerifications: "email_verifications",
 } as const;
 
 export type UserDocument = {
@@ -67,6 +68,15 @@ export type RateLimitDocument = {
   windowStartedAt: Date;
   lockouts: number;
   lockedUntil?: Date | null;
+  expiresAt: Date;
+};
+
+/** One pending registration code per email address; the code itself is stored hashed. */
+export type EmailVerificationDocument = {
+  _id: string;
+  codeHash: string;
+  attempts: number;
+  sentAt: Date;
   expiresAt: Date;
 };
 
@@ -365,6 +375,8 @@ export type NotificationDocument = {
   kind?: string;
   entityId?: ObjectId;
   readAt?: Date;
+  /** Set when the customer's email copy is claimed for sending, so it is sent once. */
+  emailedAt?: Date;
   createdAt: Date;
 };
 

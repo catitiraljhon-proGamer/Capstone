@@ -23,6 +23,7 @@ import {
 } from "@/lib/construction";
 import { BillingError, audit, billingTransaction, nextReference } from "@/lib/server/billing";
 import { customerDesignDto } from "@/lib/server/design-requests";
+import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import type {
@@ -110,8 +111,8 @@ async function activeUsers(db: Db, session: ClientSession, role: UserRole) {
 async function notify(db: Db, session: ClientSession, userIds: ObjectId[], note: Pick<NotificationDocument, "title" | "body" | "href" | "kind" | "entityId">) {
   if (!userIds.length) return;
   const createdAt = new Date();
-  await db.collection<NotificationDocument>(collections.notifications).insertMany(
-    userIds.map((userId) => ({ _id: new ObjectId(), userId, ...note, createdAt })), { session },
+  await insertNotifications(
+    db, userIds.map((userId) => ({ _id: new ObjectId(), userId, ...note, createdAt })), session,
   );
 }
 

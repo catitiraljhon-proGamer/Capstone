@@ -1,10 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { ObjectId, type ClientSession, type Db } from "mongodb";
 import { z } from "zod";
-import { collections, type InvoiceDocument, type NotificationDocument, type PaymentCheckoutDocument, type PaymentDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type InvoiceDocument, type PaymentCheckoutDocument, type PaymentDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, sumMoney, toCentavos } from "@/lib/billing";
 import { assertBillingRole, audit, BillingError, billingTransaction, lockInvoice, nextReference, verifyPaymentInSession } from "@/lib/server/billing";
 import { getAuthSecret } from "@/lib/server/auth-secret";
+import { insertNotifications } from "@/lib/server/notifications";
 import { PAYMONGO_MIN_AMOUNT, paymongoMethodLabels, paymongoMethods, type PaymongoCheckoutDto, type PaymongoMethod } from "@/types/paymongo";
 import type { PaymentMethod } from "@/types/billing";
 import type { SessionUser } from "@/types/domain";
@@ -294,12 +295,11 @@ export async function handlePaymongoWebhook(db: Db, rawBody: string, signatureHe
     await payments.insertOne(doc, { session });
     const paid = await verifiedTotal(db, invoice._id, session);
     const payable = !["Draft", "Ready", "Void"].includes(invoice.status) && toCentavos(amount) <= toCentavos(invoiceState(invoice, paid).balance);
-    const notifications = db.collection<NotificationDocument>(collections.notifications);
     if (payable) {
       await verifyPaymentInSession(db, session, { payment: doc, invoice, verifier: { id: invoice.customerId.toHexString(), ...SIMULATED_ACTOR }, now });
     } else {
       const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
-      await notifications.insertMany([
+      await insertNotifications(db, [
         ...clerks.map((clerk) => ({
           _id: new ObjectId(), userId: clerk._id, title: "Online payment needs review",
           body: `${doc.reference} (${formatPhp(amount)}) was paid online for ${invoice.invoiceNumber} but could not be applied automatically. Review it in Payments.`,
@@ -310,7 +310,7 @@ export async function handlePaymongoWebhook(db: Db, rawBody: string, signatureHe
           body: `${doc.reference} for ${invoice.invoiceNumber} was received and is being reviewed by the Billing Clerk.`,
           href: "/customer/billing", kind: "billing", entityId: doc._id, createdAt: now,
         },
-      ], { session });
+      ], session);
     }
     await checkouts.updateOne({ _id: checkout._id }, { $set: {
       status: "paid", method, paymentId: payment.id, billingPaymentId: doc._id, completedAt: now, updatedAt: now,
@@ -337,11 +337,11 @@ async function handleFailed(db: Db, eventId: string, sessionId: string, resource
     );
     if (!claimed) return;
     const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOne({ _id: checkout.invoiceId }, { session });
-    await db.collection<NotificationDocument>(collections.notifications).insertOne({
+    await insertNotifications(db, [{
       _id: new ObjectId(), userId: checkout.customerId, title: "Online payment failed",
       body: `${paymongoMethodLabels[method]} payment for ${invoice?.invoiceNumber ?? "your invoice"} did not go through: ${failureReason} You were not charged.`,
       href: "/customer/billing", kind: "billing", entityId: checkout._id, createdAt: now,
-    }, { session });
+    }], session);
     await audit(db, session, { id: checkout.customerId.toHexString(), ...SIMULATED_ACTOR }, "paymongo.payment-failed", "payment-checkout", checkout._id, {
       sessionId, method, reason: failureReason,
     });

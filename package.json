@@ -11,6 +11,7 @@
     "test:auth": "node --import tsx --test tests/google-auth.test.ts",
     "test:database": "node --import tsx --test tests/mongodb.test.ts",
     "test:clients": "node --import tsx --test tests/clients.test.ts",
+    "test:email": "node --import tsx --test tests/notification-emails.test.ts",
     "test:pricing": "node --import tsx --test tests/house-design-pricing.test.ts",
     "test:billing": "node --import tsx --test tests/billing.test.ts",
     "test:construction": "node --import tsx --test tests/construction-pricing.test.ts tests/construction.test.ts",
@@ -28,6 +29,7 @@
     "lucide-react": "^1.27.0",
     "mongodb": "^6.21.0",
     "next": "16.4.0",
+    "nodemailer": "^10.0.12",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.3"
@@ -35,6 +37,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

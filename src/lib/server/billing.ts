@@ -1,7 +1,8 @@
 import { ObjectId, MongoServerError, type ClientSession, type Db, type Filter } from "mongodb";
 import { z } from "zod";
-import { collections, type AuditLogDocument, type DesignRequestDocument, type InvoiceDocument, type NotificationDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type AuditLogDocument, type DesignRequestDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
+import { insertNotifications } from "@/lib/server/notifications";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
 import type { SessionUser, UserRole } from "@/types/domain";
@@ -97,10 +98,10 @@ export async function audit(db: Db, session: ClientSession, actor: Pick<SessionU
 }
 
 async function notifyCustomer(db: Db, session: ClientSession, customerId: ObjectId, title: string, body: string, entityId: ObjectId) {
-  await db.collection<NotificationDocument>(collections.notifications).insertOne({
+  await insertNotifications(db, [{
     _id: new ObjectId(), userId: customerId, title, body, entityId,
     kind: "billing", href: "/customer/billing", createdAt: new Date(),
-  }, { session });
+  }], session);
 }
 
 async function lockProject(db: Db, session: ClientSession, id: ObjectId) {
@@ -306,7 +307,6 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
     { $set: { paymentStatus: fullyPaid ? "Paid" : "Expected", updatedAt: now } }, { session },
   );
   if (!milestone.isDownpayment) return;
-  const notifications = db.collection<NotificationDocument>(collections.notifications);
   if (action === "verify" && fullyPaid && project.status === "Awaiting downpayment") {
     const startDate = project.startDate?.toISOString().slice(0, 10);
     const scheduled = Boolean(startDate && startDate > manilaDate(now));
@@ -314,7 +314,7 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
     const moved = await projects.updateOne({ _id: project._id, status: "Awaiting downpayment" }, { $set: { status, updatedAt: now } }, { session });
     if (!moved.modifiedCount) return;
     const admins = await db.collection<UserDocument>(collections.users).find({ role: "admin", status: "active" }, { session, projection: { _id: 1 } }).toArray();
-    await notifications.insertMany([
+    await insertNotifications(db, [
       {
         _id: new ObjectId(), userId: project.customerId,
         title: scheduled ? "Downpayment verified — your project is scheduled" : "Downpayment verified — your project is active",
@@ -326,14 +326,14 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
         body: `${project.reference} · ${project.name} is now ${status.toLowerCase()}.`,
         href: "/admin/projects", kind: "construction-project", entityId: project._id, createdAt: now,
       })),
-    ], { session });
+    ], session);
   } else if (action === "reverse" && !fullyPaid && project.status === "Scheduled") {
     await projects.updateOne({ _id: project._id, status: "Scheduled" }, { $set: { status: "Awaiting downpayment", updatedAt: now } }, { session });
-    await notifications.insertOne({
+    await insertNotifications(db, [{
       _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment reversed",
       body: `A downpayment payment for ${project.name} was reversed. Settle the downpayment to keep your project schedule.`,
       href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
-    }, { session });
+    }], session);
   }
 }
 
@@ -370,11 +370,11 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
     $set: { status: invoiceState(invoice, updatedPaid, now).status, updatedAt: now },
   }, { session });
   if (invoice.designRequestId && toCentavos(updatedPaid) >= toCentavos(invoice.amount)) {
-    await db.collection<NotificationDocument>(collections.notifications).insertOne({
+    await insertNotifications(db, [{
       _id: new ObjectId(), userId: invoice.customerId, title: "Your house design is unlocked",
       body: "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
       href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
-    }, { session });
+    }], session);
   }
   if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "verify", now);
   await audit(db, session, verifier, "payment.verify", "payment", payment._id, { reference: payment.reference, amount: payment.amount });
@@ -416,11 +416,11 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     }, { session });
     if (input.action === "reverse") {
       if (invoice.designRequestId) {
-        await db.collection<NotificationDocument>(collections.notifications).insertOne({
+        await insertNotifications(db, [{
           _id: new ObjectId(), userId: invoice.customerId, title: "Design access requires payment",
           body: "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
           href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
-        }, { session });
+        }], session);
       }
       if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "reverse", now);
     }

@@ -7,6 +7,7 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { recordAuditLog } from "@/lib/server/audit";
 import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
+import { checkEmailVerificationCode, EmailVerificationError } from "@/lib/server/email-verification";
 import {
   clientIp,
   formatRetryAfter,
@@ -31,11 +32,15 @@ const registrationSchema = createClientSchema.extend({
     .string()
     .min(8, "Your password must contain at least 8 characters.")
     .max(72, "Your password must contain 72 characters or fewer."),
+  verificationCode: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code sent to your email."),
 });
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password, ...input } = registrationSchema.parse(await request.json());
+    const { name, email, password, verificationCode, ...input } = registrationSchema.parse(await request.json());
     const clientDetails = toClientDetails(input);
     const db = await getDatabase();
     // Every attempt from a network address counts, which limits both
@@ -64,6 +69,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // Proves the registrant can read this inbox, so made-up addresses cannot register.
+    await checkEmailVerificationCode(db, email, verificationCode);
+
     const now = new Date();
     const userId = new ObjectId();
     const user: UserDocument = {
@@ -90,6 +98,8 @@ export async function POST(request: Request) {
       }
       throw error;
     }
+    // The used code is left to expire: the account now exists, so it cannot register
+    // again, and a simultaneous duplicate submission still gets the 409 above.
 
     const admins = await users
       .find(
@@ -131,6 +141,9 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    if (error instanceof EmailVerificationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return apiError(error);
   }
 }

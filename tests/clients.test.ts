@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, before, beforeEach, test } from "node:test";
+import { after, before, beforeEach, mock, test } from "node:test";
 import { compare } from "bcryptjs";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { type Db, type MongoClient, ObjectId } from "mongodb";
@@ -9,6 +9,8 @@ import { clientProfileSchema, ClientRequestError, createClient, getClient, listC
 import { assertClientMutation, clientApiError } from "@/lib/server/client-api";
 import type { SessionUser } from "@/types/domain";
 import { POST as registerCustomer } from "@/app/api/auth/register/route";
+import { POST as sendVerificationCode } from "@/app/api/auth/register/send-code/route";
+import { issueEmailVerificationCode } from "@/lib/server/email-verification";
 import { sessionCookieName } from "@/lib/server/session";
 import { phContactNumberError, sanitizePhContactNumberInput } from "@/lib/ph-contact-number";
 
@@ -22,12 +24,22 @@ const formattedAddress = "123 Example Street, Brgy. Baclaran, Balayan, Batangas 
 const details = { name: "Test Client", contactNumber: "+63 917 123 4567", addressDetails: addressInput, occupation: "Engineer" };
 const password = "Test-password-2026";
 const registrationInput = { ...details, email: "new@example.test", password };
+// Issued fresh for registrationInput.email before every test.
+let verificationCode = "";
 
 function registrationRequest(input: unknown) {
   return new Request("http://localhost:3000/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ verificationCode, ...(input as object) }),
+  });
+}
+
+function sendCodeRequest(email: string, ip = "203.0.113.10") {
+  return new Request("http://localhost:3000/api/auth/register/send-code", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-real-ip": ip },
+    body: JSON.stringify({ email }),
   });
 }
 
@@ -43,7 +55,8 @@ before(async () => {
   db = await getDatabase();
 });
 beforeEach(async () => {
-  await Promise.all(["users", "audit_logs", "notifications", "projects", "invoices"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["users", "audit_logs", "notifications", "projects", "invoices", "rate_limits", "email_verifications"].map((name) => db.collection(name).deleteMany({})));
+  verificationCode = await issueEmailVerificationCode(db, registrationInput.email);
 });
 after(async () => {
   const cache = globalThis as typeof globalThis & { mongoClientPromise?: Promise<MongoClient> };
@@ -190,6 +203,86 @@ test("simultaneous registrations with the same email create only one client", as
   ]);
   assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
   assert.equal((await listClients(db, admin, {})).total, 1);
+});
+
+test("registration requires the latest unexpired code sent to that email address", async () => {
+  for (const code of [undefined, "12345", "abcdef"]) {
+    const response = await registerCustomer(registrationRequest({ ...registrationInput, verificationCode: code }));
+    assert.equal(response.status, 400, String(code));
+  }
+  const wrongCode = verificationCode === "000000" ? "111111" : "000000";
+  const wrong = await registerCustomer(registrationRequest({ ...registrationInput, verificationCode: wrongCode }));
+  assert.equal(wrong.status, 400);
+  assert.match((await wrong.json()).error, /incorrect/);
+  // A code sent to one address cannot register a different, made-up address.
+  const otherAddress = await registerCustomer(registrationRequest({ ...registrationInput, email: "made-up@example.test" }));
+  assert.equal(otherAddress.status, 400);
+  await db.collection<{ _id: string }>("email_verifications").updateOne(
+    { _id: registrationInput.email }, { $set: { expiresAt: new Date(Date.now() - 1000) } },
+  );
+  const expired = await registerCustomer(registrationRequest(registrationInput));
+  assert.equal(expired.status, 400);
+  assert.match((await expired.json()).error, /expired/);
+  assert.equal(await db.collection("users").countDocuments(), 0);
+  assert.equal(await db.collection("audit_logs").countDocuments(), 0);
+});
+
+test("a verification code stops working after five wrong attempts", async () => {
+  const wrongCode = verificationCode === "000000" ? "111111" : "000000";
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal((await registerCustomer(registrationRequest({ ...registrationInput, verificationCode: wrongCode }))).status, 400);
+  }
+  const response = await registerCustomer(registrationRequest(registrationInput));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /too many times/);
+  assert.equal(await db.collection("users").countDocuments(), 0);
+});
+
+test("verification codes go only to addresses without an account, at most once a minute, and are stored hashed", async () => {
+  const logged: string[] = [];
+  mock.method(console, "info", (message: string) => logged.push(message));
+  try {
+    const sent = await sendVerificationCode(sendCodeRequest("  Fresh@Example.TEST "));
+    assert.equal(sent.status, 200);
+    const code = logged.at(-1)?.match(/fresh@example\.test: (\d{6})$/)?.[1];
+    assert.ok(code);
+    const stored = await db.collection<{ _id: string }>("email_verifications").findOne({ _id: "fresh@example.test" });
+    assert.ok(stored);
+    assert.equal(JSON.stringify(stored).includes(code), false);
+
+    const tooSoon = await sendVerificationCode(sendCodeRequest("fresh@example.test"));
+    assert.equal(tooSoon.status, 429);
+    assert.ok((await tooSoon.json()).retryAfterSeconds > 0);
+
+    await db.collection<UserDocument>("users").insertOne(legacyUser({ email: "taken@example.test" }));
+    assert.equal((await sendVerificationCode(sendCodeRequest("taken@example.test"))).status, 409);
+    assert.equal((await sendVerificationCode(sendCodeRequest("not-an-email"))).status, 400);
+
+    const registered = await registerCustomer(registrationRequest({ ...registrationInput, email: "fresh@example.test", verificationCode: code }));
+    assert.equal(registered.status, 201);
+  } finally {
+    mock.restoreAll();
+  }
+});
+
+test("one address cannot be flooded with verification emails from many networks", async () => {
+  const realNow = Date.now();
+  mock.method(console, "info", () => undefined);
+  try {
+    for (let request = 0; request < 5; request += 1) {
+      // Step past the one-minute resend wait each time.
+      await db.collection<{ _id: string }>("email_verifications").updateOne(
+        { _id: "inbox@example.test" }, { $set: { sentAt: new Date(realNow - 120_000) } },
+      );
+      assert.equal((await sendVerificationCode(sendCodeRequest("inbox@example.test", `198.51.100.${request}`))).status, 200);
+    }
+    await db.collection<{ _id: string }>("email_verifications").updateOne(
+      { _id: "inbox@example.test" }, { $set: { sentAt: new Date(realNow - 120_000) } },
+    );
+    assert.equal((await sendVerificationCode(sendCodeRequest("inbox@example.test", "198.51.100.99"))).status, 429);
+  } finally {
+    mock.restoreAll();
+  }
 });
 
 test("customer updates only their profile and the administrator reads the same saved record", async () => {

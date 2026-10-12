@@ -112,6 +112,7 @@ async function ensureIndexes(db: Db) {
       db.collection("audit_logs").createIndex({ entityType: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ actorId: 1, createdAt: -1 }),
       db.collection("rate_limits").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      db.collection("email_verifications").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ])
       .then(() => undefined)
       .catch((error: unknown) => {

@@ -1,13 +1,13 @@
 import {
   collections,
   type AuditLogDocument,
-  type NotificationDocument,
   type ProjectDocument,
   type ScheduleDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
+import { insertNotifications } from "@/lib/server/notifications";
 import { scheduleInputSchema, toScheduleDto } from "@/lib/server/schedules";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
@@ -146,14 +146,14 @@ export async function POST(request: Request) {
         },
         createdAt: now,
       }),
-      db.collection<NotificationDocument>(collections.notifications).insertOne({
+      insertNotifications(db, [{
         _id: new ObjectId(),
         userId: clientId,
         title: isMeeting ? "Meeting scheduled" : "Payment schedule added",
         body: `${document.title} is scheduled for ${formatScheduleDate(scheduledFor)}.`,
         href: "/customer/notifications",
         createdAt: now,
-      }),
+      }]),
     ]);
 
     return NextResponse.json({ schedule: toScheduleDto(document) }, { status: 201 });
