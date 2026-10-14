@@ -290,7 +290,7 @@ export function SignInPage({
               <p className="animate-element animate-delay-1000 text-center text-sm text-stone-500">
                 New client?{" "}
                 <Link
-                  href="/register"
+                  href="/register?from=login"
                   className="font-semibold text-red-700 hover:underline"
                 >
                   Create an account

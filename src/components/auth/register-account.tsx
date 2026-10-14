@@ -22,8 +22,10 @@ const benefits = [
 
 export function RegisterAccountPage({
   initialError = "",
+  backHref = "/",
 }: {
   initialError?: string;
+  backHref?: string;
 }) {
   const [showPasswords, setShowPasswords] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -165,7 +167,7 @@ export function RegisterAccountPage({
           <Link href="/" aria-label="G4 Builders home" className="min-w-0">
             <BrandLogo />
           </Link>
-          <BackButton href="/login" />
+          <BackButton href={backHref} />
         </nav>
       </header>
 

@@ -23,5 +23,12 @@ export default async function RegisterPage({
 
   const params = await searchParams;
   const error = googleAuthErrorMessage(params.google_error);
-  return <RegisterAccountPage key={error} initialError={error} />;
+  const backHref = params.from === "login" ? "/login" : "/";
+  return (
+    <RegisterAccountPage
+      key={error}
+      initialError={error}
+      backHref={backHref}
+    />
+  );
 }
