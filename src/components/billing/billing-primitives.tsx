@@ -35,7 +35,12 @@ export function BillingDialog({ title, children, onClose, busy = false }: {
     document.body.style.overflow = "hidden";
     return () => { dialog?.close(); document.body.style.overflow = previousOverflow; };
   }, []);
-  return <dialog ref={ref} aria-label={title} onCancel={(event) => { event.preventDefault(); if (!busy) onClose(); }}
+  return <dialog ref={ref} aria-label={title} onCancel={(event) => {
+    // A dismissed file picker fires a bubbling "cancel" from its input; only Escape on the dialog closes it.
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    if (!busy) onClose();
+  }}
     className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-xl border border-stone-200 bg-white p-0 text-stone-950 shadow-xl backdrop:bg-stone-950/40">
     <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-stone-200 bg-white px-5 py-4">
       <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
