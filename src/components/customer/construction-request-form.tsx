@@ -33,7 +33,7 @@ function addressErrorsOf(form: HTMLFormElement): AddressErrors {
     province: address.provinceCode ? null : "Choose the province.",
     city: address.cityCode ? null : "Choose the city or municipality.",
     barangay: address.barangayCode ? null : "Choose the barangay.",
-    street: address.street.length >= 2 ? null : "Enter the house number and street.",
+    street: address.street.length === 1 ? "House no. / street must be at least 2 characters." : null,
     postalCode: !address.postalCode ? "Enter the postal code." : /^\d{4}$/.test(address.postalCode) ? null : "Postal code must be 4 digits.",
   };
 }

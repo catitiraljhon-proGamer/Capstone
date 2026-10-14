@@ -20,7 +20,7 @@ export const addressDetailsSchema = z
     cityCode: psgcCode,
     barangayCode: psgcCode,
     barangay: z.string().trim().min(1, "Choose your barangay.").max(120),
-    street: z.string().trim().min(2, "Enter your house number and street.").max(200),
+    street: z.string().trim().max(200).refine((street) => street.length !== 1, "House no. / street must be at least 2 characters."),
     postalCode: z.string().trim().regex(/^\d{4}$/, "Enter a 4-digit postal code."),
   })
   .strict()

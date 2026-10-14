@@ -15,7 +15,8 @@ export function formatAddress(
   const barangay = /^(barangay|brgy\.?)\s/i.test(address.barangay)
     ? address.barangay
     : `Brgy. ${address.barangay}`;
-  return `${address.street}, ${barangay}, ${address.city}, ${address.province} ${address.postalCode}`;
+  const street = address.street.trim();
+  return `${street ? `${street}, ` : ""}${barangay}, ${address.city}, ${address.province} ${address.postalCode}`;
 }
 
 const provinceCache = new Map<string, Promise<PhCity[]>>();

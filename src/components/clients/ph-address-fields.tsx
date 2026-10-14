@@ -56,7 +56,7 @@ export function addressFieldErrors(values: Record<string, string | undefined>): 
   else if (!get(fieldNames.cityCode)) errors[fieldNames.cityCode] = "Select your city or municipality.";
   else if (!get(fieldNames.barangayCode)) errors[fieldNames.barangayCode] = "Select your barangay.";
 
-  const street = textError(get(fieldNames.street), { label: "House no. / street", min: 2, max: 200 });
+  const street = textError(get(fieldNames.street), { label: "House no. / street", required: false, min: 2, max: 200 });
   if (street) errors[fieldNames.street] = street;
 
   const postal = get(fieldNames.postalCode);
@@ -233,13 +233,12 @@ export function PhAddressFields({
       <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-street`}>
-            House no. / street <RequiredIndicator />
+            House no. / street (optional)
             <input
               id={`${id}-street`}
               name={fieldNames.street}
               {...describe(fieldNames.street, "street")}
               autoComplete="address-line1"
-              required
               minLength={2}
               maxLength={200}
               placeholder="123 Rizal Street, Purok 2"
