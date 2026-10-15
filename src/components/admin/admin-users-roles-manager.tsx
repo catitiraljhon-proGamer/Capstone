@@ -526,9 +526,20 @@ export function AdminUsersRolesManager() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {roleGuide.map((item) => (
-          <section
+          <button
             key={item.role}
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+            type="button"
+            aria-pressed={roleFilter === item.role}
+            aria-controls="user-directory"
+            onClick={() => {
+              // Clicking the selected role again shows every account.
+              setRoleFilter(roleFilter === item.role ? "all" : item.role);
+              setPage(1);
+              document.getElementById("user-directory")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            className={`rounded-xl border bg-white p-5 text-left shadow-sm transition hover:border-red-200 hover:bg-red-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600 ${
+              roleFilter === item.role ? "border-red-300 ring-2 ring-red-600/10" : "border-stone-200"
+            }`}
           >
             <div className="flex items-start gap-4">
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-50 text-red-700">
@@ -536,7 +547,7 @@ export function AdminUsersRolesManager() {
               </span>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold">{item.title}</h3>
+                  <span className="font-semibold">{item.title}</span>
                   <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600">
                     {roleCounts[item.role]}
                   </span>
@@ -544,13 +555,16 @@ export function AdminUsersRolesManager() {
                 <p className="mt-2 text-sm leading-5 text-stone-600">
                   {item.description}
                 </p>
+                <p className="mt-3 text-xs font-semibold text-red-700">
+                  {roleFilter === item.role ? "Showing these accounts · Click to show all" : "Click to show these accounts"}
+                </p>
               </div>
             </div>
-          </section>
+          </button>
         ))}
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <section id="user-directory" className="scroll-mt-28 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-stone-200 p-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">User directory</h2>
