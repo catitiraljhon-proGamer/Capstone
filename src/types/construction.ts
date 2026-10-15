@@ -2,7 +2,7 @@ import type { AddressDetails } from "@/types/clients";
 
 /**
  * Construction phase: after a design is unlocked, the customer asks to build it,
- * the admin prepares a cost estimate (BOQ + 12% VAT + payment schedule), the
+ * the admin prepares a cost estimate (scope of works + payment schedule, no VAT), the
  * customer accepts with a downpayment of at least 30%, and a project is created.
  *
  * API contract (all JSON, errors are `{ error: string }`):

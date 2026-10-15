@@ -11,7 +11,6 @@ import {
   lineAmount,
   MIN_DOWNPAYMENT_PERCENT,
   scheduleTemplateError,
-  VAT_RATE,
 } from "@/lib/construction";
 import { amountError, dateError, numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
@@ -50,17 +49,16 @@ export function EstimateStatusPill({ status }: { status: EstimateStatus }) {
 let rowCounter = 0;
 const nextKey = () => ++rowCounter;
 
-type LineRow = { key: number; item: string; description: string; unit: string; quantity: string; unitPrice: string };
+/** One scope of work and its lump-sum amount; saved as a 1 lot line so older estimates still read the same way. */
+type LineRow = { key: number; scope: string; amount: string };
 type ScheduleRow = { key: number; label: string; description: string; percentage: string; targetDate: string };
 
 const toLineRows = (items: EstimateLineItemInput[]): LineRow[] =>
   items.map((line) => ({
     key: nextKey(),
-    item: line.item,
-    description: line.description,
-    unit: line.unit,
-    quantity: String(line.quantity),
-    unitPrice: String(line.unitPrice),
+    // Older itemized lines fold their description into the scope text.
+    scope: (line.description ? `${line.item} – ${line.description}` : line.item).slice(0, 160),
+    amount: String(lineAmount(line.quantity, line.unitPrice)),
   }));
 
 const toScheduleRows = (template: MilestoneTemplate[]): ScheduleRow[] =>
@@ -78,13 +76,7 @@ const num = (value: string) => {
 };
 
 const fromLineRows = (rows: LineRow[]): EstimateLineItemInput[] =>
-  rows.map((row) => ({
-    item: row.item.trim(),
-    description: row.description.trim(),
-    unit: row.unit.trim(),
-    quantity: num(row.quantity),
-    unitPrice: num(row.unitPrice),
-  }));
+  rows.map((row) => ({ item: row.scope.trim(), description: "", unit: "lot", quantity: 1, unitPrice: num(row.amount) }));
 
 const fromScheduleRows = (rows: ScheduleRow[]): MilestoneTemplate[] =>
   rows.map((row) => ({
@@ -159,10 +151,12 @@ function TotalsBox({ subtotal, vat, total }: { subtotal: number; vat: number; to
         <dt className="text-stone-600">Subtotal</dt>
         <dd className="font-medium tabular-nums">{formatPeso(subtotal)}</dd>
       </div>
-      <div className="flex justify-between gap-4">
-        <dt className="text-stone-600">VAT ({Math.round(VAT_RATE * 100)}%)</dt>
-        <dd className="font-medium tabular-nums">{formatPeso(vat)}</dd>
-      </div>
+      {vat > 0 ? (
+        <div className="flex justify-between gap-4">
+          <dt className="text-stone-600">VAT</dt>
+          <dd className="font-medium tabular-nums">{formatPeso(vat)}</dd>
+        </div>
+      ) : null}
       <div className="flex justify-between gap-4 border-t border-stone-200 pt-3 text-base">
         <dt className="font-semibold">Contract total</dt>
         <dd className="font-semibold tabular-nums text-red-700">{formatPeso(total)}</dd>
@@ -218,27 +212,19 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
     <div className="space-y-5">
       <DetailsCard estimate={estimate} />
 
-      <Card title="Bill of quantities">
+      <Card title="Scope of works">
         <div className="-mx-5 overflow-x-auto px-5">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead className="border-y border-stone-200 bg-stone-50">
               <tr>
-                <th className={headClass}>Item</th>
-                <th className={headClass}>Description</th>
-                <th className={headClass}>Unit</th>
-                <th className={`${headClass} text-right`}>Qty</th>
-                <th className={`${headClass} text-right`}>Unit price</th>
+                <th className={headClass}>Scope of works</th>
                 <th className={`${headClass} text-right`}>Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {estimate.lineItems.map((line) => (
                 <tr key={line.id}>
-                  <td className="px-3 py-3 font-medium">{line.item}</td>
-                  <td className="px-3 py-3 text-stone-600">{line.description || "—"}</td>
-                  <td className="px-3 py-3">{line.unit}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{line.quantity.toLocaleString("en-PH")}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">{formatPeso(line.unitPrice)}</td>
+                  <td className="px-3 py-3 font-medium">{line.description ? `${line.item} – ${line.description}` : line.item}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums">{formatPeso(line.amount)}</td>
                 </tr>
               ))}
@@ -306,18 +292,13 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
 
 type Issue = { id: string; where: string; message: string };
 
-const blankLine = (): LineRow => ({ key: nextKey(), item: "", description: "", unit: "lot", quantity: "1", unitPrice: "0" });
+const blankLine = (): LineRow => ({ key: nextKey(), scope: "", amount: "" });
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 
 function lineErrors(row: LineRow) {
-  const quantity =
-    numberError(row.quantity, { label: "Quantity", max: 10_000_000, maxDecimals: 4 }) ??
-    (Number(row.quantity) <= 0 ? "Quantity must be more than 0." : null);
   return {
-    item: textError(row.item, { label: "Item name", max: 160 }),
-    unit: textError(row.unit, { label: "Unit", max: 24 }),
-    quantity,
-    unitPrice: amountError(row.unitPrice, { label: "Unit price", allowZero: true, max: 1_000_000_000 }),
+    scope: textError(row.scope, { label: "Scope of work", max: 160 }),
+    amount: amountError(row.amount, { label: "Amount", max: 1_000_000_000 }),
   };
 }
 
@@ -371,7 +352,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
   const percentTotal = template.reduce((sum, row) => sum + row.percentage, 0);
   const lineErrorRows = useMemo(() => lines.map(lineErrors), [lines]);
   const scheduleErrorRows = useMemo(() => schedule.map((row, index) => scheduleErrors(row, index, schedule[index - 1])), [schedule]);
-  const totalError = totals.total <= 0 ? "Add at least one priced line item before sending." : null;
+  const totalError = totals.total <= 0 ? "Add at least one scope of work with an amount before sending." : null;
 
   const touch = (id: string) => setTouched((current) => (current.has(id) ? current : new Set(current).add(id)));
   const shown = (id: string, message: string | null) => (submitted || touched.has(id) ? message : null);
@@ -385,12 +366,12 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
 
   function collectIssues(mode: "save" | "send"): Issue[] {
     const issues: Issue[] = [];
-    if (lines.length === 0) issues.push({ id: "est-add-line", where: "Bill of quantities", message: "Add at least one line item." });
+    if (lines.length === 0) issues.push({ id: "est-add-line", where: "Scope of works", message: "Add at least one scope of work." });
     lines.forEach((row, index) => {
       const errors = lineErrorRows[index];
-      (["item", "unit", "quantity", "unitPrice"] as const).forEach((name) => {
+      (["scope", "amount"] as const).forEach((name) => {
         const message = errors[name];
-        if (message) issues.push({ id: `est-line-${row.key}-${name}`, where: `Line item ${index + 1}`, message });
+        if (message) issues.push({ id: `est-line-${row.key}-${name}`, where: `Scope of work ${index + 1}`, message });
       });
     });
     schedule.forEach((row, index) => {
@@ -408,7 +389,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
         const last = schedule[schedule.length - 1];
         issues.push({ id: schedule.length < 2 || !last ? "est-add-milestone" : `est-sched-${last.key}-percentage`, where: "Payment schedule", message: scheduleError });
       }
-      if (totalError) issues.push({ id: lines[0] ? `est-line-${lines[0].key}-unitPrice` : "est-add-line", where: "Bill of quantities", message: totalError });
+      if (totalError) issues.push({ id: lines[0] ? `est-line-${lines[0].key}-amount` : "est-add-line", where: "Scope of works", message: totalError });
     }
     return issues;
   }
@@ -477,7 +458,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     if (issues.length > 0) return reject(issues, "sending");
     if (
       !window.confirm(
-        `Send this estimate to ${estimate.customer.name}?\n\nContract total: ${formatPeso(totals.total)} (incl. 12% VAT). The customer will be able to accept it with a downpayment of at least ${MIN_DOWNPAYMENT_PERCENT}%. You will not be able to edit it afterwards.`,
+        `Send this estimate to ${estimate.customer.name}?\n\nContract total: ${formatPeso(totals.total)}. The customer will be able to accept it with a downpayment of at least ${MIN_DOWNPAYMENT_PERCENT}%. You will not be able to edit it afterwards.`,
       )
     ) {
       return;
@@ -505,7 +486,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     <div className="space-y-5">
       <DetailsCard estimate={estimate} />
 
-      <Card title="Bill of quantities" note="Itemize the work. Amounts are quantity × unit price.">
+      <Card title="Scope of works" note="List each scope of work and its amount. The contract total is the sum of the amounts.">
         <div className="mb-4 flex flex-wrap gap-2">
           <Button
             id="est-add-line"
@@ -515,66 +496,44 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
             disabled={Boolean(busy)}
             onClick={() => setLines((current) => [...current, blankLine()])}
           >
-            <Plus className="mr-1.5 h-4 w-4" /> Add line item
+            <Plus className="mr-1.5 h-4 w-4" /> Add scope of work
           </Button>
         </div>
         <div className="-mx-5 overflow-x-auto px-5">
-          <table className="w-full min-w-[920px] border-collapse text-sm">
+          <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead className="border-y border-stone-200 bg-stone-50">
               <tr>
-                <th className={headClass}>Item</th>
-                <th className={headClass}>Description</th>
-                <th className={headClass}>Unit</th>
-                <th className={headClass}>Quantity</th>
-                <th className={headClass}>Unit price</th>
-                <th className={`${headClass} text-right`}>Amount</th>
+                <th className={headClass}>Scope of works</th>
+                <th className={headClass}>Amount</th>
                 <th className={headClass}><span className="sr-only">Remove</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {lines.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-stone-500">
-                    No line items yet. Add a line item to start the bill of quantities.
+                  <td colSpan={3} className="px-3 py-8 text-center text-stone-500">
+                    No scope of work yet. Add one to start the estimate.
                   </td>
                 </tr>
               ) : null}
               {lines.map((row, index) => {
                 const errors = lineErrorRows[index];
-                const itemId = `est-line-${row.key}-item`;
-                const unitId = `est-line-${row.key}-unit`;
-                const quantityId = `est-line-${row.key}-quantity`;
-                const priceId = `est-line-${row.key}-unitPrice`;
-                const itemMessage = shown(itemId, errors.item);
-                const unitMessage = shown(unitId, errors.unit);
-                const quantityMessage = shown(quantityId, errors.quantity);
-                const priceMessage = shown(priceId, errors.unitPrice);
+                const scopeId = `est-line-${row.key}-scope`;
+                const amountId = `est-line-${row.key}-amount`;
+                const scopeMessage = shown(scopeId, errors.scope);
+                const amountMessage = shown(amountId, errors.amount);
                 return (
                   <tr key={row.key} className="align-top">
-                    <td className="w-44 px-2 py-2">
-                      <input aria-label={`Item ${index + 1}`} maxLength={160} className={inputClass} value={row.item} onChange={(event) => updateLine(row.key, { item: event.target.value })} {...field(itemId, itemMessage)} />
-                      <FieldError id={`${itemId}-error`} message={itemMessage} />
+                    <td className="min-w-64 px-2 py-2">
+                      <input aria-label={`Scope of work ${index + 1}`} maxLength={160} placeholder="Masonry works" className={inputClass} value={row.scope} onChange={(event) => updateLine(row.key, { scope: event.target.value })} {...field(scopeId, scopeMessage)} />
+                      <FieldError id={`${scopeId}-error`} message={scopeMessage} />
                     </td>
-                    <td className="min-w-48 px-2 py-2">
-                      <input aria-label={`Description ${index + 1}`} maxLength={400} className={inputClass} value={row.description} onChange={(event) => updateLine(row.key, { description: event.target.value })} />
-                    </td>
-                    <td className="w-24 px-2 py-2">
-                      <input aria-label={`Unit ${index + 1}`} maxLength={24} className={inputClass} value={row.unit} onChange={(event) => updateLine(row.key, { unit: event.target.value })} {...field(unitId, unitMessage)} />
-                      <FieldError id={`${unitId}-error`} message={unitMessage} />
-                    </td>
-                    <td className="w-28 px-2 py-2">
-                      <input aria-label={`Quantity ${index + 1}`} type="number" min="0" step="any" inputMode="decimal" className={`${inputClass} tabular-nums`} value={row.quantity} onChange={(event) => updateLine(row.key, { quantity: event.target.value })} {...field(quantityId, quantityMessage)} />
-                      <FieldError id={`${quantityId}-error`} message={quantityMessage} />
-                    </td>
-                    <td className="w-40 px-2 py-2">
-                      <PesoInput aria-label={`Unit price ${index + 1}`} min="0" step="0.01" value={row.unitPrice} onChange={(event) => updateLine(row.key, { unitPrice: event.target.value })} {...field(priceId, priceMessage)} />
-                      <FieldError id={`${priceId}-error`} message={priceMessage} />
-                    </td>
-                    <td className="w-36 whitespace-nowrap px-3 py-4 text-right font-medium tabular-nums">
-                      {formatPeso(lineAmount(num(row.quantity), num(row.unitPrice)))}
+                    <td className="w-48 px-2 py-2">
+                      <PesoInput aria-label={`Amount ${index + 1}`} min="0" step="0.01" value={row.amount} onChange={(event) => updateLine(row.key, { amount: event.target.value })} {...field(amountId, amountMessage)} />
+                      <FieldError id={`${amountId}-error`} message={amountMessage} />
                     </td>
                     <td className="w-12 px-2 py-2">
-                      <Button type="button" variant="ghost" size="icon" aria-label={`Remove line item ${index + 1}`} disabled={Boolean(busy)} onClick={() => setLines((current) => current.filter((item) => item.key !== row.key))}>
+                      <Button type="button" variant="ghost" size="icon" aria-label={`Remove scope of work ${index + 1}`} disabled={Boolean(busy)} onClick={() => setLines((current) => current.filter((item) => item.key !== row.key))}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </td>

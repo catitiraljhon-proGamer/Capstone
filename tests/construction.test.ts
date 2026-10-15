@@ -233,8 +233,8 @@ test("admin saves and sends a validated estimate using the default schedule", as
   const saved = (await changeEstimate(db, admin, estimate.id, savePayload())).estimate;
   assert.equal(saved.status, "Draft");
   assert.equal(saved.subtotal, 6_000_000);
-  assert.equal(saved.vat, 720_000);
-  assert.equal(saved.total, 6_720_000);
+  assert.equal(saved.vat, 0);
+  assert.equal(saved.total, 6_000_000);
   const sent = (await changeEstimate(db, admin, estimate.id, { action: "send" })).estimate;
   assert.equal(sent.status, "Sent");
   assert.ok(sent.sentAt);
@@ -256,14 +256,14 @@ test("customers never see line items before the estimate is sent, and only their
   await changeEstimate(db, admin, estimate.id, savePayload());
   hiddenView(await getEstimate(db, customer, estimate.id));
   hiddenView((await listEstimates(db, customer))[0]);
-  assert.equal((await getEstimate(db, admin, estimate.id)).total, 6_720_000);
+  assert.equal((await getEstimate(db, admin, estimate.id)).total, 6_000_000);
   await assert.rejects(getEstimate(db, other, estimate.id), isError(404));
   assert.deepEqual(await listEstimates(db, other), []);
   await assert.rejects(listEstimates(db, clerk), isError(403));
 
   await changeEstimate(db, admin, estimate.id, { action: "send" });
   const visible = await getEstimate(db, customer, estimate.id);
-  assert.equal(visible.total, 6_720_000);
+  assert.equal(visible.total, 6_000_000);
   assert.equal(visible.lineItems.length, 1);
 
   // A revision request hides the BOQ again until the admin resends it.
@@ -279,7 +279,7 @@ test("customers never see line items before the estimate is sent, and only their
   const resent = (await changeEstimate(db, admin, estimate.id, { action: "send" })).estimate;
   assert.equal(resent.status, "Sent");
   assert.equal(resent.revisionNote, null);
-  assert.equal(resent.total, 5_600_000);
+  assert.equal(resent.total, 5_000_000);
 });
 
 test("accepting at 30% creates the project, a Draft downpayment invoice, and payment-due events", async () => {
@@ -288,17 +288,17 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   assert.equal(project.status, "Awaiting downpayment");
   assert.equal(project.name, "120 sqm · Standard – Construction");
   assert.match(project.reference, /^PRJ-\d{4}-\d{6}$/);
-  assert.equal(project.contractPrice, 6_720_000);
+  assert.equal(project.contractPrice, 6_000_000);
   assert.equal(project.subtotal, 6_000_000);
-  assert.equal(project.vat, 720_000);
+  assert.equal(project.vat, 0);
   assert.equal(project.estimateId, estimate.id);
   assert.equal(project.downpaymentPercent, 30);
   assert.equal(project.startDate, startDate());
   assert.equal(project.neededBy, neededBy());
-  assert.deepEqual(project.milestones.map((milestone) => milestone.amount), [2_016_000, 2_016_000, 2_016_000, 672_000]);
+  assert.deepEqual(project.milestones.map((milestone) => milestone.amount), [1_800_000, 1_800_000, 1_800_000, 600_000]);
   assert.deepEqual(project.milestones.map((milestone) => milestone.isDownpayment), [true, false, false, false]);
   assert.equal(project.milestones[0].invoice?.status, "Draft");
-  assert.equal(project.milestones[0].invoice?.amount, 2_016_000);
+  assert.equal(project.milestones[0].invoice?.amount, 1_800_000);
   assert.equal(project.milestones[0].status, "Invoiced");
   assert.equal(project.nextMilestone?.id, project.milestones[0].id);
   assert.equal(project.paid, 0);
@@ -314,7 +314,7 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   assert.equal(events.length, 4);
   assert.ok(events.every((event) => event.eventType === "Payment due" && event.paymentStatus === "Expected" && event.status === "Scheduled"));
   assert.equal(events[0].scheduledFor.toISOString(), `${startDate()}T01:00:00.000Z`);
-  assert.equal(events[0].expectedAmount, 2_016_000);
+  assert.equal(events[0].expectedAmount, 1_800_000);
 
   const accepted = await getEstimate(db, customer, estimate.id);
   assert.equal(accepted.status, "Accepted");
@@ -346,10 +346,10 @@ test("a larger downpayment scales the remaining milestones; less than 30% is rej
 
   const { projectId } = await changeEstimate(db, customer, estimate.id, { action: "accept", downpaymentPercent: 40 });
   const project = await projectDto(projectId!);
-  assert.deepEqual(project.milestones.map((milestone) => milestone.amount), [2_688_000, 1_728_000, 1_728_000, 576_000]);
+  assert.deepEqual(project.milestones.map((milestone) => milestone.amount), [2_400_000, 1_542_857.14, 1_542_857.14, 514_285.72]);
   assert.deepEqual(project.milestones.map((milestone) => milestone.percentage), [40, 25.71, 25.71, 8.57]);
-  assert.equal(project.milestones.reduce((sum, milestone) => sum + milestone.amount, 0), 6_720_000);
-  assert.equal(project.milestones[0].invoice?.amount, 2_688_000);
+  assert.equal(project.milestones.reduce((sum, milestone) => sum + Math.round(milestone.amount * 100), 0) / 100, 6_000_000);
+  assert.equal(project.milestones[0].invoice?.amount, 2_400_000);
 });
 
 test("an awaiting-downpayment project only bills the downpayment, for exactly its amount", async () => {
@@ -399,15 +399,15 @@ test("verifying the downpayment schedules the project; reversing it returns to a
   let project = await projectDto(projectId);
   assert.equal(project.status, "Awaiting downpayment");
   assert.equal(project.milestones[0].status, "Partially paid");
-  assert.equal(project.milestones[0].invoice?.balance, 1_016_000);
+  assert.equal(project.milestones[0].invoice?.balance, 800_000);
 
-  const rest = await submitPayment(db, customer, payInput(invoiceId, 1_016_000));
+  const rest = await submitPayment(db, customer, payInput(invoiceId, 800_000));
   await reviewPayment(db, clerk, rest, { action: "verify" });
   project = await projectDto(projectId);
   assert.equal(project.status, "Scheduled");
   assert.equal(project.milestones[0].status, "Paid");
-  assert.equal(project.paid, 2_016_000);
-  assert.equal(project.balance, 4_704_000);
+  assert.equal(project.paid, 1_800_000);
+  assert.equal(project.balance, 4_200_000);
   assert.equal(project.nextMilestone?.id, project.milestones[1].id);
   const dueEvent = await db.collection("schedules").findOne({ projectId: new ObjectId(projectId), milestoneId: project.milestones[0].id });
   assert.equal(dueEvent?.paymentStatus, "Paid");
@@ -422,7 +422,7 @@ test("verifying the downpayment schedules the project; reversing it returns to a
   assert.equal((await db.collection("schedules").findOne({ projectId: new ObjectId(projectId), milestoneId: project.milestones[0].id }))?.paymentStatus, "Expected");
 
   // Paying again restores the schedule, and a project whose start date arrived becomes Active instead.
-  const again = await submitPayment(db, customer, payInput(invoiceId, 1_016_000));
+  const again = await submitPayment(db, customer, payInput(invoiceId, 800_000));
   await reviewPayment(db, clerk, again, { action: "verify" });
   assert.equal((await projectDto(projectId)).status, "Scheduled");
   await db.collection<ProjectDocument>("projects").updateOne({ _id: new ObjectId(projectId) }, { $set: { startDate: new Date(`${manilaDate()}T00:00:00.000Z`) } });
@@ -463,12 +463,12 @@ test("an admin controls project status, and completion waits until every milesto
   const partial = await submitPayment(db, customer, payInput(invoiceId, 100_000));
   await reviewPayment(db, clerk, partial, { action: "verify" });
   await assert.rejects(changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed" }), isError(409));
-  const remaining = await submitPayment(db, customer, payInput(invoiceId, 572_000));
+  const remaining = await submitPayment(db, customer, payInput(invoiceId, 500_000));
   await reviewPayment(db, clerk, remaining, { action: "verify" });
 
   const completed = (await changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed" })).project;
   assert.equal(completed.status, "Completed");
-  assert.equal(completed.paid, 6_720_000);
+  assert.equal(completed.paid, 6_000_000);
   assert.equal(completed.balance, 0);
   assert.equal(completed.nextMilestone, null);
   assert.ok(completed.milestones.every((milestone) => milestone.status === "Paid"));

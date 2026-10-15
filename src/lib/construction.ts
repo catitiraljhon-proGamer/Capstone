@@ -1,7 +1,8 @@
 import { fromCentavos, toCentavos } from "@/lib/billing";
 import type { EstimateLineItemInput, MilestoneTemplate } from "@/types/construction";
 
-export const VAT_RATE = 0.12;
+/** G4 Builders Inc is VAT-exempt with the BIR, so new estimates add no VAT. Older estimates keep their saved VAT. */
+export const VAT_RATE = 0;
 export const MIN_DOWNPAYMENT_PERCENT = 30;
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
@@ -9,7 +10,7 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 export const lineAmount = (quantity: number, unitPrice: number) =>
   fromCentavos(Math.round(quantity * toCentavos(unitPrice)));
 
-/** Subtotal of all lines, 12% VAT on top, and the contract total — exact to the centavo. */
+/** Subtotal of all scope-of-work amounts, any VAT on top, and the contract total — exact to the centavo. */
 export function estimateTotals(lines: Pick<EstimateLineItemInput, "quantity" | "unitPrice">[], vatRate = VAT_RATE) {
   const subtotalCentavos = lines.reduce((sum, line) => sum + toCentavos(lineAmount(line.quantity, line.unitPrice)), 0);
   const vatCentavos = Math.round(subtotalCentavos * vatRate);

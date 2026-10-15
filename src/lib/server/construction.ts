@@ -295,7 +295,7 @@ async function sendEstimate(db: Db, session: ClientSession, actor: SessionUser, 
   }, "This estimate changed while you were sending it. Reload it and try again.");
   await notify(db, session, [estimate.customerId], {
     title: "Your construction cost estimate is ready",
-    body: `${estimate.reference} totals ${estimate.total.toLocaleString("en-PH", { style: "currency", currency: "PHP" })} including VAT. Review it and choose your downpayment.`,
+    body: `${estimate.reference} totals ${estimate.total.toLocaleString("en-PH", { style: "currency", currency: "PHP" })}. Review it and choose your downpayment.`,
     href: `/customer/dream-house?estimate=${estimate._id.toHexString()}`, kind: "construction-estimate", entityId: estimate._id,
   });
   await audit(db, session, actor, "estimate.sent", "estimate", estimate._id, { reference: estimate.reference, total: estimate.total });

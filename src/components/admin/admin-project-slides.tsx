@@ -85,9 +85,11 @@ function ProjectCard({
           <div className="text-right">
             <span className={`${pillBase} ${projectTone[project.status] ?? projectTone.Pending}`}>{project.status}</span>
             <p className="mt-3 text-xl font-semibold tabular-nums tracking-tight">{formatPeso(project.contractPrice)}</p>
-            <p className="text-xs text-stone-500">
-              {formatPeso(project.subtotal)} + {formatPeso(project.vat)} VAT
-            </p>
+            {project.vat > 0 ? (
+              <p className="text-xs text-stone-500">
+                {formatPeso(project.subtotal)} + {formatPeso(project.vat)} VAT
+              </p>
+            ) : null}
           </div>
         </div>
 

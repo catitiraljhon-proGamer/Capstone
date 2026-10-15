@@ -103,7 +103,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
             <h3 className="text-sm font-semibold">Contract</h3>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex justify-between gap-3"><dt className="text-stone-600">Subtotal</dt><dd className="font-semibold tabular-nums">{formatPeso(project.subtotal)}</dd></div>
-              <div className="flex justify-between gap-3"><dt className="text-stone-600">VAT (12%)</dt><dd className="font-semibold tabular-nums">{formatPeso(project.vat)}</dd></div>
+              {project.vat > 0 ? <div className="flex justify-between gap-3"><dt className="text-stone-600">VAT</dt><dd className="font-semibold tabular-nums">{formatPeso(project.vat)}</dd></div> : null}
               <div className="flex justify-between gap-3 border-t border-stone-200 pt-2"><dt className="font-semibold">Contract total</dt><dd className="font-semibold tabular-nums text-red-700">{formatPeso(project.contractPrice)}</dd></div>
             </dl>
           </div>

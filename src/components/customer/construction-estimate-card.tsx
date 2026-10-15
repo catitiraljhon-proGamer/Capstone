@@ -32,36 +32,33 @@ function RequestSummary({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
-function BoqTable({ estimate }: { estimate: CostEstimateDto }) {
+function ScopeOfWorksTable({ estimate }: { estimate: CostEstimateDto }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-stone-200">
-      <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+      <table className="w-full min-w-[20rem] border-collapse text-left text-sm">
         <thead className="bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
           <tr>
-            <th scope="col" className="px-3 py-2.5">Item</th>
-            <th scope="col" className="px-3 py-2.5">Description</th>
-            <th scope="col" className="px-3 py-2.5">Unit</th>
-            <th scope="col" className="px-3 py-2.5 text-right">Qty</th>
-            <th scope="col" className="px-3 py-2.5 text-right">Unit price</th>
+            <th scope="col" className="px-3 py-2.5">Scope of works</th>
             <th scope="col" className="px-3 py-2.5 text-right">Amount</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-stone-200">
           {estimate.lineItems.map((line) => (
             <tr key={line.id}>
-              <td className="px-3 py-2.5 align-top font-semibold text-stone-950">{line.item}</td>
-              <td className="max-w-xs px-3 py-2.5 align-top text-stone-600">{line.description || "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 align-top text-stone-600">{line.unit}</td>
-              <td className="px-3 py-2.5 text-right align-top tabular-nums">{line.quantity.toLocaleString("en-PH")}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right align-top tabular-nums">{formatPeso(line.unitPrice)}</td>
+              <td className="px-3 py-2.5 align-top font-semibold text-stone-950">{line.description ? `${line.item} – ${line.description}` : line.item}</td>
               <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums">{formatPeso(line.amount)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot className="border-t border-stone-200 text-sm">
-          <tr><td colSpan={5} className="px-3 py-2 text-right text-stone-600">Subtotal</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.subtotal)}</td></tr>
-          <tr><td colSpan={5} className="px-3 py-2 text-right text-stone-600">VAT ({Math.round(estimate.vatRate * 100)}%)</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.vat)}</td></tr>
-          <tr className="bg-rose-50"><td colSpan={5} className="px-3 py-3 text-right font-semibold text-stone-950">Contract total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
+          {/* VAT appears only on older estimates made before G4 Builders became VAT-exempt. */}
+          {estimate.vat > 0 ? (
+            <>
+              <tr><td className="px-3 py-2 text-right text-stone-600">Subtotal</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.subtotal)}</td></tr>
+              <tr><td className="px-3 py-2 text-right text-stone-600">VAT ({Math.round(estimate.vatRate * 100)}%)</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.vat)}</td></tr>
+            </>
+          ) : null}
+          <tr className="bg-rose-50"><td className="px-3 py-3 text-right font-semibold text-stone-950">Contract total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
         </tfoot>
       </table>
     </div>
@@ -123,9 +120,9 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-semibold tracking-tight">Bill of quantities</h3>
-        <p className="mt-1 text-sm text-stone-600">Every cost line for building your house, with 12% VAT on top.</p>
-        <div className="mt-3"><BoqTable estimate={estimate} /></div>
+        <h3 className="text-base font-semibold tracking-tight">Scope of works</h3>
+        <p className="mt-1 text-sm text-stone-600">Each scope of work for building your house and its amount.</p>
+        <div className="mt-3"><ScopeOfWorksTable estimate={estimate} /></div>
       </div>
 
       {estimate.adminNotes && (
@@ -171,7 +168,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
       {dialog === "accept" && (
         <BillingDialog title="Accept this estimate?" busy={busy} onClose={() => setDialog(null)}>
           <div className="space-y-4 text-sm leading-6 text-stone-600">
-            <p>You are accepting estimate <span className="font-semibold text-stone-950">{estimate.reference}</span> for a contract total of <span className="font-semibold text-stone-950">{formatPeso(estimate.total)}</span> (VAT included).</p>
+            <p>You are accepting estimate <span className="font-semibold text-stone-950">{estimate.reference}</span> for a contract total of <span className="font-semibold text-stone-950">{formatPeso(estimate.total)}</span>.</p>
             <div className="rounded-lg bg-rose-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Downpayment due</p>
               <p className="mt-1 text-2xl font-semibold text-red-700">{formatPeso(downpayment)}</p>
