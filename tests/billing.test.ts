@@ -10,8 +10,9 @@ import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
 import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
-import { acceptDesignRequestTerms, requireDesignRequestTerms } from "@/lib/server/design-request-terms";
-import { designRequestTerms, designRequestTermsText } from "@/lib/design-request-terms";
+import { acceptAccountTerms, requireAccountTerms } from "@/lib/server/account-terms";
+import { accountTerms, accountTermsText } from "@/lib/account-terms";
+import { designRequestTerms } from "@/lib/design-request-terms";
 import { ZodError } from "zod";
 import type { SessionUser } from "@/types/domain";
 
@@ -28,6 +29,13 @@ const isError = (status: number) => (error: unknown) => error instanceof Billing
 const dates = { preferredDate: "2099-01-10", neededBy: "2099-02-10" };
 const privateImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1cAAAAASUVORK5CYII=";
 
+/** Records the customer's one-time Terms and Conditions agreement and returns its audit record id. */
+async function agree(actor: SessionUser = customer) {
+  const result = await acceptAccountTerms(db, actor, { accepted: true, version: accountTerms.version });
+  const saved = await requireAccountTerms(db, actor);
+  return { id: saved.auditLogId.toHexString(), acceptedAt: result.acceptedAt };
+}
+
 async function publishedHouseDesign() {
   const now = new Date();
   const design: HouseDesignDocument = {
@@ -43,8 +51,8 @@ async function publishedHouseDesign() {
 
 test("requesting a published design keeps its identity and specifications without duplicate uploads", async () => {
   const design = await publishedHouseDesign();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id });
+  const acceptance = await agree();
+  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...dates });
   assert.equal(result.selectedDesign?.id, design._id.toHexString());
   assert.equal(result.selectedDesign.name, design.name);
   assert.equal(result.floorArea, design.area);
@@ -69,8 +77,8 @@ test("requesting a published design keeps its identity and specifications withou
 
 test("selected designs reject unavailable records, forged specifications, unauthorized roles, and missing terms", async () => {
   const design = await publishedHouseDesign();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
+  await agree();
+  const input = { houseDesignId: design._id.toHexString(), ...dates };
   for (const actor of [admin, clerk]) await assert.rejects(createDesignRequest(db, actor, input), isError(403));
   await assert.rejects(createDesignRequest(db, other, input), isError(409));
   await assert.rejects(createDesignRequest(db, customer, { houseDesignId: input.houseDesignId }), ZodError);
@@ -89,8 +97,8 @@ test("selected designs reject unavailable records, forged specifications, unauth
 
 test("customers can have at most three design requests waiting for review", async () => {
   const design = await publishedHouseDesign();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
+  await agree();
+  const input = { houseDesignId: design._id.toHexString(), ...dates };
   const customerId = new ObjectId(customer.id);
   const now = new Date();
   const existing = (status: DesignRequestDocument["status"]): DesignRequestDocument => ({
@@ -112,13 +120,13 @@ test("customers can have at most three design requests waiting for review", asyn
   await db.collection("design_requests").updateOne({ _id: new ObjectId(third.id) }, { $set: { status: "Rejected" } });
   assert.equal((await createDesignRequest(db, customer, input)).status, "Pending");
 
-  const otherAcceptance = await acceptDesignRequestTerms(db, other, { accepted: true, version: designRequestTerms.version });
-  assert.equal((await createDesignRequest(db, other, { ...input, termsAcceptanceId: otherAcceptance.id })).status, "Pending");
+  await agree(other);
+  assert.equal((await createDesignRequest(db, other, input)).status, "Pending");
 });
 
 test("custom design requests still require requirements and inspiration images", async () => {
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };
+  await agree();
+  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
   await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, bedrooms: 101 }), /Bedrooms cannot be more than 100/);
@@ -132,9 +140,9 @@ test("custom design requests still require requirements and inspiration images",
 
 test("design requests require a Preferred Date and Needed By in the future, in order, and return them", async () => {
   const design = await publishedHouseDesign();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  const input = { houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id };
-  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom layout", inspirationImages: [privateImage], ...dates, termsAcceptanceId: acceptance.id };
+  await agree();
+  const input = { houseDesignId: design._id.toHexString(), ...dates };
+  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom layout", inspirationImages: [privateImage], ...dates };
   const withoutPreferred = { ...input, preferredDate: undefined };
   const withoutNeeded = { ...custom, neededBy: undefined };
   await assert.rejects(createDesignRequest(db, customer, withoutPreferred), ZodError);
@@ -160,9 +168,9 @@ test("design requests require a Preferred Date and Needed By in the future, in o
 
 test("a selected design is reviewed for free, and only the blueprint is paid before construction billing", async () => {
   const design = await publishedHouseDesign();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  await agree();
   const request = await createDesignRequest(db, customer, {
-    houseDesignId: design._id.toHexString(), ...dates, termsAcceptanceId: acceptance.id,
+    houseDesignId: design._id.toHexString(), ...dates,
     notes: "Please review a different gate finish.", inspirationImages: [privateImage],
   });
   assert.equal(request.notes, "Please review a different gate finish.");
@@ -218,47 +226,50 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   await createInvoice(db, clerk, { ...draft, projectId: project });
 });
 
-test("design terms require an explicit customer agreement to the current version", async () => {
-  const input = { accepted: true, version: designRequestTerms.version };
-  await assert.rejects(acceptDesignRequestTerms(db, admin, input), isError(403));
-  await assert.rejects(acceptDesignRequestTerms(db, clerk, input), isError(403));
+test("the Terms and Conditions need an explicit customer agreement to the current version", async () => {
+  const input = { accepted: true, version: accountTerms.version };
+  await assert.rejects(acceptAccountTerms(db, admin, input), isError(403));
+  await assert.rejects(acceptAccountTerms(db, clerk, input), isError(403));
   for (const invalid of [{}, { ...input, accepted: false }, { ...input, accepted: "true" }, { ...input, version: "old-version" }]) {
-    await assert.rejects(acceptDesignRequestTerms(db, customer, invalid), ZodError);
+    await assert.rejects(acceptAccountTerms(db, customer, invalid), ZodError);
   }
   assert.equal(await db.collection("audit_logs").countDocuments(), 0);
 });
 
-test("design terms save the customer identity, server timestamp, and exact acknowledged terms", async () => {
+test("the agreement saves the customer identity, server timestamp, and exact terms, once per account", async () => {
   const beforeAcceptance = Date.now();
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  const acceptance = await agree();
   const event = await db.collection("audit_logs").findOne({ _id: new ObjectId(acceptance.id) });
   assert.ok(event);
   assert.equal(event.actorId.toHexString(), customer.id);
   assert.equal(event.actorRole, "customer");
   assert.equal(event.details.accepted, true);
-  assert.equal(event.details.termsSnapshot, designRequestTermsText);
+  assert.equal(event.details.termsSnapshot, accountTermsText);
   assert.ok(event.details.termsSnapshot.includes(designRequestTerms.paymentNotice));
-  for (const section of designRequestTerms.sections) assert.ok(event.details.termsSnapshot.includes(section.body));
+  for (const section of accountTerms.sections) assert.ok(event.details.termsSnapshot.includes(section.body));
   assert.equal(event.createdAt.toISOString(), acceptance.acceptedAt);
   assert.ok(event.createdAt.getTime() >= beforeAcceptance && event.createdAt.getTime() <= Date.now());
-  const snapshot = await requireDesignRequestTerms(db, customer, acceptance.id);
-  assert.equal(snapshot.auditLogId.toHexString(), acceptance.id);
-  assert.equal(snapshot.version, acceptance.version);
-  assert.equal(snapshot.acceptedAt.toISOString(), acceptance.acceptedAt);
+  const saved = await requireAccountTerms(db, customer);
+  assert.equal(saved.auditLogId.toHexString(), acceptance.id);
+  assert.equal(saved.version, accountTerms.version);
+  await agree();
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "account.terms-accepted" }), 1);
 });
 
-test("design requests reject another customer's, missing, forged, or outdated agreement", async () => {
-  const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
-  await assert.rejects(requireDesignRequestTerms(db, other, acceptance.id), isError(409));
-  await assert.rejects(requireDesignRequestTerms(db, customer, ""), isError(400));
-  await assert.rejects(requireDesignRequestTerms(db, customer, new ObjectId().toHexString()), isError(409));
-  await db.collection("audit_logs").updateOne({ _id: new ObjectId(acceptance.id) }, { $set: { "details.termsVersion": "old-version" } });
-  await assert.rejects(requireDesignRequestTerms(db, customer, acceptance.id), isError(409));
+test("design requests need the customer's own Terms and Conditions agreement", async () => {
+  const design = await publishedHouseDesign();
+  const input = { houseDesignId: design._id.toHexString(), ...dates };
+  await assert.rejects(createDesignRequest(db, customer, input), isError(409));
+  await agree(other);
+  await assert.rejects(createDesignRequest(db, customer, input), isError(409));
+  await assert.rejects(createDesignRequest(db, customer, { ...input, termsAcceptanceId: new ObjectId().toHexString() }), ZodError);
+  await agree();
+  assert.equal((await createDesignRequest(db, customer, input)).status, "Pending");
 });
 
-test("accepting design terms does not unlock unpaid designs or create a payment", async () => {
+test("agreeing to the terms does not unlock unpaid designs or create a payment", async () => {
   const { designId } = await deliveredFee();
-  await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
+  await agree();
   assert.equal((await listCustomerDesigns(db, customer))[0].access, "payment-required");
   await assert.rejects(getCustomerDesignImage(db, customer, designId, 0), isError(403));
   assert.equal(await db.collection("payments").countDocuments(), 0);

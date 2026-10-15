@@ -6,6 +6,7 @@ import {
   googleLinkCookieName,
   GoogleAuthError,
 } from "@/lib/server/google-oauth";
+import { accountTerms } from "@/lib/account-terms";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
     const { url, cookie } = await createGoogleFlow(
       mode,
       request.nextUrl.searchParams.get("rememberMe") === "true",
+      mode === "register" && request.nextUrl.searchParams.get("terms") === accountTerms.version,
     );
     const response = NextResponse.redirect(url, {
       headers: {

@@ -5,6 +5,7 @@ import {
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
+import { recordAccountTerms, termsVersionSchema } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
 import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
 import {
@@ -41,11 +42,12 @@ const registrationSchema = createClientSchema.extend({
     .string()
     .trim()
     .regex(/^\d{6}$/, "Enter the 6-digit code sent to your email."),
+  termsVersion: termsVersionSchema,
 });
 
 export async function POST(request: Request) {
   try {
-    const { name, email, password, verificationCode, ...input } = registrationSchema.parse(await request.json());
+    const { name, email, password, verificationCode, termsVersion, ...input } = registrationSchema.parse(await request.json());
     const clientDetails = toClientDetails(input);
     const db = await getDatabase();
     // Every attempt from a network address counts, which limits both
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
     }
     // The used code is left to expire: the account now exists, so it cannot register
     // again, and a simultaneous duplicate submission still gets the 409 above.
+    await recordAccountTerms(db, { id: userId.toHexString(), name: user.name, role: user.role }, termsVersion, now);
 
     const admins = await users
       .find(

@@ -11,12 +11,8 @@ import {
 } from "@/lib/database/collections";
 import { createSessionToken, sessionCookieName } from "@/lib/server/session";
 import { proxy } from "@/proxy";
-import { finishedDesignsTerms } from "@/lib/finished-designs-terms";
-import {
-  acceptFinishedDesignsTerms,
-  canViewFullDesignImages,
-  hasAcceptedFinishedDesignsTerms,
-} from "@/lib/server/finished-designs-terms";
+import { accountTerms } from "@/lib/account-terms";
+import { acceptAccountTerms, canViewFullDesignImages, getAccountTermsAcceptance } from "@/lib/server/account-terms";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
 
 const origin = "http://localhost:3000";
@@ -148,7 +144,7 @@ test("repeated lockouts double the lock time", async () => {
   assert.equal(second.headers.get("retry-after"), String(30 * 60));
 });
 
-test("full design galleries require staff access or accepted Finished Designs terms", async () => {
+test("full design galleries require staff access or the account Terms and Conditions agreement", async () => {
   const customer = await insertUser({ role: "customer", email: "viewer@example.com" });
   const session = { id: customer._id.toHexString(), email: customer.email, name: customer.name, role: customer.role };
   assert.equal(await canViewFullDesignImages(db, null), false);
@@ -156,20 +152,20 @@ test("full design galleries require staff access or accepted Finished Designs te
   assert.equal(await canViewFullDesignImages(db, { ...session, role: "admin" }), true);
   assert.equal(await canViewFullDesignImages(db, { ...session, role: "billing-clerk" }), true);
 
-  await assert.rejects(
-    acceptFinishedDesignsTerms(db, session, { accepted: true, version: "1999-01-01" }),
-  );
-  await assert.rejects(
-    acceptFinishedDesignsTerms(db, { ...session, role: "admin" }, { accepted: true, version: finishedDesignsTerms.version }),
-  );
-  assert.equal(await hasAcceptedFinishedDesignsTerms(db, session.id), false);
+  await assert.rejects(acceptAccountTerms(db, session, { accepted: true, version: "1999-01-01" }));
+  await assert.rejects(acceptAccountTerms(db, { ...session, role: "admin" }, { accepted: true, version: accountTerms.version }));
+  assert.equal(await getAccountTermsAcceptance(db, session.id), null);
 
-  await acceptFinishedDesignsTerms(db, session, { accepted: true, version: finishedDesignsTerms.version });
-  assert.equal(await hasAcceptedFinishedDesignsTerms(db, session.id), true);
+  const first = await acceptAccountTerms(db, session, { accepted: true, version: accountTerms.version });
+  assert.ok(await getAccountTermsAcceptance(db, session.id));
   assert.equal(await canViewFullDesignImages(db, session), true);
-  const record = await db.collection("audit_logs").findOne({ action: "finished-designs.terms-accepted" });
-  assert.equal(record?.details.termsVersion, finishedDesignsTerms.version);
+  // Agreeing again keeps the original agreement: the terms are asked only once.
+  assert.equal((await acceptAccountTerms(db, session, { accepted: true, version: accountTerms.version })).acceptedAt, first.acceptedAt);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "account.terms-accepted" }), 1);
+  const record = await db.collection("audit_logs").findOne({ action: "account.terms-accepted" });
+  assert.equal(record?.details.termsVersion, accountTerms.version);
   assert.match(String(record?.details.termsSnapshot), /RA 8293/);
+  assert.match(String(record?.details.termsSnapshot), /You pay only for the blueprint/);
   assert.match(
     String(record?.details.termsSnapshot),
     /Case 3: Building a design[^\n]*\nLaw: RA 8293 \(Intellectual Property Code of the Philippines\), Section 186/,

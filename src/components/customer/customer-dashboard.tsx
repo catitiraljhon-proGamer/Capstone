@@ -1,6 +1,6 @@
 "use client";
 
-import { FinishedDesignsTermsGate } from "@/components/customer/finished-designs-terms-gate";
+import { AccountTermsGate } from "@/components/customer/account-terms-gate";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { ClientInformationReminder, ClientProfileForm } from "@/components/clients/client-profile";
@@ -167,6 +167,7 @@ function CustomerShell({
         </header>
 
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <AccountTermsGate />
       </div>
     </div>
   );
@@ -309,10 +310,8 @@ export function CustomerFinishedDesignsPage() {
       description="Explore published G4 Builders designs for inspiration before submitting your own request."
     >
       <Link href="/customer" className="mb-5 inline-flex text-sm font-semibold text-red-700 hover:underline">← Back to Dashboard</Link>
-      {/* Designs load only after the terms are accepted, so the server returns full galleries. */}
-      <FinishedDesignsTermsGate>
-        <FinishedDesignsBrowser />
-      </FinishedDesignsTermsGate>
+      {/* The account's Terms and Conditions agreement lets the server return full galleries. */}
+      <FinishedDesignsBrowser />
     </CustomerShell>
   );
 }

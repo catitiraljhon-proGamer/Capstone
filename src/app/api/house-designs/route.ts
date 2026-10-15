@@ -5,7 +5,7 @@ import {
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
-import { canViewFullDesignImages } from "@/lib/server/finished-designs-terms";
+import { canViewFullDesignImages } from "@/lib/server/account-terms";
 import { houseDesignInputSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       .sort({ createdAt: -1 })
       .toArray();
 
-    // Without staff access or accepted Finished Designs terms, only each
+    // Without staff access or accepted Terms and Conditions, only each
     // design's cover image is sent, so the full gallery cannot be scraped.
     const fullImages = await canViewFullDesignImages(db, session);
     const designs = documents.map(toHouseDesignDto).map((design) =>

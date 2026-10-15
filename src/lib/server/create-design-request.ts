@@ -19,15 +19,10 @@ import {
 import { recordAuditLog } from "@/lib/server/audit";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { BillingError } from "@/lib/server/billing";
-import { requireDesignRequestTerms } from "@/lib/server/design-request-terms";
+import { requireAccountTerms } from "@/lib/server/account-terms";
 import { customerDesignDto } from "@/lib/server/design-requests";
 import { embeddedImageSchema, embeddedImagesSchema } from "@/lib/server/embedded-images";
 import type { SessionUser } from "@/types/domain";
-
-const termsAcceptanceId = z.string().regex(
-  /^[a-f\d]{24}$/i,
-  "Accept the Design Request Terms and Conditions first.",
-);
 
 const preferredDate = z.iso.date("Choose a Preferred Date after today.");
 const neededBy = z.iso.date("Choose a Needed By date after today.");
@@ -39,7 +34,6 @@ const inputSchema = z.union([
     inspirationImages: z.array(embeddedImageSchema).max(6).default([]),
     preferredDate,
     neededBy,
-    termsAcceptanceId,
   }).strict(),
   z.object({
     floorArea: z.number().finite().positive().max(100_000),
@@ -50,7 +44,6 @@ const inputSchema = z.union([
     inspirationImages: embeddedImagesSchema,
     preferredDate,
     neededBy,
-    termsAcceptanceId,
   }).strict(),
 ]);
 
@@ -70,7 +63,8 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   if (input.neededBy < input.preferredDate) {
     throw new BillingError("The Needed By date must be on or after the Preferred Date.", 400);
   }
-  const termsAcceptance = await requireDesignRequestTerms(db, actor, input.termsAcceptanceId);
+  // The account-level agreement from registration (or first sign-in) covers every request.
+  const termsAcceptance = await requireAccountTerms(db, actor);
   let details: Pick<DesignRequestDocument,
     "floorArea" | "rooms" | "finish" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign"
   >;

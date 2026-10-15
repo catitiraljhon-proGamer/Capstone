@@ -22,10 +22,14 @@ type TermsDialogProps<T> = {
   terms: TermsContent;
   notice: { title: string; body: string; icon: LucideIcon };
   /** POST endpoint that records `{ accepted: true, version }` and returns `{ acceptance }`. */
-  acceptUrl: string;
+  acceptUrl?: string;
+  /** Called instead of posting to `acceptUrl` when the agreement is saved later, such as with a new account. */
+  onAgree?: () => void;
+  /** Label for the agree button; defaults to "Yes, I have read and agree". */
+  agreeLabel?: string;
   declineLabel: string;
   helperText: string;
-  onAccept: (acceptance: T) => void;
+  onAccept?: (acceptance: T) => void;
   onDecline: () => void;
   /** Read-only mode: shows a single close button instead of agree/decline. */
   onClose?: () => void;
@@ -36,6 +40,8 @@ export function TermsDialog<T>({
   terms,
   notice,
   acceptUrl,
+  onAgree,
+  agreeLabel = "Yes, I have read and agree",
   declineLabel,
   helperText,
   onAccept,
@@ -67,7 +73,8 @@ export function TermsDialog<T>({
   }, []);
 
   async function accept() {
-    if (requestPending.current) return;
+    if (onAgree) return onAgree();
+    if (requestPending.current || !acceptUrl) return;
     requestPending.current = true;
     setIsSaving(true);
     setError(null);
@@ -81,7 +88,7 @@ export function TermsDialog<T>({
       if (!response.ok || !payload.acceptance) {
         throw new Error(payload.error ?? "Unable to record your agreement. Please try again.");
       }
-      onAccept(payload.acceptance);
+      onAccept?.(payload.acceptance);
     } catch (acceptError) {
       setError(acceptError instanceof Error ? acceptError.message : "Unable to record your agreement. Please try again.");
     } finally {
@@ -169,7 +176,7 @@ export function TermsDialog<T>({
               <Button type="button" variant="outline" disabled={isSaving} onClick={onDecline} className="h-11">{declineLabel}</Button>
               <Button type="button" disabled={isSaving} onClick={() => void accept()} className="h-11">
                 {isSaving ? <LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isSaving ? "Recording agreement…" : "Yes, I have read and agree"}
+                {isSaving ? "Recording agreement…" : agreeLabel}
               </Button>
             </div>
             <p className="mt-2 text-center text-xs leading-5 text-stone-500">{helperText}</p>

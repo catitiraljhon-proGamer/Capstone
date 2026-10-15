@@ -19,6 +19,8 @@ const flowSchema = z.object({
   verifier: z.string().min(43).max(128),
   mode: z.enum(["login", "register"]),
   rememberMe: z.boolean(),
+  /** Set when the register page's Terms and Conditions box was checked before continuing with Google. */
+  termsAccepted: z.boolean().default(false),
 });
 const linkSchema = z.object({
   userId: z.string().regex(/^[a-f0-9]{24}$/),
@@ -102,6 +104,7 @@ async function verifyTemporaryToken(
 export async function createGoogleFlow(
   mode: GoogleFlow["mode"],
   rememberMe: boolean,
+  termsAccepted = false,
 ) {
   const config = getGoogleConfig();
   const flow: GoogleFlow = {
@@ -110,6 +113,7 @@ export async function createGoogleFlow(
     verifier: randomBytes(32).toString("base64url"),
     mode,
     rememberMe,
+    termsAccepted,
   };
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.search = new URLSearchParams({

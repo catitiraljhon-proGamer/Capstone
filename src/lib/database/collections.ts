@@ -59,6 +59,8 @@ export type UserDocument = {
   authVersion?: number;
   clientDetails?: ClientDetails;
   clientArchivedAt?: Date | null;
+  /** Customer's one-time agreement to the Terms and Conditions; the audit log keeps the exact text. */
+  termsAcceptance?: { auditLogId: ObjectId; version: string; acceptedAt: Date };
   createdAt: Date;
   updatedAt: Date;
 };

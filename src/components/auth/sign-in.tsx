@@ -2,6 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { AccountTermsNotice } from "@/components/auth/account-terms";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
@@ -296,6 +297,7 @@ export function SignInPage({
                   Create an account
                 </Link>
               </p>
+              <AccountTermsNotice />
             </div>
           </div>
         </section>

@@ -3,6 +3,7 @@ import { after, before, beforeEach, mock, test } from "node:test";
 import { compare } from "bcryptjs";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { type Db, type MongoClient, ObjectId } from "mongodb";
+import { accountTerms } from "@/lib/account-terms";
 import { getDatabase } from "@/lib/database/mongodb";
 import { type UserDocument } from "@/lib/database/collections";
 import { clientProfileSchema, ClientRequestError, createClient, getClient, listClients, setClientArchived, toClientDto, updateClient } from "@/lib/server/clients";
@@ -31,7 +32,7 @@ function registrationRequest(input: unknown) {
   return new Request("http://localhost:3000/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ verificationCode, ...(input as object) }),
+    body: JSON.stringify({ verificationCode, termsVersion: accountTerms.version, ...(input as object) }),
   });
 }
 
@@ -118,6 +119,11 @@ test("customer registration saves a complete record visible in the Client Module
   await db.collection<UserDocument>("users").insertOne(legacyUser({
     _id: new ObjectId(admin.id), name: admin.name, email: admin.email, role: "admin",
   }));
+  // The Terms and Conditions pop-up must be agreed to before an account is created.
+  for (const termsVersion of [undefined, "1999-01-01"]) {
+    assert.equal((await registerCustomer(registrationRequest({ ...registrationInput, termsVersion }))).status, 400);
+  }
+  assert.equal(await db.collection("users").countDocuments({ email: registrationInput.email }), 0);
   const response = await registerCustomer(registrationRequest({
     ...registrationInput, name: `  ${details.name}  `, email: "  NEW.CLIENT@GMAIL.COM  ",
     contactNumber: `  ${details.contactNumber}  `, addressDetails: { ...addressInput, street: `  ${addressInput.street}  ` },
@@ -131,6 +137,8 @@ test("customer registration saves a complete record visible in the Client Module
   assert.ok(saved);
   assert.equal(saved.role, "customer");
   assert.equal(saved.status, "active");
+  assert.equal(saved.termsAcceptance?.version, accountTerms.version);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "account.terms-accepted", actorId: saved._id }), 1);
   assert.equal(await compare(password, saved.passwordHash!), true);
   assert.deepEqual(saved.clientDetails, {
     contactNumber: details.contactNumber, address: formattedAddress, occupation: details.occupation,

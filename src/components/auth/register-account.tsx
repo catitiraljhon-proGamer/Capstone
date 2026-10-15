@@ -1,6 +1,8 @@
 "use client";
 
+import { AccountTermsConsent } from "@/components/auth/account-terms";
 import { BackButton } from "@/components/ui/back-button";
+import { accountTerms } from "@/lib/account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { registrationEmailError, useClientFormValidation } from "@/components/clients/client-information-form";
@@ -41,6 +43,9 @@ export function RegisterAccountPage({
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
+  /** Which sign-up the Terms and Conditions pop-up is confirming; null when it is closed. */
+  const [consentFor, setConsentFor] = useState<"email" | "google" | null>(null);
+  const pendingRegistration = useRef<Record<string, unknown> | null>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const normalizedEmail = email.trim().toLowerCase();
@@ -127,13 +132,22 @@ export function RegisterAccountPage({
     const addressDetails = readAddressDetails(formData);
     const occupation = String(formData.get("occupation") ?? "").trim();
 
+    // The account is created only after the customer agrees in the Terms and Conditions pop-up.
+    pendingRegistration.current = { name, email, password, contactNumber, addressDetails, occupation, verificationCode };
+    setConsentFor("email");
+  };
+
+  const createAccount = async () => {
+    const details = pendingRegistration.current;
+    setConsentFor(null);
+    if (!details || isSubmitting) return;
     setIsSubmitting(true);
 
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, contactNumber, addressDetails, occupation, verificationCode }),
+        body: JSON.stringify({ ...details, termsVersion: accountTerms.version }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -152,6 +166,7 @@ export function RegisterAccountPage({
         return;
       }
 
+      pendingRegistration.current = null;
       window.location.replace(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
@@ -196,7 +211,7 @@ export function RegisterAccountPage({
                 {googleError}
               </p>
             ) : null}
-            <GoogleAuthButton mode="register" disabled={isSubmitting} />
+            <GoogleAuthButton mode="register" disabled={isSubmitting} onClick={() => setConsentFor("google")} />
             <p className="text-xs leading-5 text-stone-500">
               Registering with Google? Add your contact number and address
               in your client profile after signing in.
@@ -419,7 +434,8 @@ export function RegisterAccountPage({
             </div>
 
             <p className="text-xs leading-5 text-stone-500">
-              Client registration cannot create staff or administrator accounts.
+              Client registration cannot create staff or administrator accounts. You will be asked to read and agree to
+              the Terms and Conditions before your account is created.
             </p>
 
             {errorMessage ? (
@@ -481,6 +497,16 @@ export function RegisterAccountPage({
           </div>
         </aside>
       </main>
+      {consentFor && (
+        <AccountTermsConsent
+          onDecline={() => setConsentFor(null)}
+          onAgree={() => {
+            if (consentFor === "email") { void createAccount(); return; }
+            const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: accountTerms.version });
+            window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
+          }}
+        />
+      )}
     </div>
   );
 }

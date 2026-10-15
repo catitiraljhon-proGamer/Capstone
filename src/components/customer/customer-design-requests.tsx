@@ -1,8 +1,7 @@
 "use client";
 
 import type { HouseDesignFinish } from "@/lib/house-design-data";
-import { DesignRequestTermsDialog } from "@/components/customer/design-request-terms-dialog";
-import type { DesignTermsAcceptance } from "@/lib/design-request-terms";
+import { AccountTermsDialog } from "@/components/auth/account-terms";
 import {
   countOpenDesignRequests,
   designRequestLimitMessage,
@@ -18,7 +17,6 @@ import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
   Hourglass,
@@ -75,27 +73,19 @@ function formatDate(value: string) {
   });
 }
 
+/** The Terms and Conditions were agreed to once for the account, so the form opens directly. */
 export function CustomerDesignRequests({ houseDesignId }: { houseDesignId?: string }) {
-  const router = useRouter();
-  const [acceptance, setAcceptance] = useState<DesignTermsAcceptance | null>(null);
   const [isReviewingTerms, setIsReviewingTerms] = useState(false);
 
   return (
     <>
-      {acceptance ? <DesignRequestForm houseDesignId={houseDesignId} acceptance={acceptance} onReviewTerms={() => setIsReviewingTerms(true)} /> : null}
-      {!acceptance || isReviewingTerms ? (
-        <DesignRequestTermsDialog
-          onAccept={setAcceptance}
-          onDecline={() => router.replace("/customer")}
-          onClose={acceptance ? () => setIsReviewingTerms(false) : undefined}
-        />
-      ) : null}
+      <DesignRequestForm houseDesignId={houseDesignId} onReviewTerms={() => setIsReviewingTerms(true)} />
+      {isReviewingTerms ? <AccountTermsDialog onClose={() => setIsReviewingTerms(false)} /> : null}
     </>
   );
 }
 
-function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
-  acceptance: DesignTermsAcceptance;
+function DesignRequestForm({ onReviewTerms, houseDesignId }: {
   onReviewTerms: () => void;
   houseDesignId?: string;
 }) {
@@ -289,7 +279,6 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
           preferredDate,
           neededBy,
           inspirationImages: inspirationImages.map((image) => image.src),
-          termsAcceptanceId: acceptance.id,
         }),
       });
       const payload = (await response.json()) as {
@@ -351,7 +340,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
         </div>
 
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
-          <p className="font-semibold text-red-900">Terms accepted · Design review is free</p>
+          <p className="font-semibold text-red-900">Design review is free</p>
           <p className="mt-1 leading-6 text-stone-600">You can review the design and floor plan and request changes for free. Only the blueprint is paid, after you accept the construction cost estimate.</p>
           <button type="button" onClick={onReviewTerms} aria-haspopup="dialog" className="mt-2 rounded text-sm font-semibold text-red-700 underline underline-offset-4 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-red-600">
             Review Terms and Conditions
