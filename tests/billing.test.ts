@@ -8,6 +8,7 @@ import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocu
 import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBillingData, getOwnedPayment, getReceipt, invoiceInputSchema, paymentInputSchema, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
+import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
 import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
 import { acceptAccountTerms, requireAccountTerms } from "@/lib/server/account-terms";
@@ -481,6 +482,38 @@ async function issuedInvoice(amount = 100000) {
 function payment(invoiceId: string, amount = 40000, extra = {}) {
   return { invoiceId, amount, method: "Bank transfer", transactionReference: randomUUID(), paidAt: manilaDate(), submissionKey: randomUUID(), ...extra };
 }
+
+test("customers get one automatic reminder when an unpaid invoice is 3 days or fewer from its due date", async () => {
+  const now = new Date("2026-10-15T00:30:00.000Z"); // 8:30 AM, October 15 in Manila
+  const setDue = (id: string, date: string) =>
+    db.collection<InvoiceDocument>("invoices").updateOne({ _id: new ObjectId(id) }, { $set: { dueDate: new Date(`${date}T00:00:00.000Z`) } });
+  const inThreeDays = await issuedInvoice(40000);
+  const inFiveDays = await createInvoice(db, clerk, { ...draft, label: "Roofing works", amount: 20000 });
+  await changeInvoice(db, clerk, inFiveDays, { action: "issue" });
+  const paid = await createInvoice(db, clerk, { ...draft, label: "Painting works", amount: 10000 });
+  await changeInvoice(db, clerk, paid, { action: "issue" });
+  const paidPayment = await submitPayment(db, customer, payment(paid, 10000));
+  await reviewPayment(db, clerk, paidPayment, { action: "verify" });
+  const unissued = await createInvoice(db, clerk, { ...draft, label: "Tiling works", amount: 5000 });
+  await Promise.all([setDue(inThreeDays, "2026-10-18"), setDue(inFiveDays, "2026-10-20"), setDue(paid, "2026-10-16"), setDue(unissued, "2026-10-16")]);
+
+  const reminders = () => db.collection("notifications").find({ kind: "payment-due-reminder" }).toArray();
+  assert.equal((await sendDuePaymentReminders(db, now)).sent, 1);
+  const [first] = await reminders();
+  assert.equal(first.userId.toHexString(), customer.id);
+  assert.equal(first.entityId.toHexString(), inThreeDays);
+  assert.equal(first.title, "Payment due in 3 days");
+  assert.match(first.body, /₱40,000/);
+
+  // Running again, even the same day, sends nothing new.
+  assert.equal((await sendDuePaymentReminders(db, now)).sent, 0);
+  // Two days later the second invoice enters the window; the first is not reminded twice.
+  assert.equal((await sendDuePaymentReminders(db, new Date("2026-10-17T00:30:00.000Z"))).sent, 1);
+  assert.deepEqual((await reminders()).map((note) => note.entityId.toHexString()).sort(), [inThreeDays, inFiveDays].sort());
+  // A new due date gets its own reminder.
+  await setDue(inThreeDays, "2026-10-19");
+  assert.equal((await sendDuePaymentReminders(db, new Date("2026-10-17T00:30:00.000Z"))).sent, 1);
+});
 
 test("only clerk manages billing; customers submit only their own payments", async () => {
   assert.throws(() => assertBillingRole(admin, true), isError(403));

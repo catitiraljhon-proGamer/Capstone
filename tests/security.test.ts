@@ -14,6 +14,7 @@ import { proxy } from "@/proxy";
 import { accountTerms } from "@/lib/account-terms";
 import { acceptAccountTerms, canViewFullDesignImages, getAccountTermsAcceptance } from "@/lib/server/account-terms";
 import { POST as passwordLogin } from "@/app/api/auth/login/route";
+import { GET as runPaymentReminders } from "@/app/api/cron/payment-reminders/route";
 
 const origin = "http://localhost:3000";
 const password = "Correct-password-123";
@@ -190,6 +191,25 @@ async function proxyRequest(
   request.cookies.set(sessionCookieName, token);
   return proxy(request);
 }
+
+test("only Vercel Cron, or a caller with CRON_SECRET, can run the payment reminder job", async () => {
+  const run = (headers: Record<string, string>) =>
+    runPaymentReminders(new Request("http://localhost:3000/api/cron/payment-reminders", { headers }));
+  const previous = process.env.CRON_SECRET;
+  try {
+    delete process.env.CRON_SECRET;
+    assert.equal((await run({})).status, 401);
+    assert.equal((await run({ "user-agent": "curl/8.0" })).status, 401);
+    assert.equal((await run({ "user-agent": "vercel-cron/1.0" })).status, 200);
+    process.env.CRON_SECRET = "test-cron-secret";
+    assert.equal((await run({ "user-agent": "vercel-cron/1.0" })).status, 401);
+    assert.equal((await run({ authorization: "Bearer wrong" })).status, 401);
+    assert.equal((await run({ authorization: "Bearer test-cron-secret" })).status, 200);
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
+});
 
 test("signed-in accounts open their own portal and are sent home from another role's", async () => {
   for (const [path, role] of [

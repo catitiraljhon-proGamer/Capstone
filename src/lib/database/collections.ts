@@ -336,6 +336,8 @@ export type InvoiceDocument = {
   voidedAt?: Date;
   billingVersion?: number;
   lastReminderAt?: Date;
+  /** Due date (YYYY-MM-DD) the automatic "payment due soon" reminder was sent for; a new due date gets a new reminder. */
+  dueReminderSentFor?: string;
   createdAt: Date;
   updatedAt: Date;
 };
