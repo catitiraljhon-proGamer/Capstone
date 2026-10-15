@@ -102,6 +102,22 @@ export type BillingData = {
   activity: { id: string; action: string; actorName: string; date: string }[];
 };
 
+/** A customer payment date shown read-only on the admin calendar; billing itself stays with the Billing Clerk. */
+export type PaymentDueDto = {
+  id: string;
+  kind: "Downpayment" | "Progress billing" | "Blueprint fee" | "Design fee";
+  label: string;
+  clientName: string;
+  projectName: string;
+  /** YYYY-MM-DD */
+  dueDate: string;
+  amount: number;
+  balance: number;
+  /** Upcoming = scheduled milestone not invoiced yet; Due = invoiced and unpaid. */
+  status: "Upcoming" | "Due" | "Partially paid" | "Paid" | "Overdue";
+  invoiceNumber?: string;
+};
+
 export type BillingReceipt = {
   receipt: ReceiptSnapshot;
   status: "Verified" | "Reversed";

@@ -1,7 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { formatPeso } from "@/lib/house-design-data";
+import type { PaymentDueDto } from "@/types/billing";
 import {
+  AlertTriangle,
+  Banknote,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -56,6 +60,15 @@ type ScheduleForm = {
 
 const eventTypeClass: Record<ScheduleEventType, string> = {
   "Client meeting": "border-red-200 bg-red-50 text-red-800",
+};
+
+/** Customer payment dates are read-only here; the Billing Clerk manages invoices and payments. */
+const paymentDueClass: Record<PaymentDueDto["status"], string> = {
+  Upcoming: "border-stone-300 bg-stone-50 text-stone-700",
+  Due: "border-amber-200 bg-amber-50 text-amber-800",
+  "Partially paid": "border-sky-200 bg-sky-50 text-sky-800",
+  Paid: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  Overdue: "border-red-400 bg-white text-red-800",
 };
 
 const statusClass: Record<ScheduleStatus, string> = {
@@ -133,6 +146,7 @@ export function AdminSchedulingCalendar() {
   const [schedules, setSchedules] = useState<ScheduleDto[]>([]);
   const [clients, setClients] = useState<ClientDto[]>([]);
   const [projects, setProjects] = useState<ProjectDto[]>([]);
+  const [paymentDues, setPaymentDues] = useState<PaymentDueDto[]>([]);
   const [form, setForm] = useState<ScheduleForm>(() => emptyForm(dateKey(today)));
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -150,6 +164,7 @@ export function AdminSchedulingCalendar() {
           schedules: ScheduleDto[];
           clients: ClientDto[];
           projects: ProjectDto[];
+          paymentDues?: PaymentDueDto[];
         }>(response),
       )
       .then((payload) => {
@@ -157,6 +172,7 @@ export function AdminSchedulingCalendar() {
         setSchedules(payload.schedules);
         setClients(payload.clients);
         setProjects(payload.projects);
+        setPaymentDues(payload.paymentDues ?? []);
         setError(null);
       })
       .catch((loadError: unknown) => {
@@ -199,6 +215,15 @@ export function AdminSchedulingCalendar() {
     return grouped;
   }, [schedules]);
   const selectedSchedules = schedulesByDay.get(selectedDate) ?? [];
+  const duesByDay = useMemo(() => {
+    const grouped = new Map<string, PaymentDueDto[]>();
+    for (const due of paymentDues) grouped.set(due.dueDate, [...(grouped.get(due.dueDate) ?? []), due]);
+    return grouped;
+  }, [paymentDues]);
+  const selectedDues = duesByDay.get(selectedDate) ?? [];
+  const monthPrefix = dateKey(visibleMonth).slice(0, 7);
+  const unpaidMonthDues = paymentDues.filter((due) => due.dueDate.startsWith(monthPrefix) && due.status !== "Paid");
+  const overdueDues = paymentDues.filter((due) => due.status === "Overdue");
   const clientProjects = projects.filter(
     (project) => project.clientId === form.clientId,
   );
@@ -318,7 +343,7 @@ export function AdminSchedulingCalendar() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
           {
             label: "Events this month",
@@ -328,7 +353,19 @@ export function AdminSchedulingCalendar() {
           { label: "Scheduled meetings", value: scheduledMeetings, icon: Users },
           { label: "Completed meetings", value: completedMeetings, icon: CalendarDays },
           { label: "Cancelled meetings", value: cancelledMeetings, icon: Clock3 },
-        ].map((item) => (
+          {
+            label: "Customer payments due this month",
+            value: unpaidMonthDues.length,
+            note: `${formatPeso(unpaidMonthDues.reduce((sum, due) => sum + due.balance, 0))} outstanding`,
+            icon: Banknote,
+          },
+          {
+            label: "Overdue customer payments",
+            value: overdueDues.length,
+            note: overdueDues.length ? `${formatPeso(overdueDues.reduce((sum, due) => sum + due.balance, 0))} past due` : "None past due",
+            icon: AlertTriangle,
+          },
+        ].map((item: { label: string; value: number; note?: string; icon: typeof CalendarDays }) => (
           <section
             key={item.label}
             className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
@@ -339,6 +376,7 @@ export function AdminSchedulingCalendar() {
                 <p className="mt-2 text-3xl font-semibold tracking-tight">
                   {item.value}
                 </p>
+                {item.note ? <p className="mt-1 text-xs text-stone-500">{item.note}</p> : null}
               </div>
               <span className="grid h-11 w-11 place-items-center rounded-lg bg-red-50 text-red-700">
                 <item.icon className="h-5 w-5" aria-hidden="true" />
@@ -593,6 +631,9 @@ export function AdminSchedulingCalendar() {
                   {days.map((day) => {
                     const key = dateKey(day);
                     const daySchedules = schedulesByDay.get(key) ?? [];
+                    const dayDues = duesByDay.get(key) ?? [];
+                    const dueSlots = Math.max(0, 3 - Math.min(daySchedules.length, 3));
+                    const hiddenCount = Math.max(0, daySchedules.length - 3) + Math.max(0, dayDues.length - dueSlots);
                     const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
                     const isSelected = key === selectedDate;
                     const isToday = key === dateKey(today);
@@ -629,9 +670,18 @@ export function AdminSchedulingCalendar() {
                               {schedule.title}
                             </span>
                           ))}
-                          {daySchedules.length > 3 ? (
+                          {dayDues.slice(0, dueSlots).map((due) => (
+                            <span
+                              key={due.id}
+                              className={`flex items-center gap-1 truncate rounded border px-1.5 py-1 text-[11px] font-medium ${paymentDueClass[due.status]}`}
+                            >
+                              <Banknote className="h-3 w-3 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{due.kind} · {due.clientName}</span>
+                            </span>
+                          ))}
+                          {hiddenCount > 0 ? (
                             <span className="block px-1 text-[11px] font-medium text-stone-500">
-                              +{daySchedules.length - 3} more
+                              +{hiddenCount} more
                             </span>
                           ) : null}
                         </span>
@@ -663,6 +713,33 @@ export function AdminSchedulingCalendar() {
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+
+          {selectedDues.length > 0 ? (
+            <div className="mt-5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Customer payments due</p>
+              {selectedDues.map((due) => (
+                <article key={due.id} className={`rounded-xl border p-4 ${paymentDueClass[due.status]}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold">{due.kind}</p>
+                      <h3 className="mt-1 break-words font-semibold text-stone-950">{due.label}</h3>
+                    </div>
+                    <span className="rounded bg-white/70 px-2 py-1 text-xs font-semibold">{due.status}</span>
+                  </div>
+                  <div className="mt-3 space-y-1.5 text-sm text-stone-700">
+                    <p className="flex items-start gap-2"><Users className="mt-0.5 h-4 w-4 shrink-0" />{due.clientName}</p>
+                    {due.projectName ? <p className="pl-6 text-xs">{due.projectName}</p> : null}
+                    <p className="flex items-start gap-2">
+                      <Banknote className="mt-0.5 h-4 w-4 shrink-0" />
+                      {formatPeso(due.amount)}{due.status !== "Upcoming" && due.balance !== due.amount ? ` · Balance ${formatPeso(due.balance)}` : ""}
+                    </p>
+                    <p className="pl-6 text-xs">{due.invoiceNumber ? `Invoice ${due.invoiceNumber}` : "In the payment schedule · Not invoiced yet"}</p>
+                  </div>
+                </article>
+              ))}
+              <p className="text-xs leading-5 text-stone-500">Payment dates are view-only here. The Billing Clerk issues invoices and verifies payments.</p>
+            </div>
+          ) : null}
 
           {selectedSchedules.length > 0 ? (
             <div className="mt-5 space-y-4">
@@ -729,7 +806,7 @@ export function AdminSchedulingCalendar() {
                 </article>
               ))}
             </div>
-          ) : (
+          ) : selectedDues.length > 0 ? null : (
             <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-6 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
               <p className="mt-3 text-sm font-medium text-stone-700">No schedules for this day</p>
@@ -748,6 +825,12 @@ export function AdminSchedulingCalendar() {
               {(Object.keys(eventTypeClass) as ScheduleEventType[]).map((eventType) => (
                 <span key={eventType} className={`rounded border px-2 py-1 ${eventTypeClass[eventType]}`}>
                   {eventType}
+                </span>
+              ))}
+              {(Object.keys(paymentDueClass) as PaymentDueDto["status"][]).map((status) => (
+                <span key={status} className={`inline-flex items-center gap-1 rounded border px-2 py-1 ${paymentDueClass[status]}`}>
+                  <Banknote className="h-3 w-3" aria-hidden="true" />
+                  Payment {status.toLowerCase()}
                 </span>
               ))}
             </div>

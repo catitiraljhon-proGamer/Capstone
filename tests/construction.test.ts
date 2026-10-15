@@ -9,6 +9,7 @@ import type { DesignRequestDocument, InvoiceDocument, PaymentDocument, ProjectDo
 import { BillingError, changeInvoice, createInvoice, getBillingData, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects } from "@/lib/server/construction";
 import { defaultScheduleTemplate } from "@/lib/construction";
+import { listPaymentDues } from "@/lib/server/payment-dues";
 import { manilaDate } from "@/lib/billing";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { SessionUser } from "@/types/domain";
@@ -115,6 +116,34 @@ beforeEach(async () => {
   })));
 });
 after(async () => { await db?.client.close(); await mongo?.stop(); });
+
+test("the admin calendar lists every customer payment date with its live status", async () => {
+  const { projectId } = await acceptedProject(30);
+  let project = await projectDto(projectId);
+  // The design fee the fixture already paid shows too, separate from the construction milestones.
+  const all = await listPaymentDues(db);
+  assert.deepEqual(all.filter((due) => due.kind === "Design fee").map((due) => due.status), ["Paid"]);
+  const projectDues = async () => (await listPaymentDues(db)).filter((due) => due.projectName.startsWith(project.reference));
+  let dues = await projectDues();
+  assert.equal(dues.length, project.milestones.length);
+  assert.ok(dues.every((due) => due.status === "Upcoming" && !due.invoiceNumber && due.clientName === customer.name));
+  assert.equal(dues.find((due) => due.kind === "Downpayment")?.amount, project.milestones[0].amount);
+  assert.deepEqual(dues.map((due) => due.dueDate), [...dues.map((due) => due.dueDate)].sort());
+
+  await payInFull(project, 0);
+  project = await projectDto(projectId);
+  dues = await projectDues();
+  const downpayment = dues.find((due) => due.kind === "Downpayment");
+  assert.equal(downpayment?.status, "Paid");
+  assert.equal(downpayment?.invoiceNumber, project.milestones[0].invoice?.number);
+  assert.equal(downpayment?.balance, 0);
+
+  const progress = await billMilestone(project, 1);
+  await db.collection<InvoiceDocument>("invoices").updateOne({ _id: new ObjectId(progress) }, { $set: { dueDate: new Date("2020-01-01T00:00:00.000Z") } });
+  dues = await projectDues();
+  assert.equal(dues.find((due) => due.label === project.milestones[1].label)?.status, "Overdue");
+  assert.equal(dues.filter((due) => due.status === "Upcoming").length, project.milestones.length - 2);
+});
 
 test("blueprint-flow designs open the free estimate once the customer approves them, and the clerk bills the blueprint first", async () => {
   const now = new Date();

@@ -8,6 +8,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { insertNotifications } from "@/lib/server/notifications";
+import { listPaymentDues } from "@/lib/server/payment-dues";
 import { scheduleInputSchema, toScheduleDto } from "@/lib/server/schedules";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
@@ -28,7 +29,7 @@ export async function GET() {
     if (session.role !== "admin") return forbidden();
 
     const db = await getDatabase();
-    const [documents, clients, projects] = await Promise.all([
+    const [documents, clients, projects, paymentDues] = await Promise.all([
       db
         .collection<ScheduleDocument>(collections.schedules)
         .find({ eventType: "Client meeting" })
@@ -45,6 +46,7 @@ export async function GET() {
         .find({ status: { $ne: "Completed" } })
         .sort({ name: 1 })
         .toArray(),
+      listPaymentDues(db),
     ]);
 
     return NextResponse.json({
@@ -60,6 +62,8 @@ export async function GET() {
         reference: project.reference,
         name: project.name,
       })),
+      // Read-only: customer payment dates the Billing Clerk manages.
+      paymentDues,
     });
   } catch (error) {
     return apiError(error);
