@@ -10,6 +10,8 @@ import { BillingError, changeInvoice, createInvoice, getBillingData, reviewPayme
 import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects } from "@/lib/server/construction";
 import { defaultScheduleTemplate } from "@/lib/construction";
 import { listPaymentDues } from "@/lib/server/payment-dues";
+import { archiveInactiveClients } from "@/lib/server/client-inactivity";
+import { setClientArchived } from "@/lib/server/clients";
 import { manilaDate } from "@/lib/billing";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { SessionUser } from "@/types/domain";
@@ -152,6 +154,57 @@ test("estimates saved with VAT drop it, unless billing already started on the ac
   // Accepting the open estimate uses the VAT-free total.
   const { projectId } = await changeEstimate(db, customer, open.id, { action: "accept", downpaymentPercent: 30 });
   assert.equal((await projectDto(projectId!)).contractPrice, 6_000_000);
+});
+
+test("clients are warned, then archived and disabled 30 days after their last project completes with nothing open", async () => {
+  const completedAt = new Date("2026-01-01T02:00:00.000Z");
+  const at = (days: number) => new Date(completedAt.getTime() + days * 86_400_000);
+  const projectId = new ObjectId();
+  await db.collection<ProjectDocument>("projects").insertOne({
+    _id: projectId, reference: "PRJ-DONE", name: "Finished home", customerId: new ObjectId(customer.id),
+    status: "Completed", contractPrice: 1_000_000, completedAt, createdAt: completedAt, updatedAt: completedAt,
+  });
+  const user = () => db.collection<UserDocument>("users").findOne({ _id: new ObjectId(customer.id) });
+
+  assert.deepEqual(await archiveInactiveClients(db, at(10)), { noticed: 0, archived: 0 });
+  assert.deepEqual(await archiveInactiveClients(db, at(24)), { noticed: 1, archived: 0 });
+  assert.deepEqual(await archiveInactiveClients(db, at(25)), { noticed: 0, archived: 0 });
+  assert.match((await db.collection("notifications").findOne({ kind: "client-inactivity-notice" }))!.title, /will be archived on January 31, 2026/);
+
+  // An unpaid invoice keeps the client active.
+  const invoiceId = new ObjectId();
+  await db.collection<InvoiceDocument>("invoices").insertOne({
+    _id: invoiceId, invoiceNumber: "INV-OPEN", customerId: new ObjectId(customer.id), projectId, label: "Retention",
+    progressPercentage: 100, amount: 5000, dueDate: at(40), status: "Sent", createdAt: completedAt, updatedAt: completedAt,
+  });
+  assert.equal((await archiveInactiveClients(db, at(31))).archived, 0);
+  await db.collection("invoices").deleteOne({ _id: invoiceId });
+
+  assert.equal((await archiveInactiveClients(db, at(31))).archived, 1);
+  const archived = await user();
+  assert.equal(archived?.status, "disabled");
+  assert.ok(archived?.clientArchivedAt && archived.autoArchivedAt);
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "client-auto-archived", userId: new ObjectId(admin.id) }), 1);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "client.auto-archived" }), 1);
+
+  // Unarchiving restores sign-in and restarts the 30-day count.
+  await setClientArchived(db, admin, customer.id, { archived: false });
+  const restored = await user();
+  assert.equal(restored?.status, "active");
+  assert.equal(restored?.clientArchivedAt, undefined);
+  const reactivatedAt = restored!.reactivatedAt!;
+  assert.deepEqual(await archiveInactiveClients(db, new Date(reactivatedAt.getTime() + 5 * 86_400_000)), { noticed: 0, archived: 0 });
+  assert.equal((await archiveInactiveClients(db, new Date(reactivatedAt.getTime() + 31 * 86_400_000))).archived, 1);
+});
+
+test("clients with an unfinished project are never archived for inactivity", async () => {
+  const old = new Date("2026-01-01T00:00:00.000Z");
+  await db.collection<ProjectDocument>("projects").insertMany([
+    { _id: new ObjectId(), reference: "PRJ-A", name: "Done", customerId: new ObjectId(customer.id), status: "Completed", contractPrice: 1, completedAt: old, createdAt: old, updatedAt: old },
+    { _id: new ObjectId(), reference: "PRJ-B", name: "Ongoing", customerId: new ObjectId(customer.id), status: "Active", contractPrice: 1, createdAt: old, updatedAt: old },
+  ]);
+  assert.deepEqual(await archiveInactiveClients(db, new Date("2026-06-01T00:00:00.000Z")), { noticed: 0, archived: 0 });
+  assert.equal((await db.collection<UserDocument>("users").findOne({ _id: new ObjectId(customer.id) }))?.status, "active");
 });
 
 test("the admin calendar lists every customer payment date with its live status", async () => {

@@ -169,7 +169,12 @@ export async function setClientArchived(db: Db, actor: SessionUser, id: string, 
     { _id: clientId, role: "customer", clientArchivedAt: archived ? null : { $ne: null } },
     archived
       ? { $set: { clientArchivedAt: now, updatedAt: now } }
-      : { $unset: { clientArchivedAt: "" }, $set: { updatedAt: now } },
+      // Unarchiving restores sign-in for accounts the 30-day inactivity job disabled (never for accounts an admin
+      // disabled in Users & Roles) and restarts the inactivity count.
+      : [
+        { $set: { status: { $cond: [{ $ifNull: ["$autoArchivedAt", false] }, "active", "$status"] }, reactivatedAt: now, updatedAt: now } },
+        { $unset: ["clientArchivedAt", "autoArchivedAt", "inactivityNoticeFor"] },
+      ],
     { returnDocument: "after" },
   );
   if (!updated) {

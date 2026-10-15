@@ -59,6 +59,12 @@ export type UserDocument = {
   authVersion?: number;
   clientDetails?: ClientDetails;
   clientArchivedAt?: Date | null;
+  /** Set when the client was archived and disabled automatically after 30 days of inactivity. */
+  autoArchivedAt?: Date;
+  /** Start of the inactivity period the 7-day "account will be archived" notice was sent for, so it is sent once. */
+  inactivityNoticeFor?: Date;
+  /** When an admin last unarchived the client; the 30-day inactivity count restarts from here. */
+  reactivatedAt?: Date;
   /** Customer's one-time agreement to the Terms and Conditions; the audit log keeps the exact text. */
   termsAcceptance?: { auditLogId: ObjectId; version: string; acceptedAt: Date };
   createdAt: Date;
@@ -171,6 +177,8 @@ export type ProjectDocument = {
   vat?: number;
   downpaymentPercent?: number;
   paymentSchedule?: ProjectMilestoneDocument[];
+  /** When the admin marked the project Completed; older completed projects fall back to updatedAt. */
+  completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };

@@ -514,7 +514,9 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
       if (milestones.some((milestone) => milestone.status !== "Paid")) throw new BillingError("Every payment milestone must be fully paid before the project is completed.", 409);
     }
     const now = new Date();
-    const moved = await projects.updateOne({ _id: project._id, status: from }, { $set: { status: input.status, updatedAt: now } }, { session });
+    const moved = await projects.updateOne({ _id: project._id, status: from }, {
+      $set: { status: input.status, updatedAt: now, ...(input.status === "Completed" ? { completedAt: now } : {}) },
+    }, { session });
     if (!moved.matchedCount) throw new BillingError("The project changed. Reload it and try again.", 409);
     await notify(db, session, [project.customerId], {
       title: `Project ${input.status === "Completed" ? "completed" : input.status === "On hold" ? "put on hold" : "is active"}`,
