@@ -76,7 +76,7 @@ type PhAddressFieldsProps = {
 };
 
 /**
- * Province, city/municipality, and barangay dropdowns (PSA PSGC, sorted A to Z)
+ * Luzon province, city/municipality, and barangay dropdowns (PSA PSGC, sorted A to Z)
  * plus street and postal code. Each list depends on the choice before it.
  */
 export function PhAddressFields({
@@ -148,6 +148,7 @@ export function PhAddressFields({
       <legend className={`${labelClassName} mb-2`}>
         Complete address <RequiredIndicator />
       </legend>
+      <p className="text-xs text-stone-500">We currently serve projects in Luzon only.</p>
       {legacyAddress && !defaultValue ? (
         <p className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-xs leading-5 text-stone-600">
           Address on file: <span className="font-medium text-stone-800">{legacyAddress}</span>. Choose it from the

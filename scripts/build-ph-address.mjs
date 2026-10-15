@@ -1,4 +1,4 @@
-// Builds the Philippine address lists used by the address dropdowns from the
+// Builds the Luzon address lists used by the address dropdowns from the
 // PSA Philippine Standard Geographic Code (PSGC), via the psgc.cloud API.
 //
 //   node scripts/build-ph-address.mjs            # download and rebuild
@@ -73,7 +73,13 @@ const independentCityProvince = {
 /** Barangays belong to a city by code prefix; Manila's run through its districts. */
 const cityPrefix = (code) => (code.endsWith("00000") ? code.slice(0, 5) : code.slice(0, 7));
 
-const regions = await load("regions.json", `${api}/regions`);
+// G4 Builders serves Luzon only: Ilocos (01), Cagayan Valley (02), Central Luzon (03),
+// CALABARZON (04), Bicol (05), NCR (13), CAR (14), and MIMAROPA (17).
+const luzonRegionPrefixes = new Set(["01", "02", "03", "04", "05", "13", "14", "17"]);
+
+const regions = (await load("regions.json", `${api}/regions`)).filter((region) =>
+  luzonRegionPrefixes.has(region.code.slice(0, 2)),
+);
 const provinceRecords = await load("provinces.json", `${api}/provinces`);
 const provinces = new Map(
   provinceRecords.map((province) => [province.code, { code: province.code, name: cleanName(province.name) }]),

@@ -26,8 +26,13 @@ export const addressDetailsSchema = z
   .strict()
   .transform((input, ctx): AddressDetails => {
     const province = index.provinces[input.provinceCode];
+    // The index lists Luzon provinces only (see scripts/build-ph-address.mjs).
+    if (!province) {
+      ctx.addIssue({ code: "custom", message: "We currently serve addresses in Luzon only.", path: ["provinceCode"] });
+      return z.NEVER;
+    }
     const city = index.cities[input.cityCode];
-    if (!province || !city || city.provinceCode !== input.provinceCode) {
+    if (!city || city.provinceCode !== input.provinceCode) {
       ctx.addIssue({ code: "custom", message: "Choose a city or municipality in the selected province.", path: ["cityCode"] });
       return z.NEVER;
     }
