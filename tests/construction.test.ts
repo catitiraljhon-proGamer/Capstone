@@ -117,6 +117,21 @@ beforeEach(async () => {
 });
 after(async () => { await db?.client.close(); await mongo?.stop(); });
 
+test("estimates saved with VAT drop it until accepted; accepted ones keep the agreed total", async () => {
+  const open = await sentEstimate();
+  const { estimate: acceptedEstimate } = await acceptedProject();
+  const withVat = { subtotal: 6_000_000, vatRate: 0.12, vat: 720_000, total: 6_720_000 };
+  await db.collection("cost_estimates").updateMany({}, { $set: withVat });
+  const estimates = await listEstimates(db, admin);
+  const reopened = estimates.find((estimate) => estimate.id === open.id)!;
+  assert.deepEqual([reopened.subtotal, reopened.vat, reopened.total], [6_000_000, 0, 6_000_000]);
+  const kept = estimates.find((estimate) => estimate.id === acceptedEstimate.id)!;
+  assert.deepEqual([kept.vat, kept.total], [720_000, 6_720_000]);
+  // Accepting the open estimate uses the VAT-free total.
+  const { projectId } = await changeEstimate(db, customer, open.id, { action: "accept", downpaymentPercent: 30 });
+  assert.equal((await projectDto(projectId!)).contractPrice, 6_000_000);
+});
+
 test("the admin calendar lists every customer payment date with its live status", async () => {
   const { projectId } = await acceptedProject(30);
   let project = await projectDto(projectId);

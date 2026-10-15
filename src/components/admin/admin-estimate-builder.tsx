@@ -144,19 +144,10 @@ function DetailsCard({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
-function TotalsBox({ subtotal, vat, total }: { subtotal: number; vat: number; total: number }) {
+/** The amounts above add up to the contract total; G4 Builders adds no VAT. */
+function TotalsBox({ total }: { total: number }) {
   return (
-    <dl className="ml-auto mt-4 w-full max-w-sm space-y-2 text-sm">
-      <div className="flex justify-between gap-4">
-        <dt className="text-stone-600">Subtotal</dt>
-        <dd className="font-medium tabular-nums">{formatPeso(subtotal)}</dd>
-      </div>
-      {vat > 0 ? (
-        <div className="flex justify-between gap-4">
-          <dt className="text-stone-600">VAT</dt>
-          <dd className="font-medium tabular-nums">{formatPeso(vat)}</dd>
-        </div>
-      ) : null}
+    <dl className="ml-auto mt-4 w-full max-w-sm text-sm">
       <div className="flex justify-between gap-4 border-t border-stone-200 pt-3 text-base">
         <dt className="font-semibold">Contract total</dt>
         <dd className="font-semibold tabular-nums text-red-700">{formatPeso(total)}</dd>
@@ -231,7 +222,7 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
             </tbody>
           </table>
         </div>
-        <TotalsBox subtotal={estimate.subtotal} vat={estimate.vat} total={estimate.total} />
+        <TotalsBox total={estimate.total} />
       </Card>
 
       <Card title="Payment schedule">
@@ -543,7 +534,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
             </tbody>
           </table>
         </div>
-        <TotalsBox {...totals} />
+        <TotalsBox total={totals.total} />
         {sendAttempted && totalError ? <div className="ml-auto max-w-sm text-right"><FieldError id="est-total-error" message={totalError} /></div> : null}
       </Card>
 

@@ -51,13 +51,6 @@ function ScopeOfWorksTable({ estimate }: { estimate: CostEstimateDto }) {
           ))}
         </tbody>
         <tfoot className="border-t border-stone-200 text-sm">
-          {/* VAT appears only on older estimates made before G4 Builders became VAT-exempt. */}
-          {estimate.vat > 0 ? (
-            <>
-              <tr><td className="px-3 py-2 text-right text-stone-600">Subtotal</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.subtotal)}</td></tr>
-              <tr><td className="px-3 py-2 text-right text-stone-600">VAT ({Math.round(estimate.vatRate * 100)}%)</td><td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{formatPeso(estimate.vat)}</td></tr>
-            </>
-          ) : null}
           <tr className="bg-rose-50"><td className="px-3 py-3 text-right font-semibold text-stone-950">Contract total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
         </tfoot>
       </table>

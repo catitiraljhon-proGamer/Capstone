@@ -41,6 +41,17 @@ const hiddenFromCustomer = new Set<string>(editableStatuses);
 
 const idPattern = /^[a-f\d]{24}$/i;
 const dateOnly = (value: string) => new Date(`${value}T00:00:00.000Z`);
+
+/**
+ * G4 Builders is VAT-exempt. Estimates made before that change and not yet accepted drop their VAT, so the contract
+ * total is the sum of the scope-of-work amounts. Accepted estimates keep the total the customer agreed to.
+ */
+async function removeVatFromOpenEstimates(db: Db) {
+  await db.collection<EstimateDocument>(collections.estimates).updateMany(
+    { status: { $in: ["Requested", "Draft", "Sent", "Revision requested"] }, vat: { $gt: 0 } },
+    [{ $set: { vat: 0, vatRate: 0, total: "$subtotal" } }],
+  );
+}
 const isoDate = (value?: Date | null) => (value ? value.toISOString().slice(0, 10) : null);
 const addDays = (date: string, days: number) => {
   const value = dateOnly(date);
@@ -223,6 +234,7 @@ export async function createConstructionRequest(db: Db, actor: SessionUser, raw:
 
 export async function listEstimates(db: Db, actor: SessionUser): Promise<CostEstimateDto[]> {
   requireRole(actor, ["customer", "admin"], "You do not have access to cost estimates.");
+  await removeVatFromOpenEstimates(db);
   const estimates = await db.collection<EstimateDocument>(collections.estimates).find({
     status: { $in: [...estimateStatuses] },
     ...(actor.role === "customer" ? { customerId: new ObjectId(actor.id) } : {}),
@@ -232,6 +244,7 @@ export async function listEstimates(db: Db, actor: SessionUser): Promise<CostEst
 
 export async function getEstimate(db: Db, actor: SessionUser, id: string): Promise<CostEstimateDto> {
   requireRole(actor, ["customer", "admin"], "You do not have access to cost estimates.");
+  await removeVatFromOpenEstimates(db);
   return (await toEstimateDtos(db, [await findEstimate(db, actor, id)], actor.role))[0];
 }
 
@@ -242,6 +255,8 @@ export async function changeEstimate(db: Db, actor: SessionUser, id: string, raw
   const input = estimateActionSchema.parse(raw);
   const staffAction = input.action === "save" || input.action === "send";
   if (staffAction && actor.role !== "admin") throw new BillingError("Only an administrator can prepare and send cost estimates.", 403);
+  // An open estimate is never accepted at its old VAT-inclusive total.
+  await removeVatFromOpenEstimates(db);
   if (!staffAction && actor.role !== "customer") throw new BillingError("Only the customer can respond to an estimate.", 403);
 
   const result = await billingTransaction(db, async (session): Promise<{ estimateId: ObjectId; projectId?: ObjectId }> => {
