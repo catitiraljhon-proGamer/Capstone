@@ -203,7 +203,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
             Contact number <RequiredIndicator />
-            <ContactNumberInput required placeholder="0917 123 4567" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
+            <ContactNumberInput required placeholder="Enter contact number" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
             <span className="mt-1 block text-xs font-normal text-stone-500">Philippine mobile number: {phContactNumberExample}.</span>
           </label>
           <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />

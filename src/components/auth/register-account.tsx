@@ -241,7 +241,7 @@ export function RegisterAccountPage({
                 minLength={2}
                 maxLength={100}
                 required
-                placeholder="Juan Dela Cruz"
+                placeholder="Enter full name"
                 {...describe("name")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
@@ -264,7 +264,7 @@ export function RegisterAccountPage({
                   autoComplete="email"
                   maxLength={254}
                   required
-                  placeholder="yourname@gmail.com"
+                  placeholder="Enter Gmail address"
                   value={email}
                   onChange={(event) => {
                     setEmail(event.target.value);
@@ -319,7 +319,7 @@ export function RegisterAccountPage({
                   autoComplete="one-time-code"
                   maxLength={6}
                   required
-                  placeholder="6-digit code"
+                  placeholder="Enter 6-digit code"
                   value={verificationCode}
                   onChange={(event) => {
                     setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
@@ -340,7 +340,7 @@ export function RegisterAccountPage({
               <ContactNumberInput
                 id="contactNumber"
                 required
-                placeholder="0917 123 4567"
+                placeholder="Enter contact number"
                 {...describe("contactNumber")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
@@ -387,7 +387,7 @@ export function RegisterAccountPage({
                     minLength={8}
                     maxLength={72}
                     required
-                    placeholder="At least 8 characters"
+                    placeholder="Enter password"
                     {...describe("password")}
                     className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 pr-11 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                   />
@@ -424,7 +424,7 @@ export function RegisterAccountPage({
                   minLength={8}
                   maxLength={72}
                   required
-                  placeholder="Repeat your password"
+                  placeholder="Re-enter password"
                   {...describe("confirmPassword")}
                   className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                 />

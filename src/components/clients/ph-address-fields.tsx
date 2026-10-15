@@ -242,7 +242,7 @@ export function PhAddressFields({
               autoComplete="address-line1"
               minLength={2}
               maxLength={200}
-              placeholder="123 Rizal Street, Purok 2"
+              placeholder="Enter house no. / street"
               defaultValue={defaultValue?.street ?? ""}
               className={invalidClassName}
             />
@@ -261,7 +261,7 @@ export function PhAddressFields({
               required
               pattern="\d{4}"
               maxLength={4}
-              placeholder="4213"
+              placeholder="Enter postal code"
               title="Enter a 4-digit postal code."
               value={postalCode}
               onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, "").slice(0, 4))}
