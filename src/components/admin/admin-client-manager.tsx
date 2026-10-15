@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Archive, ArchiveRestore, Pencil, Plus, Search, Users } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Search, Users } from "lucide-react";
 import { ClientInformationForm } from "@/components/clients/client-information-form";
 import { readClientResponse } from "@/lib/client-information";
 import type { ClientDto, ClientListPayload } from "@/types/clients";
@@ -18,7 +18,6 @@ export function AdminClientManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [editing, setEditing] = useState<ClientDto | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirmingArchiveId, setConfirmingArchiveId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -40,7 +39,7 @@ export function AdminClientManager() {
   }, [query, page, view, revision]);
 
   const refresh = () => { setLoading(true); setRevision((value) => value + 1); };
-  const closeForm = () => { setCreating(false); setEditing(null); setSuccess(""); };
+  const closeForm = () => { setCreating(false); setSuccess(""); };
   const searchClients = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setConfirmingArchiveId(null);
@@ -80,19 +79,18 @@ export function AdminClientManager() {
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div><h1 className="text-xl font-semibold tracking-tight">{creating ? "Add client" : editing ? "Edit client information" : "Client records"}</h1><p className="mt-1 text-sm leading-6 text-stone-600">Personal and contact details for registered clients.</p></div>
-      {!creating && !editing && <button type="button" disabled={savingId !== null} onClick={() => { setCreating(true); setSuccess(""); setConfirmingArchiveId(null); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"><Plus className="h-4 w-4" />Add client</button>}
+      <div><h1 className="text-xl font-semibold tracking-tight">{creating ? "Add client" : "Client records"}</h1><p className="mt-1 text-sm leading-6 text-stone-600">Personal and contact details for registered clients. Clients update their own information in My Profile.</p></div>
+      {!creating && <button type="button" disabled={savingId !== null} onClick={() => { setCreating(true); setSuccess(""); setConfirmingArchiveId(null); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"><Plus className="h-4 w-4" />Add client</button>}
     </div>
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-white p-4 text-sm">{success}</p>}
-    {creating || editing ? <section className="max-w-3xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6">
-      <ClientInformationForm key={creating ? "new-client" : `${editing!.id}:${editing!.updatedAt}`} creating={creating} client={editing ?? undefined} onCancel={closeForm} onSave={async (input) => {
-        const response = await fetch(creating ? "/api/clients" : `/api/clients/${editing!.id}`, {
-          method: creating ? "POST" : "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
+    {creating ? <section className="max-w-3xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6">
+      <ClientInformationForm key="new-client" creating onCancel={closeForm} onSave={async (input) => {
+        const response = await fetch("/api/clients", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input),
         });
-        const result = await readClientResponse<{ client: ClientDto }>(response);
-        setSuccess(creating ? "Client account and information created." : "Client information saved.");
-        if (creating) { setCreating(false); setSearch(""); setQuery(""); setPage(1); setView("current"); }
-        else setEditing(result.client);
+        await readClientResponse<{ client: ClientDto }>(response);
+        setSuccess("Client account and information created.");
+        setCreating(false); setSearch(""); setQuery(""); setPage(1); setView("current");
         refresh();
       }} />
     </section> : <>
@@ -131,7 +129,6 @@ export function AdminClientManager() {
             {!client.profileComplete && <p className="mt-4 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">Client information is incomplete.</p>}
             {client.archivedAt && <p className="mt-4 text-xs text-stone-500">Archived on {new Date(client.archivedAt).toLocaleDateString("en-PH", { dateStyle: "medium" })}</p>}
             <div className="mt-5 flex flex-wrap gap-2">
-              <button type="button" disabled={savingId !== null} onClick={() => { setEditing(client); setSuccess(""); setConfirmingArchiveId(null); }} className={`${actionClass} flex-1`}><Pencil className="h-4 w-4" />Edit information<span className="sr-only"> for {client.name}</span></button>
               {client.archivedAt ? (
                 <button type="button" disabled={savingId !== null} onClick={() => void changeArchiveStatus(client, false)} className={`${actionClass} flex-1`}>
                   <ArchiveRestore className="h-4 w-4" />{savingId === client.id ? "Unarchiving…" : "Unarchive"}<span className="sr-only"> {client.name}</span>

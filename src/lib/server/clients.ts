@@ -126,8 +126,11 @@ export async function getClient(db: Db, actor: SessionUser, id: string) {
   return toClientDto(user);
 }
 
+/** Clients keep their own details current in My Profile; staff can read them but not change them. */
 export async function updateClient(db: Db, actor: SessionUser, id: string, rawInput: unknown) {
-  requireClientAccess(actor, id);
+  if (actor.role !== "customer" || actor.id !== id) {
+    throw new ClientRequestError("Clients update their own information in My Profile.", 403);
+  }
   const { name, ...input } = clientProfileSchema.parse(rawInput);
   const clientDetails = toClientDetails(input);
   const updated = await db.collection<UserDocument>(collections.users).findOneAndUpdate(

@@ -308,6 +308,9 @@ test("customer updates only their profile and the administrator reads the same s
   const original = legacyUser();
   await db.collection<UserDocument>("users").insertOne(original);
   const actor: SessionUser = { id: original._id.toHexString(), name: original.name, email: original.email, role: "customer" };
+  // The administrator reads client details but cannot change them; clients edit their own in My Profile.
+  await assert.rejects(updateClient(db, admin, actor.id, details), (error: unknown) => error instanceof ClientRequestError && error.status === 403);
+  assert.equal((await db.collection<UserDocument>("users").findOne({ _id: original._id }))?.name, original.name);
   await updateClient(db, actor, actor.id, details);
   const dto = await getClient(db, admin, actor.id);
   assert.equal(dto.name, details.name);
@@ -339,7 +342,7 @@ test("customers and billing clerks cannot list, create, read, or edit other clie
 test("client APIs cannot modify staff accounts, invalid ids, or unknown account fields", async () => {
   const staff = legacyUser({ role: "admin" });
   await db.collection<UserDocument>("users").insertOne(staff);
-  await assert.rejects(updateClient(db, admin, staff._id.toHexString(), details), (error: unknown) => error instanceof ClientRequestError && error.status === 404);
+  await assert.rejects(updateClient(db, admin, staff._id.toHexString(), details), (error: unknown) => error instanceof ClientRequestError && error.status === 403);
   await assert.rejects(getClient(db, admin, "invalid-id"), (error: unknown) => error instanceof ClientRequestError && error.status === 400);
   await assert.rejects(updateClient(db, admin, new ObjectId().toHexString(), { ...details, role: "admin" }));
   assert.equal((await db.collection("users").findOne({ _id: staff._id }))?.name, staff.name);
