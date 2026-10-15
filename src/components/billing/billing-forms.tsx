@@ -72,8 +72,10 @@ function milestoneFields(project: BillingProject, milestone: PaymentMilestoneDto
 export function InvoiceForm({ projects, designRequests, designRequestId, invoice, mutate, onClose }: {
   projects: BillingProject[]; designRequests: BillingData["designRequests"]; designRequestId?: string; invoice?: BillingInvoice; mutate: BillingMutation; onClose: () => void;
 }) {
+  const feeTypeOf = (id: string) => designRequests.find((item) => item.id === id)?.feeType ?? invoice?.feeType ?? "design";
+  const feeLabelFor = (id: string) => (feeTypeOf(id) === "blueprint" ? "Blueprint fee" : "House design fee");
   const [form, setForm] = useState({
-    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? "House design fee" : ""), basis: invoice?.basis ?? "",
+    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? feeLabelFor(designRequestId) : ""), basis: invoice?.basis ?? "",
     progressPercentage: String(invoice?.progressPercentage ?? 0), amount: invoice ? String(invoice.amount) : "", dueDate: invoice?.dueDate ?? manilaDate(),
   });
   const [busy, setBusy] = useState(false);
@@ -119,15 +121,17 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
     <form onSubmit={submit} noValidate className="space-y-4">
       <BillingErrorMessage message={error} />
       <label className="block text-sm font-medium">Billing for
-        <select disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId ? "design" : "project"} onChange={(event) => { setForm({ ...form, projectId: "", milestoneId: "", designRequestId: event.target.value === "design" ? (designRequests.find((item) => !item.invoiceId)?.id ?? "") : "", label: event.target.value === "design" ? "House design fee" : "" }); }}>
-          <option value="project">Construction progress</option><option value="design" disabled={!designRequests.some((item) => !item.invoiceId || item.id === invoice?.designRequestId)}>Completed design fee</option>
+        <select disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId ? "design" : "project"} onChange={(event) => { const id = event.target.value === "design" ? (designRequests.find((item) => !item.invoiceId)?.id ?? "") : ""; setForm({ ...form, projectId: "", milestoneId: "", designRequestId: id, label: id ? feeLabelFor(id) : "" }); }}>
+          <option value="project">Construction progress</option><option value="design" disabled={!designRequests.some((item) => !item.invoiceId || item.id === invoice?.designRequestId)}>Blueprint or design fee</option>
         </select>
       </label>
-      {form.designRequestId ? <label className="block text-sm font-medium">Customer / completed design request
-        <select required disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId} onChange={(event) => setForm({ ...form, designRequestId: event.target.value })}>
-          {designRequests.filter((item) => !item.invoiceId || item.id === invoice?.designRequestId).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.label}</option>)}
+      {form.designRequestId ? <label className="block text-sm font-medium">Customer / design request
+        <select required disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId} onChange={(event) => setForm({ ...form, designRequestId: event.target.value, label: feeLabelFor(event.target.value) })}>
+          {designRequests.filter((item) => !item.invoiceId || item.id === invoice?.designRequestId).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.feeType === "blueprint" ? "Blueprint" : "Design fee"} · {item.label}</option>)}
         </select>
-        <p className="mt-2 text-xs font-normal leading-5 text-stone-500">Use the agreed design fee. Full verified payment unlocks this request only. This fee is separate from the construction contract.</p>
+        <p className="mt-2 text-xs font-normal leading-5 text-stone-500">{feeTypeOf(form.designRequestId) === "blueprint"
+          ? "Set the agreed blueprint fee. Full verified payment unlocks the blueprint download, and only then can the construction downpayment be invoiced."
+          : "Use the agreed design fee. Full verified payment unlocks this request only. This fee is separate from the construction contract."}</p>
       </label> : <div><label className="block text-sm font-medium">Customer / project
         <select required disabled={busy || Boolean(invoice)} className={invalidField} {...fields.props("project", messages.project)} value={form.projectId} onChange={(event) => chooseProject(event.target.value)}>
           <option value="">Select a project</option>

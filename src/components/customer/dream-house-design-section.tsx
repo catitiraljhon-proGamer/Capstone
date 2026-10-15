@@ -10,7 +10,7 @@ import { Eyebrow } from "@/components/customer/construction-shared";
 import { formatPeso } from "@/lib/house-design-data";
 import type { DesignRequestDto } from "@/types/design-requests";
 
-/** The design part of a Dream House card: request details, design fee, and viewing once unlocked. */
+/** Legacy design-fee requests: request details, design fee, and viewing once unlocked. See DreamHouseDesignReview for the blueprint flow. */
 export function DreamHouseDesignSection({ design }: { design: DesignRequestDto }) {
   const [viewing, setViewing] = useState(false);
   return (

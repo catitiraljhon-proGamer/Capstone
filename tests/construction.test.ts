@@ -116,6 +116,29 @@ beforeEach(async () => {
 });
 after(async () => { await db?.client.close(); await mongo?.stop(); });
 
+test("blueprint-flow designs open the free estimate once the customer approves them, and the clerk bills the blueprint first", async () => {
+  const now = new Date();
+  const id = new ObjectId();
+  await db.collection<DesignRequestDocument>("design_requests").insertOne({
+    _id: id, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms", finish: "Standard",
+    notes: "Courtyard home", status: "Changes requested", currentVersion: 1, createdAt: now, updatedAt: now,
+  });
+  await assert.rejects(createConstructionRequest(db, customer, requestInput(id.toHexString())), isError(409));
+  await db.collection("design_requests").updateOne({ _id: id }, { $set: { status: "Design approved", designApprovedAt: now } });
+  const estimate = await createConstructionRequest(db, customer, requestInput(id.toHexString()));
+  assert.equal(await db.collection("payments").countDocuments(), 0);
+  await changeEstimate(db, admin, estimate.id, savePayload());
+  await changeEstimate(db, admin, estimate.id, { action: "send" });
+  const { projectId } = await changeEstimate(db, customer, estimate.id, { action: "accept", downpaymentPercent: 30 });
+  assert.ok(projectId);
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 0);
+  const project = await projectDto(projectId);
+  const downpaymentInvoice = project.milestones[0].invoice?.id;
+  assert.ok(downpaymentInvoice);
+  await assert.rejects(changeInvoice(db, clerk, downpaymentInvoice, { action: "issue" }), isError(409));
+});
+
 test("only the owner of an unlocked design can request construction, and each design allows one request", async () => {
   const locked = await designFixture(customer, false);
   await assert.rejects(createConstructionRequest(db, customer, requestInput(locked)), isError(409));

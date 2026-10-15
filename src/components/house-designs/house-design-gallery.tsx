@@ -10,15 +10,21 @@ import { useState } from "react";
  * Main image with a thumbnail strip, matching the showcase pattern on the
  * landing page. Falls back to a placeholder when a design has no images.
  */
+/** Data URLs and same-origin API images bypass the optimizer, which cannot forward the session cookie. */
+const skipOptimizer = (src: string) => isDataImage(src) || src.startsWith("/api/");
+
 export function HouseDesignGallery({
   images,
   name,
   protectedView = false,
+  fit = "cover",
 }: {
   images: string[];
   name: string;
   /** Customer-facing view: watermark the image and block right-click/drag saving. */
   protectedView?: boolean;
+  /** "contain" keeps floor plans and drawings uncropped. */
+  fit?: "cover" | "contain";
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const safeIndex = activeIndex < images.length ? activeIndex : 0;
@@ -54,9 +60,9 @@ export function HouseDesignGallery({
             alt={`${name} exterior view ${safeIndex + 1} of ${images.length}`}
             fill
             priority
-            unoptimized={isDataImage(activeImage)}
+            unoptimized={skipOptimizer(activeImage)}
             draggable={!protectedView}
-            className="object-cover"
+            className={fit === "contain" ? "object-contain" : "object-cover"}
             sizes="(min-width: 1024px) 72vw, 100vw"
           />
         </div>
@@ -67,6 +73,7 @@ export function HouseDesignGallery({
           className="grid grid-cols-4 gap-2 sm:grid-cols-6"
           role="group"
           aria-label={`${name} image thumbnails`}
+          onContextMenu={protectedView ? (event) => event.preventDefault() : undefined}
         >
           {images.map((imageSrc, index) => (
             <button
@@ -86,8 +93,9 @@ export function HouseDesignGallery({
                 src={imageSrc}
                 alt=""
                 fill
-                unoptimized={isDataImage(imageSrc)}
-                className="object-cover"
+                unoptimized={skipOptimizer(imageSrc)}
+                draggable={!protectedView}
+                className={fit === "contain" ? "object-contain" : "object-cover"}
                 sizes="160px"
               />
             </button>

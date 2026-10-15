@@ -1,11 +1,8 @@
 "use client";
 
+import { AdminDesignWorkflow } from "@/components/admin/admin-design-workflow";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
-import {
-  embeddedImageAccept,
-  readEmbeddedImage,
-} from "@/lib/client-image-upload";
 import {
   approvalRecordTypes,
   type ApprovalDto,
@@ -21,19 +18,16 @@ import {
   Clock,
   Eye,
   FileCheck2,
-  ImagePlus,
   LoaderCircle,
   RefreshCw,
   Search,
   ShieldCheck,
-  Send,
   UserRound,
   X,
   XCircle,
 } from "lucide-react";
 import Image from "next/image";
 import {
-  type ChangeEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -45,12 +39,14 @@ type ApprovalPayload = {
   summary: ApprovalSummary;
 };
 
-type SelectedImage = {
-  src: string;
-  name: string;
+/** Where an approved design request stands in the review and blueprint workflow. */
+const designStageLabel: Record<string, string> = {
+  Approved: "Design in progress",
+  "In customer review": "With customer for review",
+  "Changes requested": "Customer requested changes",
+  "Design approved": "Design approved · Blueprint stage",
+  Completed: "Design delivered (legacy)",
 };
-
-const maxWorkflowImages = 6;
 
 const emptySummary: ApprovalSummary = {
   total: 0,
@@ -184,60 +180,18 @@ function ApprovalReviewDialog({
   error,
   onClose,
   onApprove,
-  onDeliver,
+  onNotice,
 }: {
   approval: ApprovalDto;
   isSaving: boolean;
   error: string | null;
   onClose: () => void;
   onApprove: (note: string) => void;
-  onDeliver: (images: string[]) => void;
+  onNotice: (message: string) => void;
 }) {
   const [note, setNote] = useState(approval.reviewNote ?? "");
-  const [completedImages, setCompletedImages] = useState<SelectedImage[]>([]);
-  const [isReadingImage, setIsReadingImage] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
   const inspirationImages = approval.inspirationImages ?? [];
   const deliveredImages = approval.completedDesignImages ?? [];
-
-  const handleCompletedImages = async (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = "";
-    if (files.length === 0) return;
-
-    const remainingSlots = maxWorkflowImages - completedImages.length;
-    if (remainingSlots <= 0) {
-      setImageError(`You can send up to ${maxWorkflowImages} completed images.`);
-      return;
-    }
-
-    setIsReadingImage(true);
-    setImageError(null);
-    try {
-      const selected = await Promise.all(
-        files.slice(0, remainingSlots).map(async (file) => ({
-          src: await readEmbeddedImage(file),
-          name: file.name,
-        })),
-      );
-      setCompletedImages((current) => [...current, ...selected]);
-      if (files.length > remainingSlots) {
-        setImageError(
-          `Only ${remainingSlots} more image(s) were added. The limit is ${maxWorkflowImages}.`,
-        );
-      }
-    } catch (readError) {
-      setImageError(
-        readError instanceof Error
-          ? readError.message
-          : "Unable to read the completed design image.",
-      );
-    } finally {
-      setIsReadingImage(false);
-    }
-  };
 
   return (
     <div
@@ -451,7 +405,9 @@ function ApprovalReviewDialog({
 
               {approval.recordType === "Design request" &&
               approval.status === "Approved" ? (
-                deliveredImages.length > 0 ? (
+                approval.sourceStatus !== "Completed" ? (
+                  <AdminDesignWorkflow designRequestId={approval.recordId} onNotice={onNotice} />
+                ) : deliveredImages.length > 0 ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
                       <CheckCircle2 className="h-4 w-4" /> {deliveredImages.length} completed design image{deliveredImages.length === 1 ? "" : "s"} sent to client
@@ -478,110 +434,7 @@ function ApprovalReviewDialog({
                       </p>
                     ) : null}
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
-                      Design production
-                    </p>
-                    <h3 className="mt-1 font-semibold">Upload the completed house designs</h3>
-                    <p className="mt-1 text-sm leading-6 text-stone-600">
-                      Once design work is finished, upload up to 6 final images here. Sending them will notify the client and Billing Clerk. The client can view and download the images only after full payment of the design fee is verified.
-                    </p>
-
-                    {imageError ? (
-                      <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                        {imageError}
-                      </p>
-                    ) : null}
-
-                    {completedImages.length > 0 ? (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {completedImages.map((image, index) => (
-                          <div
-                            key={`${image.name}-${index}`}
-                            className="overflow-hidden rounded-lg border border-stone-200 bg-white"
-                          >
-                            <div className="relative aspect-[4/3]">
-                              <Image
-                                src={image.src}
-                                alt={`Completed design ready to send ${index + 1}`}
-                                fill
-                                unoptimized
-                                className="object-contain"
-                              />
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setCompletedImages((current) =>
-                                    current.filter((_, position) => position !== index),
-                                  )
-                                }
-                                className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-stone-950/75 text-white hover:bg-red-700"
-                                aria-label={`Remove completed design ${index + 1}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                            <p className="truncate border-t border-stone-200 px-3 py-2 text-xs text-stone-500">
-                              {image.name}
-                            </p>
-                          </div>
-                        ))}
-                        {completedImages.length < maxWorkflowImages ? (
-                          <label className="grid min-h-32 cursor-pointer place-items-center rounded-lg border border-dashed border-violet-300 bg-white p-4 text-center hover:bg-violet-50">
-                            <span>
-                              <ImagePlus className="mx-auto h-7 w-7 text-violet-700" />
-                              <span className="mt-2 block text-xs font-semibold">Add more images</span>
-                            </span>
-                            <input
-                              type="file"
-                              multiple
-                              accept={embeddedImageAccept}
-                              onChange={(event) => void handleCompletedImages(event)}
-                              className="sr-only"
-                            />
-                          </label>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <label className="mt-3 grid min-h-32 cursor-pointer place-items-center rounded-lg border border-dashed border-violet-300 bg-white p-5 text-center hover:bg-violet-50">
-                        <span>
-                          <ImagePlus className="mx-auto h-7 w-7 text-violet-700" />
-                          <span className="mt-2 block text-sm font-semibold">
-                            {isReadingImage ? "Reading images…" : "Select completed designs"}
-                          </span>
-                          <span className="mt-1 block text-xs text-stone-500">
-                            1–6 images · JPG, PNG, or WebP · maximum 750 KB each
-                          </span>
-                        </span>
-                        <input
-                          type="file"
-                          multiple
-                          accept={embeddedImageAccept}
-                          onChange={(event) => void handleCompletedImages(event)}
-                          className="sr-only"
-                        />
-                      </label>
-                    )}
-
-                    <div className="mt-4 flex justify-end">
-                      <Button
-                        type="button"
-                        disabled={isSaving || isReadingImage || completedImages.length === 0}
-                        onClick={() => onDeliver(completedImages.map((image) => image.src))}
-                      >
-                        {isSaving ? (
-                          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="mr-2 h-4 w-4" />
-                        )}
-                        {isSaving
-                          ? "Sending designs…"
-                          : `Send ${completedImages.length || ""} Design Image${completedImages.length === 1 ? "" : "s"} to Client`}
-                      </Button>
-                    </div>
-                  </div>
-                )
+                ) : null
               ) : null}
             </>
           )}
@@ -701,7 +554,7 @@ export function AdminApprovalsManager() {
       await readJson<{ approval: { status: ApprovalStatus } }>(response);
       setSuccessMessage(
         selectedApproval.recordType === "Design request"
-          ? `${selectedApproval.reference} is feasible and approved. The client was notified; upload the completed design from the Approved queue when it is ready.`
+          ? `${selectedApproval.reference} is feasible and approved. The client was notified; upload the design and floor plan from the Approved queue when they are ready.`
           : `${selectedApproval.reference} was approved. The client has been notified.`,
       );
       setSelectedApproval(null);
@@ -711,44 +564,6 @@ export function AdminApprovalsManager() {
         saveError instanceof Error
           ? saveError.message
           : "Unable to save the approval decision.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const submitDelivery = async (images: string[]) => {
-    if (!selectedApproval || selectedApproval.recordType !== "Design request") {
-      return;
-    }
-
-    setIsSaving(true);
-    setDecisionError(null);
-    try {
-      const response = await fetch(
-        `/api/design-requests/${selectedApproval.recordId}/delivery`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images }),
-        },
-      );
-      await readJson<{
-        request: {
-          status: "Completed";
-          completedAt: string;
-        };
-      }>(response);
-      setSuccessMessage(
-        `${images.length} completed design image${images.length === 1 ? " was" : "s were"} sent to ${selectedApproval.customer.name} for ${selectedApproval.reference}. Client viewing unlocks after verified full payment.`,
-      );
-      setSelectedApproval(null);
-      await loadApprovals(true);
-    } catch (deliveryError) {
-      setDecisionError(
-        deliveryError instanceof Error
-          ? deliveryError.message
-          : "Unable to send the completed design.",
       );
     } finally {
       setIsSaving(false);
@@ -934,9 +749,7 @@ export function AdminApprovalsManager() {
                       {approval.recordType === "Design request" &&
                       approval.status === "Approved" ? (
                         <p className="mt-2 text-xs font-medium text-stone-500">
-                          {approval.sourceStatus === "Completed"
-                            ? "Design delivered"
-                            : "Design in progress"}
+                          {designStageLabel[approval.sourceStatus ?? ""] ?? "Design in progress"}
                         </p>
                       ) : null}
                     </td>
@@ -1005,7 +818,10 @@ export function AdminApprovalsManager() {
             if (!isSaving) setSelectedApproval(null);
           }}
           onApprove={(note) => void submitApproval(note)}
-          onDeliver={(images) => void submitDelivery(images)}
+          onNotice={(message) => {
+            setSuccessMessage(`${selectedApproval.reference}: ${message}`);
+            void loadApprovals(true);
+          }}
         />
       ) : null}
     </div>

@@ -22,7 +22,7 @@ import {
   scheduleTemplateError,
 } from "@/lib/construction";
 import { BillingError, audit, billingTransaction, nextReference } from "@/lib/server/billing";
-import { customerDesignDto } from "@/lib/server/design-requests";
+import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
 import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
@@ -181,8 +181,10 @@ export async function createConstructionRequest(db: Db, actor: SessionUser, raw:
     _id: objectId(input.designRequestId, "Design request not found."), customerId,
   });
   if (!design) throw new BillingError("Design request not found.", 404);
-  if ((await customerDesignDto(db, design)).access !== "unlocked") {
-    throw new BillingError("Your house design must be fully paid and unlocked before you can proceed to construction.", 409);
+  if (designWorkflow(design) === "blueprint" ? design.status !== "Design approved" : (await customerDesignDto(db, design)).access !== "unlocked") {
+    throw new BillingError(designWorkflow(design) === "blueprint"
+      ? "Approve your design and floor plan in Dream House before requesting a construction cost estimate."
+      : "Your house design must be fully paid and unlocked before you can proceed to construction.", 409);
   }
   if (input.preferredStartDate <= manilaDate()) throw new BillingError("Choose a preferred start date after today.");
   if (input.neededBy <= input.preferredStartDate) throw new BillingError("The needed-by date must be after your preferred start date.");
@@ -369,15 +371,23 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
   })), { session });
 
   const [clerks, admins] = await Promise.all([activeUsers(db, session, "billing-clerk"), activeUsers(db, session, "admin")]);
-  await notify(db, session, clerks.map((clerk) => clerk._id), {
+  // Blueprint workflow: the blueprint fee is billed and paid before the downpayment invoice can be issued.
+  const blueprintFirst = Boolean(design && designWorkflow(design) === "blueprint");
+  await notify(db, session, clerks.map((clerk) => clerk._id), blueprintFirst ? {
+    title: "Blueprint fee ready to bill",
+    body: `${actor.name} accepted ${estimate.reference}. Once the admin uploads the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) can be issued after the blueprint is paid.`,
+    href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: estimate.designRequestId,
+  } : {
     title: "Downpayment invoice ready to issue",
     body: `${actor.name} accepted ${estimate.reference}. Issue the ${downpayment.label} invoice (${invoice.invoiceNumber}) for ${project.reference}.`,
     href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: projectId,
   });
   await notify(db, session, admins.map((admin) => admin._id), {
     title: "Cost estimate accepted",
-    body: `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. ${project.reference} is awaiting its downpayment.`,
-    href: `/admin/cost-estimates?estimate=${estimate._id.toHexString()}`, kind: "construction-project", entityId: projectId,
+    body: blueprintFirst
+      ? `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. Upload the blueprint files in Approvals so the Billing Clerk can bill the blueprint fee.`
+      : `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. ${project.reference} is awaiting its downpayment.`,
+    href: blueprintFirst ? "/admin/approvals" : `/admin/cost-estimates?estimate=${estimate._id.toHexString()}`, kind: "construction-project", entityId: projectId,
   });
   await audit(db, session, actor, "estimate.accepted", "estimate", estimate._id, {
     reference: estimate.reference, projectReference: project.reference, downpaymentPercent, total: estimate.total,

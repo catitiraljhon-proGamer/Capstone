@@ -19,7 +19,7 @@ import { dateError, manilaDay, numberError, textError } from "@/lib/form-validat
 import { useHouseDesigns } from "@/lib/house-design-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { DesignRequestDto } from "@/types/design-requests";
+import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
   Hourglass,
   ImagePlus,
@@ -28,13 +28,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-
-type DesignRequestStatus =
-  | "Pending"
-  | "In review"
-  | "Approved"
-  | "Rejected"
-  | "Completed";
 
 type SelectedImage = {
   src: string;
@@ -47,6 +40,9 @@ const statusClass: Record<DesignRequestStatus, string> = {
   Pending: "bg-amber-50 text-amber-800",
   "In review": "bg-sky-50 text-sky-700",
   Approved: "bg-violet-50 text-violet-700",
+  "In customer review": "bg-rose-50 text-red-800",
+  "Changes requested": "bg-amber-50 text-amber-800",
+  "Design approved": "bg-emerald-50 text-emerald-700",
   Rejected: "bg-red-50 text-red-700",
   Completed: "bg-emerald-50 text-emerald-700",
 };
@@ -54,7 +50,10 @@ const statusClass: Record<DesignRequestStatus, string> = {
 const statusLabel: Record<DesignRequestStatus, string> = {
   Pending: "Waiting for feasibility review",
   "In review": "Under feasibility review",
-  Approved: "Approved — design in progress",
+  Approved: "Approved — design and floor plan in progress",
+  "In customer review": "Ready for your review — open Dream House",
+  "Changes requested": "Your requested changes are being made",
+  "Design approved": "Design approved — continue to the cost estimate in Dream House",
   Rejected: "Not feasible",
   Completed: "Delivered — check Dream House for access",
 };
@@ -319,7 +318,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
       setImageError(null);
       setSuccessMessage(
         selectedDesign
-          ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in Dream House; the design fee will be billed separately.`
+          ? `Your request for ${selectedDesign.name} was sent to the admin for review. Track it in Dream House, where you will review the design and floor plan for free.`
           : "Your request and inspiration images were sent directly to the admin for feasibility review.",
       );
     } catch (submitError) {
@@ -346,14 +345,14 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
           </h1>
           <p className="mt-1 text-sm leading-6 text-stone-600">
             {hasDesignSelection
-              ? "Request the selected house design as shown, or add notes about your preferred changes. The admin will review your request before preparing the design for delivery."
+              ? "Request the selected house design as shown, or add notes about your preferred changes. The admin will review your request, then share the design and floor plan for your review."
               : "Share your requirements and reference images. The admin will first review whether the request is feasible before design work begins."}
           </p>
         </div>
 
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
-          <p className="font-semibold text-red-900">Terms accepted · Full payment required before viewing</p>
-          <p className="mt-1 leading-6 text-stone-600">Your delivered design unlocks after the Billing Clerk verifies the full design fee.</p>
+          <p className="font-semibold text-red-900">Terms accepted · Design review is free</p>
+          <p className="mt-1 leading-6 text-stone-600">You can review the design and floor plan and request changes for free. Only the blueprint is paid, after you accept the construction cost estimate.</p>
           <button type="button" onClick={onReviewTerms} aria-haspopup="dialog" className="mt-2 rounded text-sm font-semibold text-red-700 underline underline-offset-4 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-red-600">
             Review Terms and Conditions
           </button>
@@ -396,7 +395,7 @@ function DesignRequestForm({ acceptance, onReviewTerms, houseDesignId }: {
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType} · {selectedDesign.area} sqm · {selectedDesign.finish}</p>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
-                    <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The construction estimate is not the design fee.</p>
+                    <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The design review is free; only the blueprint is billed.</p>
                   </div>
                 </div>
               ) : null}

@@ -1,6 +1,6 @@
 // Keep published versions unchanged; bump the version whenever the terms change.
 export const finishedDesignsTerms = {
-  version: "2026-10-08.4",
+  version: "2026-10-15",
   title: "Finished Designs Terms and Conditions",
   introduction:
     "Please read these terms before viewing the finished house designs of G4 Builders Inc.",
@@ -20,8 +20,8 @@ export const finishedDesignsTerms = {
       body: "Without written permission from G4 Builders Inc, you may not screenshot, download, copy, print, or share the designs, post them online, remove their watermark, or use them to build a house.",
     },
     {
-      title: "Paid designs",
-      body: "Paying the design fee allows you to build the design once, for the project in your request. G4 Builders Inc still owns the design, so you may not reuse or resell it for another project.",
+      title: "Paid blueprints",
+      body: "Paying the blueprint fee allows you to build the design once, for the project in your request. G4 Builders Inc still owns the design, so you may not reuse or resell it for another project.",
     },
     {
       title: "Consequences",

@@ -1,36 +1,40 @@
 // Keep published versions unchanged; bump the version whenever the terms change.
 export const designRequestTerms = {
-  version: "2026-10-08",
+  version: "2026-10-15",
   title: "Design Request Terms and Conditions",
   introduction: "Please read these terms before submitting a design request to G4 Builders Inc.",
-  paymentNotice: "You must pay the full design fee before you can view or download your requested design. Access opens only after the Billing Clerk verifies full payment.",
+  paymentNotice: "The design, floor plan, and construction cost estimate are free. You pay only for the blueprint, after you accept the cost estimate. The blueprint unlocks once the Billing Clerk verifies full payment of the blueprint fee.",
   sections: [
     {
       title: "Your request and feasibility review",
       body: "Provide accurate floor area, room requirements, finish preferences, descriptions, and inspiration images. The admin reviews whether your request is feasible before design work begins. Submitting a request does not guarantee approval or authorize construction.",
     },
     {
-      title: "Design fee and invoice",
-      body: "Once the approved design is completed, the Billing Clerk prepares the agreed design fee invoice. Check Billing Status for the amount, due date, and payment details. The design fee is separate from the construction contract price. Contact the team if the invoice does not match the fee discussed with you.",
+      title: "Design and floor plan review",
+      body: "Once your request is approved, the admin shares the design and floor plan in Dream House. These previews are watermarked and are provided only for your review. You may approve the design or request changes, and the admin will send a revised version. Review rounds are free.",
     },
     {
-      title: "Payment is required before design access",
-      body: "The completed design stays locked until the full amount on its design fee invoice has been paid and verified. Partial payments, pending payments, and uploading payment proof alone do not unlock the design. Rejected payments do not count toward the fee. If a verified payment is reversed and a balance remains, access is locked again until full payment is verified.",
+      title: "Construction cost estimate",
+      body: "After you approve the design, you may request a construction cost estimate. You may accept the estimate or ask for a revision. Requesting or reviewing an estimate is free and does not charge you.",
     },
     {
-      title: "Submitting and verifying payment",
-      body: "Use Billing Status to submit payment against the correct design fee invoice using an available payment method. Provide accurate payment details and any required reference or proof. Allow the Billing Clerk to verify the payment; submitting it does not provide immediate access. Agreeing to these terms does not make a payment or automatically charge you.",
+      title: "Blueprint fee and invoice",
+      body: "After you accept the cost estimate, the Billing Clerk sets the blueprint fee and issues its invoice in Billing Status. The blueprint fee is separate from the construction contract price. Contact the team if the invoice does not match the fee discussed with you.",
     },
     {
-      title: "Delivery and viewing your design",
-      body: "Track review and completion in Design Requests or Dream House. Once the design is completed and full payment is verified, you can view and download the delivered design images in Dream House. Discuss the expected completion schedule with the team; submitting a request does not guarantee a delivery date.",
+      title: "Payment is required before blueprint access",
+      body: "The blueprint stays locked until the full amount on its invoice has been paid and verified. Partial payments, pending payments, and uploading payment proof alone do not unlock it. Rejected payments do not count toward the fee. If a verified payment is reversed and a balance remains, access is locked again until full payment is verified.",
     },
     {
-      title: "Changes, questions, and payment concerns",
-      body: "Use Support to contact G4 Builders Inc about requirements, revisions, cancellation, or payment concerns. Confirm the scope, applicable conditions, and any additional fees with the team before proceeding with changes. Keep your invoice and payment reference for follow-up.",
+      title: "Construction billing",
+      body: "The construction downpayment invoice is issued only after the blueprint fee is fully paid. Progress billings then follow the payment schedule in your accepted estimate.",
+    },
+    {
+      title: "Use of designs, questions, and payment concerns",
+      body: "Design previews and blueprints remain the property of G4 Builders Inc. Do not copy, share, or remove watermarks from them. Use Support to contact G4 Builders Inc about requirements, revisions, cancellation, or payment concerns, and keep your invoice and payment reference for follow-up.",
     },
   ],
-  acknowledgment: "I have read and agree to the Design Request Terms and Conditions. I understand that I can view or download my requested design only after the Billing Clerk verifies full payment of the design fee.",
+  acknowledgment: "I have read and agree to the Design Request Terms and Conditions. I understand that the design and floor plan are shared for review only, and that I can download the blueprint only after the Billing Clerk verifies full payment of the blueprint fee.",
 } as const;
 
 export const designRequestTermsText = [

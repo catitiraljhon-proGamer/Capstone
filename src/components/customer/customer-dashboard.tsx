@@ -503,7 +503,7 @@ function FinishedDesignsBrowser() {
                   </p>
                   <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600">
                     Request this design as shown or include your preferred changes.
-                    The design fee is billed separately from the construction estimate.
+                    Reviewing the design and its cost estimate is free; only the blueprint is billed.
                   </p>
                 </div>
                 <Link href={`/customer/design-requests?design=${encodeURIComponent(selectedDesign.id)}`} className="inline-flex shrink-0 justify-center rounded-lg bg-red-700 px-5 py-3 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Request This Design</Link>

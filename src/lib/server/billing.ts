@@ -1,6 +1,6 @@
 import { ObjectId, MongoServerError, type ClientSession, type Db, type Filter } from "mongodb";
 import { z } from "zod";
-import { collections, type AuditLogDocument, type DesignRequestDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type AuditLogDocument, type BlueprintFileDocument, type DesignRequestDocument, type EstimateDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { insertNotifications } from "@/lib/server/notifications";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
@@ -67,6 +67,12 @@ export const paymentActionSchema = z.discriminatedUnion("action", [
 
 function recordId(value: string) { return new ObjectId(idSchema.parse(value)); }
 
+/** Display name for design and blueprint fee invoices, which have no construction project. */
+function designInvoiceName(invoice: Pick<InvoiceDocument, "designRequestId" | "feeType">) {
+  const label = `Design request ${invoice.designRequestId!.toHexString().slice(-8).toUpperCase()}`;
+  return invoice.feeType === "blueprint" ? `Blueprint · ${label}` : label;
+}
+
 /** Shared writes serialize concurrent balance checks inside the transaction. */
 export async function billingTransaction<T>(db: Db, work: (session: ClientSession) => Promise<T>) {
   const session = db.client.startSession();
@@ -126,8 +132,20 @@ export async function paidForInvoice(db: Db, session: ClientSession, id: ObjectI
   return sumMoney(payments.map((payment) => payment.amount));
 }
 
+/** In the blueprint workflow, construction billing waits until the blueprint fee is fully paid. */
+async function assertBlueprintPaid(db: Db, session: ClientSession, project: ProjectDocument) {
+  if (!project.designRequestId) return;
+  const design = await db.collection<DesignRequestDocument>(collections.designRequests).findOne({ _id: project.designRequestId }, { session, projection: { status: 1 } });
+  if (!design || design.status === "Completed") return;
+  const fee = await db.collection<InvoiceDocument>(collections.invoices).findOne({ designRequestId: project.designRequestId, status: { $ne: "Void" } }, { session });
+  if (!fee || ["Draft", "Ready"].includes(fee.status) || toCentavos(await paidForInvoice(db, session, fee._id)) < toCentavos(fee.amount)) {
+    throw new BillingError("The blueprint fee must be fully paid and verified before construction invoices can be prepared or issued.", 409);
+  }
+}
+
 async function validateInvoice(db: Db, session: ClientSession, input: z.infer<typeof invoiceInputSchema>, project: ProjectDocument, exceptId?: ObjectId) {
   if (!["Active", "Completed", "Scheduled", "Awaiting downpayment"].includes(project.status)) throw new BillingError("Select an active, scheduled, or completed project with an agreed contract.");
+  await assertBlueprintPaid(db, session, project);
   if (!Number.isFinite(project.contractPrice) || project.contractPrice <= 0) throw new BillingError("The project needs a valid agreed contract amount before billing.");
   const customer = await db.collection<UserDocument>(collections.users).findOne({
     _id: project.customerId, role: "customer", status: "active", clientArchivedAt: null,
@@ -155,12 +173,26 @@ async function validateInvoice(db: Db, session: ClientSession, input: z.infer<ty
   }
 }
 
+/**
+ * Legacy requests bill a design fee after delivery. Blueprint requests bill the blueprint fee once the customer
+ * approved the design, accepted the construction estimate, and the admin uploaded the blueprint files.
+ */
 async function validateDesignInvoice(db: Db, session: ClientSession, id: ObjectId, exceptId?: ObjectId) {
   const design = await db.collection<DesignRequestDocument>(collections.designRequests).findOneAndUpdate(
     { _id: id }, { $inc: { billingVersion: 1 } }, { session, returnDocument: "after" },
   );
-  if (!design || design.status !== "Completed" || !(design.completedDesignImages?.length || design.completedDesignImage)) {
-    throw new BillingError("The admin must deliver the completed design before preparing its fee.", 409);
+  if (!design) throw new BillingError("Design request not found.", 404);
+  if (design.status === "Completed") {
+    if (!(design.completedDesignImages?.length || design.completedDesignImage)) {
+      throw new BillingError("The admin must deliver the completed design before preparing its fee.", 409);
+    }
+  } else {
+    if (design.status !== "Design approved") throw new BillingError("The customer must approve the design before the blueprint fee is billed.", 409);
+    const estimate = await db.collection<EstimateDocument>(collections.estimates).findOne({ designRequestId: design._id }, { session, projection: { status: 1 } });
+    if (estimate?.status !== "Accepted") throw new BillingError("The customer must accept the construction cost estimate before the blueprint fee is billed.", 409);
+    if (!(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }, { session }))) {
+      throw new BillingError("The admin must upload the blueprint files before the blueprint fee is billed.", 409);
+    }
   }
   const customer = await db.collection<UserDocument>(collections.users).findOne({ _id: design.customerId, role: "customer", status: "active", clientArchivedAt: null }, { session });
   if (!customer) throw new BillingError("This customer is inactive or archived.");
@@ -176,8 +208,11 @@ export async function createInvoice(db: Db, actor: SessionUser, raw: unknown) {
   const input = invoiceInputSchema.parse(raw);
   return billingTransaction(db, async (session) => {
     let customerId: ObjectId;
+    let blueprintFee = false;
     if (input.designRequestId) {
-      customerId = (await validateDesignInvoice(db, session, recordId(input.designRequestId))).customerId;
+      const design = await validateDesignInvoice(db, session, recordId(input.designRequestId));
+      customerId = design.customerId;
+      blueprintFee = design.status !== "Completed";
     } else {
       const project = await lockProject(db, session, recordId(input.projectId!));
       await validateInvoice(db, session, input, project);
@@ -186,7 +221,7 @@ export async function createInvoice(db: Db, actor: SessionUser, raw: unknown) {
     const now = new Date();
     const invoice: InvoiceDocument = {
       _id: new ObjectId(), invoiceNumber: await nextReference(db, session, "INV", now), customerId,
-      ...(input.designRequestId ? { designRequestId: recordId(input.designRequestId) } : { projectId: recordId(input.projectId!), ...(input.milestoneId ? { milestoneId: input.milestoneId } : {}) }),
+      ...(input.designRequestId ? { designRequestId: recordId(input.designRequestId), ...(blueprintFee ? { feeType: "blueprint" as const } : {}) } : { projectId: recordId(input.projectId!), ...(input.milestoneId ? { milestoneId: input.milestoneId } : {}) }),
       label: input.label, basis: input.basis,
       progressPercentage: input.designRequestId ? 0 : input.progressPercentage, amount: input.amount,
       dueDate: new Date(input.dueDate + "T00:00:00.000Z"), status: "Draft", createdAt: now, updatedAt: now,
@@ -359,7 +394,7 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
   await db.collection<PaymentDocument>(collections.payments).updateOne({ _id: payment._id, status: "Pending" }, { $set: {
     status: "Verified", verifiedAt: now, verifiedBy: recordId(verifier.id), reviewedAt: now, reviewedByName: verifier.name,
     receipt: {
-      number: await nextReference(db, session, "RCT", now), customerName: customer.name, projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : `${project!.reference} · ${project!.name}`,
+      number: await nextReference(db, session, "RCT", now), customerName: customer.name, projectName: invoice.designRequestId ? designInvoiceName(invoice) : `${project!.reference} · ${project!.name}`,
       invoiceNumber: invoice.invoiceNumber, invoiceLabel: invoice.label, invoiceAmount: invoice.amount,
       amount: payment.amount, balanceAfterPayment: fromCentavos(toCentavos(invoice.amount) - toCentavos(updatedPaid)),
       method: normalizePaymentMethod(payment.method), transactionReference: payment.transactionReference || payment.reference,
@@ -370,11 +405,22 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
     $set: { status: invoiceState(invoice, updatedPaid, now).status, updatedAt: now },
   }, { session });
   if (invoice.designRequestId && toCentavos(updatedPaid) >= toCentavos(invoice.amount)) {
+    const blueprint = invoice.feeType === "blueprint";
     await insertNotifications(db, [{
-      _id: new ObjectId(), userId: invoice.customerId, title: "Your house design is unlocked",
-      body: "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
+      _id: new ObjectId(), userId: invoice.customerId, title: blueprint ? "Your blueprint is unlocked" : "Your house design is unlocked",
+      body: blueprint
+        ? "Full payment of your blueprint fee was verified. Open Dream House to download your blueprint. Your downpayment invoice comes next."
+        : "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
       href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
     }], session);
+    if (blueprint) {
+      const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
+      await insertNotifications(db, clerks.map((clerk) => ({
+        _id: new ObjectId(), userId: clerk._id, title: "Downpayment invoice ready to issue",
+        body: `${customer.name} fully paid blueprint fee ${invoice.invoiceNumber}. Issue the downpayment invoice for their construction project.`,
+        href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: invoice.designRequestId!, createdAt: now,
+      })), session);
+    }
   }
   if (invoice.projectId && invoice.milestoneId) await syncMilestoneProject(db, session, invoice, updatedPaid, "verify", now);
   await audit(db, session, verifier, "payment.verify", "payment", payment._id, { reference: payment.reference, amount: payment.amount });
@@ -417,8 +463,10 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     if (input.action === "reverse") {
       if (invoice.designRequestId) {
         await insertNotifications(db, [{
-          _id: new ObjectId(), userId: invoice.customerId, title: "Design access requires payment",
-          body: "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
+          _id: new ObjectId(), userId: invoice.customerId, title: invoice.feeType === "blueprint" ? "Blueprint access requires payment" : "Design access requires payment",
+          body: invoice.feeType === "blueprint"
+            ? "A blueprint payment was reversed. Settle the remaining blueprint fee to restore download access."
+            : "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
           href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
         }], session);
       }
@@ -430,6 +478,22 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     await notifyCustomer(db, session, payment.customerId, input.action === "reject" ? "Payment rejected" : "Payment reversed",
       `${payment.reference} for ${invoice.invoiceNumber}. ${input.reason}`, payment._id);
   });
+}
+
+/** Legacy delivered designs, plus approved designs whose estimate is accepted and whose blueprint is uploaded. */
+async function billableDesignRequests(db: Db) {
+  const designs = await db.collection<DesignRequestDocument>(collections.designRequests)
+    .find({ status: { $in: ["Completed", "Design approved"] } }, { projection: { customerId: 1, floorArea: 1, finish: 1, status: 1 } })
+    .sort({ updatedAt: -1 }).toArray();
+  const blueprintIds = designs.filter((design) => design.status === "Design approved").map((design) => design._id);
+  if (!blueprintIds.length) return designs;
+  // The Stable API (strict) has no distinct command, so read the linked ids with projected finds.
+  const [accepted, withFiles] = await Promise.all([
+    db.collection<EstimateDocument>(collections.estimates).find({ designRequestId: { $in: blueprintIds }, status: "Accepted" }, { projection: { designRequestId: 1 } }).toArray(),
+    db.collection<BlueprintFileDocument>(collections.blueprintFiles).find({ designRequestId: { $in: blueprintIds } }, { projection: { designRequestId: 1 } }).toArray(),
+  ]);
+  const has = (records: { designRequestId?: ObjectId }[], id: ObjectId) => records.some((record) => record.designRequestId?.equals(id));
+  return designs.filter((design) => design.status === "Completed" || (has(accepted, design._id) && has(withFiles, design._id)));
 }
 
 export async function getBillingData(db: Db, actor: SessionUser): Promise<BillingData> {
@@ -447,7 +511,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     db.collection<PaymentDocument>(collections.payments).find(owner, { projection: { proofImage: 0 } }).sort({ createdAt: -1 }).toArray(),
     db.collection<UserDocument>(collections.users).find(clerk ? { role: "customer" } : { _id: recordId(actor.id) }, { projection: { name: 1 } }).toArray(),
     clerk ? db.collection<AuditLogDocument>(collections.auditLogs).find({ entityType: { $in: ["invoice", "payment"] } }).sort({ createdAt: -1 }).limit(12).toArray() : [],
-    clerk ? db.collection<DesignRequestDocument>(collections.designRequests).find({ status: "Completed" }, { projection: { customerId: 1, floorArea: 1, finish: 1 } }).sort({ completedAt: -1 }).toArray() : [],
+    clerk ? billableDesignRequests(db) : [],
   ]);
   const billing = projectBillingFrom(invoices, payments);
   const customerNames = new Map(users.map((user) => [user._id.toHexString(), user.name]));
@@ -460,14 +524,20 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     return {
       id: invoice._id.toHexString(), invoiceNumber: invoice.invoiceNumber, projectId: invoice.projectId?.toHexString() ?? "", designRequestId: invoice.designRequestId?.toHexString(), milestoneId: invoice.milestoneId,
       customerId: invoice.customerId.toHexString(), customerName: customerNames.get(invoice.customerId.toHexString()) ?? "Unknown customer",
-      projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : projectNames.get(invoice.projectId?.toHexString() ?? "") ?? "Unknown project",
+      ...(invoice.designRequestId ? { feeType: invoice.feeType ?? "design" as const } : {}),
+      projectName: invoice.designRequestId ? designInvoiceName(invoice) : projectNames.get(invoice.projectId?.toHexString() ?? "") ?? "Unknown project",
       label: invoice.label, basis: invoice.basis ?? "", progressPercentage: invoice.progressPercentage,
       amount: invoice.amount, paid, ...invoiceState(invoice, paid),
       dueDate: invoice.dueDate.toISOString().slice(0, 10), issuedAt: invoice.issuedAt?.toISOString(), voidReason: invoice.voidReason,
     };
   });
   return {
-    designRequests: designs.map((design) => ({ id: design._id.toHexString(), customerName: customerNames.get(design.customerId.toHexString()) ?? "Unknown customer", label: design.floorArea + " sqm · " + design.finish + " · " + design._id.toHexString().slice(-8).toUpperCase(), invoiceId: invoices.find((invoice) => invoice.designRequestId?.equals(design._id) && invoice.status !== "Void")?._id.toHexString() })),
+    designRequests: designs.map((design) => ({
+      id: design._id.toHexString(), customerName: customerNames.get(design.customerId.toHexString()) ?? "Unknown customer",
+      label: design.floorArea + " sqm · " + design.finish + " · " + design._id.toHexString().slice(-8).toUpperCase(),
+      feeType: design.status === "Completed" ? "design" as const : "blueprint" as const,
+      invoiceId: invoices.find((invoice) => invoice.designRequestId?.equals(design._id) && invoice.status !== "Void")?._id.toHexString(),
+    })),
     projects: projects.map((project) => {
       const projectInvoices = invoiceDtos.filter((invoice) => invoice.projectId === project._id.toHexString() && invoice.status !== "Void");
       const issued = projectInvoices.filter((invoice) => !["Draft", "Ready"].includes(invoice.status));

@@ -18,7 +18,7 @@ import type {
 import type { ObjectId } from "mongodb";
 import type { AddressDetails, ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot, StoredPaymentMethod } from "@/types/billing";
-import type { RequestedHouseDesign } from "@/types/design-requests";
+import type { DesignRequestStatus, RequestedHouseDesign } from "@/types/design-requests";
 import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 
@@ -33,6 +33,8 @@ export const collections = {
   messages: "messages",
   projects: "projects",
   designRequests: "design_requests",
+  designVersions: "design_versions",
+  blueprintFiles: "blueprint_files",
   estimates: "cost_estimates",
   approvals: "approvals",
   invoices: "invoices",
@@ -194,7 +196,14 @@ export type DesignRequestDocument = {
   completedDesignImages?: string[];
   /** Legacy single-image field retained for existing records. */
   completedDesignImage?: string;
-  status: "Pending" | "In review" | "Approved" | "Rejected" | "Completed";
+  /**
+   * Blueprint workflow: Approved (feasible, design in progress) → In customer review ⇄ Changes requested
+   * → Design approved. "Completed" marks legacy requests delivered under the old design-fee flow.
+   */
+  status: DesignRequestStatus;
+  /** Latest design version uploaded for customer review. */
+  currentVersion?: number;
+  designApprovedAt?: Date;
   completedAt?: Date;
   completedBy?: ObjectId;
   completedByName?: string;
@@ -207,6 +216,36 @@ export type DesignRequestDocument = {
   billingVersion?: number;
   createdAt: Date;
   updatedAt: Date;
+};
+
+/** One round of design and floor plan images the admin sends for the customer's review. */
+export type DesignVersionDocument = {
+  _id: ObjectId;
+  designRequestId: ObjectId;
+  customerId: ObjectId;
+  version: number;
+  images: string[];
+  adminNote: string;
+  createdBy: ObjectId;
+  createdByName: string;
+  createdAt: Date;
+  /** The customer's answer to this version; missing while it awaits review. */
+  response?: { decision: "approved" | "changes"; note: string; respondedAt: Date };
+};
+
+/** A blueprint file, stored one per document so PDFs stay within MongoDB's document limit. */
+export type BlueprintFileDocument = {
+  _id: ObjectId;
+  designRequestId: ObjectId;
+  customerId: ObjectId;
+  name: string;
+  mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
+  size: number;
+  /** Base64 file content without the data URL prefix. */
+  data: string;
+  createdBy: ObjectId;
+  createdByName: string;
+  createdAt: Date;
 };
 
 export type EstimateLineItemDocument = {
@@ -277,8 +316,10 @@ export type InvoiceDocument = {
   invoiceNumber: string;
   customerId: ObjectId;
   projectId?: ObjectId;
-  /** Design fees are separate from the construction contract. */
+  /** Design and blueprint fees are separate from the construction contract. */
   designRequestId?: ObjectId;
+  /** "blueprint" for blueprint fees; legacy design-fee invoices have no value. */
+  feeType?: "blueprint";
   /** Payment-schedule row this invoice bills, for projects created from an estimate. */
   milestoneId?: string;
   label: string;

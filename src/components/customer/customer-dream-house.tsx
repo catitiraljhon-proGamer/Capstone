@@ -7,8 +7,9 @@ import { BillingErrorMessage, billingJson } from "@/components/billing/billing-p
 import { ConstructionEstimateCard } from "@/components/customer/construction-estimate-card";
 import { ConstructionProjectCard } from "@/components/customer/construction-project-card";
 import { DreamHouseConstructionSection } from "@/components/customer/dream-house-construction";
+import { DreamHouseDesignReview } from "@/components/customer/dream-house-design-review";
 import { DreamHouseDesignSection } from "@/components/customer/dream-house-design-section";
-import { journeyProgress, JourneyStepper, journeyStageText } from "@/components/customer/dream-house-journey";
+import { canRequestEstimate, journeyProgress, JourneyStepper, journeyStageText, journeySteps } from "@/components/customer/dream-house-journey";
 import { Button } from "@/components/ui/button";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
@@ -35,14 +36,15 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
   onChanged: (message?: string) => void;
 }) {
   const progress = journeyProgress(design, estimate, project);
-  const unlocked = design.access === "unlocked";
+  const unlocked = design.workflow === "blueprint" ? design.status === "Design approved" : design.access === "unlocked";
+  const locked = design.workflow === "legacy" && design.status === "Completed";
   return (
     <article id={`dream-${design.id}`} className={`scroll-mt-28 overflow-hidden rounded-xl border bg-white shadow-sm ${highlighted ? "border-red-300 ring-2 ring-red-600/20" : "border-stone-200"}`}>
       <div className="space-y-5 border-b border-stone-200 bg-stone-50 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-4">
             <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-stone-200">
-              {unlocked ? <CheckCircle2 className="h-7 w-7 text-red-700" /> : design.status === "Completed" ? <LockKeyhole className="h-7 w-7 text-stone-500" /> : <FileImage className="h-7 w-7 text-stone-400" />}
+              {unlocked ? <CheckCircle2 className="h-7 w-7 text-red-700" /> : locked ? <LockKeyhole className="h-7 w-7 text-stone-500" /> : <FileImage className="h-7 w-7 text-stone-400" />}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p>
@@ -53,10 +55,12 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
           </div>
           <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">{journeyStageText(design, estimate, project)}</span>
         </div>
-        <JourneyStepper current={progress} />
+        <JourneyStepper steps={journeySteps(design)} current={progress} />
       </div>
       <div className="divide-y divide-stone-200">
-        <DreamHouseDesignSection design={design} />
+        {design.workflow === "blueprint"
+          ? <DreamHouseDesignReview design={design} estimateAccepted={estimate?.status === "Accepted"} onChanged={onChanged} />
+          : <DreamHouseDesignSection design={design} />}
         <DreamHouseConstructionSection
           design={design} estimate={estimate} project={project} starting={starting}
           onStart={onStart} onCancelStart={onCancelStart} onSubmitted={onSubmitted} onChanged={onChanged}
@@ -132,7 +136,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
   }, [scrollTarget]);
 
   const requested = designRequestId ? designs.find((design) => design.id === designRequestId) : undefined;
-  const designNotEligible = Boolean(data && designRequestId && (!requested || (requested.access !== "unlocked" && !estimateFor(requested.id))));
+  const designNotEligible = Boolean(data && designRequestId && (!requested || (!canRequestEstimate(requested) && !estimateFor(requested.id))));
 
   const refresh = (message?: string) => {
     if (message) setNotice(message);
@@ -148,7 +152,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
         <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">From design to construction</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Dream House</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-rose-100">
-          Follow each design from request to delivery. Once the design fee is verified, ask G4 Builders for a construction cost estimate on the same design, accept it, and pay by stage as the house goes up.
+          Review your design and floor plan for free and request changes until it is right. Once you approve it, get a free construction cost estimate. After you accept the estimate, pay for the blueprint, then pay by stage as the house goes up.
         </p>
         <Button asChild variant="outline" className="mt-5 min-h-11 w-full sm:w-auto"><Link href="/customer/design-requests">New Design Request</Link></Button>
       </section>
@@ -163,7 +167,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
       {loading && !data && <p role="status" className="text-sm text-stone-500">Loading your dream house…</p>}
       {designNotEligible && (
         <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
-          That design is not available for construction yet. Construction estimation opens after your design fee is verified and your design is unlocked.
+          That design is not available for construction yet. Construction estimation opens after you approve your design and floor plan.
         </p>
       )}
 
@@ -172,7 +176,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
           <HardHat className="mx-auto h-10 w-10 text-stone-400" />
           <h2 className="mt-4 text-lg font-semibold">No dream house yet</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-stone-600">
-            Your journey starts with a design. Explore finished designs for inspiration, or send your own requirements in Design Requests. Once the design fee is paid, you can ask G4 Builders to estimate construction right here.
+            Your journey starts with a design. Explore finished designs for inspiration, or send your own requirements in Design Requests. Once you approve your design, you can ask G4 Builders to estimate construction right here.
           </p>
           <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild variant="outline" className="min-h-11"><Link href="/customer/finished-designs">Explore Finished Designs</Link></Button>
@@ -188,7 +192,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
             <DreamHouseCard
               key={design.id} design={design} estimate={estimate} project={projectFor(estimate)}
               highlighted={design.id === focusDesignId}
-              starting={startingId === design.id && design.access === "unlocked" && !estimate}
+              starting={startingId === design.id && canRequestEstimate(design) && !estimate}
               onStart={() => { setNotice(null); setStartingId(design.id); }}
               onCancelStart={() => setStartingId(null)}
               onSubmitted={(submitted) => {

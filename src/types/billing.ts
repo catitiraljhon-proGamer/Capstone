@@ -6,6 +6,10 @@ export type PaymentMethod = (typeof paymentMethods)[number];
 /** Payments saved before the "Cheque" spelling may still read "Check" in MongoDB. */
 export type StoredPaymentMethod = PaymentMethod | "Check";
 
+export type DesignFeeType = "design" | "blueprint";
+
+export const designFeeLabels: Record<DesignFeeType, string> = { design: "Design fee", blueprint: "Blueprint fee" };
+
 export function normalizePaymentMethod(method: StoredPaymentMethod): PaymentMethod {
   return method === "Check" ? "Cheque" : method;
 }
@@ -32,6 +36,8 @@ export type BillingInvoice = {
   invoiceNumber: string;
   projectId: string;
   designRequestId?: string;
+  /** Set on design-request invoices: a legacy design fee or a blueprint fee. */
+  feeType?: DesignFeeType;
   milestoneId?: string;
   customerId: string;
   customerName: string;
@@ -89,7 +95,7 @@ export type BillingProject = {
 };
 
 export type BillingData = {
-  designRequests: { id: string; customerName: string; label: string; invoiceId?: string }[];
+  designRequests: { id: string; customerName: string; label: string; feeType: DesignFeeType; invoiceId?: string }[];
   projects: BillingProject[];
   invoices: BillingInvoice[];
   payments: BillingPayment[];

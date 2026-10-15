@@ -5,6 +5,7 @@ import { ConstructionEstimateCard } from "@/components/customer/construction-est
 import { ConstructionProjectCard } from "@/components/customer/construction-project-card";
 import { ConstructionRequestForm } from "@/components/customer/construction-request-form";
 import { dateOrDash, Eyebrow } from "@/components/customer/construction-shared";
+import { canRequestEstimate } from "@/components/customer/dream-house-journey";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
@@ -23,7 +24,7 @@ function AcceptedEstimateSummary({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
-/** The construction part of a Dream House card; opens only once the design is unlocked. */
+/** The construction part of a Dream House card; opens once the design is approved (or, for legacy designs, paid). */
 export function DreamHouseConstructionSection({ design, estimate, project, starting, onStart, onCancelStart, onSubmitted, onChanged }: {
   design: DesignRequestDto;
   estimate?: CostEstimateDto;
@@ -34,18 +35,21 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
   onSubmitted: (estimate: CostEstimateDto) => void;
   onChanged: (message?: string) => void;
 }) {
-  if (design.access !== "unlocked") {
-    // A declined request never reaches construction, so the payment hint would mislead.
+  if (!canRequestEstimate(design)) {
+    // A declined request never reaches construction, so the hint would mislead.
     if (design.status === "Rejected") return null;
     return (
       <section aria-label="Construction" className="p-5">
         <p className="flex items-start gap-2 text-sm leading-6 text-stone-500">
           <LockKeyhole className="mt-1 h-4 w-4 shrink-0" />
-          Construction estimation opens after your design fee is fully paid.
+          {design.workflow === "blueprint"
+            ? "Construction cost estimation opens after you approve your design and floor plan."
+            : "Construction estimation opens after your design fee is fully paid."}
         </p>
       </section>
     );
   }
+  const blueprintPending = design.workflow === "blueprint" && design.access !== "unlocked";
 
   return (
     <section aria-label="Construction" className="space-y-4 p-5">
@@ -61,6 +65,12 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
       )}
       {!estimate && starting && <ConstructionRequestForm design={design} showDesignFacts={false} onCancel={onCancelStart} onSubmitted={onSubmitted} />}
       {estimate && project && <AcceptedEstimateSummary estimate={estimate} />}
+      {project && blueprintPending && (
+        <p className="flex items-start gap-2 rounded-lg bg-stone-50 p-4 text-sm leading-6 text-stone-600">
+          <LockKeyhole className="mt-1 h-4 w-4 shrink-0" />
+          Your downpayment invoice is issued after the blueprint fee above is fully paid and verified.
+        </p>
+      )}
       {estimate && !project && <ConstructionEstimateCard estimate={estimate} highlighted={false} onChanged={onChanged} />}
       {project && <ConstructionProjectCard project={project} />}
     </section>

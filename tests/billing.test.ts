@@ -8,7 +8,7 @@ import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocu
 import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBillingData, getOwnedPayment, getReceipt, invoiceInputSchema, paymentInputSchema, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
-import { deliverDesign, listCustomerDesigns, getCustomerDesignImage } from "@/lib/server/design-requests";
+import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
 import { acceptDesignRequestTerms, requireDesignRequestTerms } from "@/lib/server/design-request-terms";
 import { designRequestTerms, designRequestTermsText } from "@/lib/design-request-terms";
@@ -158,7 +158,7 @@ test("design requests require a Preferred Date and Needed By in the future, in o
   assert.equal(listed.neededBy, "2099-01-10");
 });
 
-test("a selected design follows approval, delivery, and verified design-fee payment before unlocking", async () => {
+test("a selected design is reviewed for free, and only the blueprint is paid before construction billing", async () => {
   const design = await publishedHouseDesign();
   const acceptance = await acceptDesignRequestTerms(db, customer, { accepted: true, version: designRequestTerms.version });
   const request = await createDesignRequest(db, customer, {
@@ -167,20 +167,55 @@ test("a selected design follows approval, delivery, and verified design-fee paym
   });
   assert.equal(request.notes, "Please review a different gate finish.");
   assert.deepEqual(request.inspirationImages, [privateImage]);
-  await assert.rejects(getCustomerDesignImage(db, customer, request.id, 0), isError(403));
   await db.collection("design_requests").updateOne({ _id: new ObjectId(request.id) }, { $set: { status: "Approved" } });
   await db.collection("approvals").updateOne({ recordId: new ObjectId(request.id) }, { $set: { status: "Approved" } });
-  await deliverDesign(db, admin, request.id, { images: [privateImage] });
+
+  // Free review loop: the customer sees each version before paying anything.
+  await uploadDesignVersion(db, admin, request.id, { images: [privateImage], note: "First layout" });
+  let listed = (await listCustomerDesigns(db, customer))[0];
+  assert.equal(listed.workflow, "blueprint");
+  assert.equal(listed.status, "In customer review");
+  assert.equal(listed.access, "in-progress");
+  assert.ok(!JSON.stringify(listed.versions).includes("base64"));
+  assert.deepEqual((await getDesignVersionImage(db, customer, request.id, 1, 0)).bytes, Buffer.from(privateImage.split(",")[1], "base64"));
+  await respondToDesign(db, customer, request.id, { decision: "changes", note: "Move the kitchen to the back." });
+  await uploadDesignVersion(db, admin, request.id, { images: [privateImage, privateImage], note: "Kitchen moved" });
+  await respondToDesign(db, customer, request.id, { decision: "approved" });
+  listed = (await listCustomerDesigns(db, customer))[0];
+  assert.equal(listed.status, "Design approved");
+  assert.deepEqual(listed.versions.map((version) => [version.version, version.imageCount, version.response?.decision]), [[1, 1, "changes"], [2, 2, "approved"]]);
+  assert.equal(listed.access, "awaiting-invoice");
+  assert.equal(await db.collection("payments").countDocuments(), 0);
+
+  // The blueprint fee needs an accepted estimate and uploaded blueprint files.
+  await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
+  await acceptedEstimate(request.id);
+  await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
+  const file = await uploadBlueprintFile(db, admin, request.id, { name: "A-101 floor plan.pdf", dataUrl: blueprintPdf });
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
+  await assert.rejects(getBlueprintFile(db, customer, request.id, file.id), isError(403));
+  assert.equal((await getBillingData(db, clerk)).designRequests[0].feeType, "blueprint");
   const invoiceId = await createInvoice(db, clerk, feeInput(request.id));
+  assert.equal((await db.collection<InvoiceDocument>("invoices").findOne({ _id: new ObjectId(invoiceId) }))?.feeType, "blueprint");
   await changeInvoice(db, clerk, invoiceId, { action: "issue" });
+
+  // Construction billing waits for the blueprint.
+  const project = await linkedProject(request.id);
+  await assert.rejects(createInvoice(db, clerk, { ...draft, projectId: project }), isError(409));
   const paymentId = await submitPayment(db, customer, payment(invoiceId, 5000));
   assert.equal((await listCustomerDesigns(db, customer))[0].access, "payment-required");
   await reviewPayment(db, clerk, paymentId, { action: "verify" });
-  const delivered = (await listCustomerDesigns(db, customer))[0];
-  assert.equal(delivered.selectedDesign?.id, design._id.toHexString());
-  assert.equal(delivered.access, "unlocked");
-  await getCustomerDesignImage(db, customer, request.id, 0);
-  assert.equal((await getBillingData(db, clerk)).projects[0].paid, 0);
+  listed = (await listCustomerDesigns(db, customer))[0];
+  assert.equal(listed.selectedDesign?.id, design._id.toHexString());
+  assert.equal(listed.access, "unlocked");
+  const downloaded = await getBlueprintFile(db, customer, request.id, file.id);
+  assert.equal(downloaded.name, "A-101 floor plan.pdf");
+  assert.equal(downloaded.bytes.toString("ascii", 0, 5), "%PDF-");
+  await assert.rejects(getBlueprintFile(db, other, request.id, file.id), isError(404));
+  await assert.rejects(deleteBlueprintFile(db, admin, request.id, file.id), isError(409));
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Your blueprint is unlocked" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 1);
+  await createInvoice(db, clerk, { ...draft, projectId: project });
 });
 
 test("design terms require an explicit customer agreement to the current version", async () => {
@@ -246,42 +281,84 @@ const feeInput = (designRequestId: string) => ({
   designRequestId, label: "House design fee", basis: "Agreed design fee per signed quotation",
   amount: 5000, progressPercentage: 0, dueDate: "2099-12-31",
 });
+const blueprintPdf = `data:application/pdf;base64,${Buffer.from("%PDF-1.4\n% G4 Builders test blueprint\n").toString("base64")}`;
+/** Legacy requests were delivered before the blueprint workflow; the delivery step no longer exists. */
+async function deliverLegacy(id: string) {
+  await db.collection<DesignRequestDocument>("design_requests").updateOne({ _id: new ObjectId(id) }, { $set: {
+    status: "Completed", completedDesignImages: [privateImage], completedAt: new Date(),
+  } });
+}
+async function acceptedEstimate(designRequestId: string) {
+  const now = new Date();
+  await db.collection("cost_estimates").insertOne({
+    _id: new ObjectId(), reference: `EST-${designRequestId.slice(-6)}`, customerId: new ObjectId(customer.id), designRequestId: new ObjectId(designRequestId),
+    lineItems: [], subtotal: 0, vatRate: 0.12, vat: 0, total: 0, scheduleTemplate: [], adminNotes: "", status: "Accepted", createdAt: now, updatedAt: now,
+  });
+}
+/** A construction project created from the request's accepted estimate. */
+async function linkedProject(designRequestId: string) {
+  const now = new Date();
+  const id = new ObjectId();
+  await db.collection<ProjectDocument>("projects").insertOne({
+    _id: id, reference: "PRJ-002", name: "Blueprint residence", customerId: new ObjectId(customer.id), designRequestId: new ObjectId(designRequestId),
+    status: "Active", contractPrice: 200000, createdAt: now, updatedAt: now,
+  });
+  return id.toHexString();
+}
 async function deliveredFee() {
   const designId = await designFixture();
-  await deliverDesign(db, admin, designId, { images: [privateImage] });
+  await deliverLegacy(designId);
   const invoiceId = await createInvoice(db, clerk, feeInput(designId));
   await changeInvoice(db, clerk, invoiceId, { action: "issue" });
   return { designId, invoiceId };
 }
 
-test("only admin can deliver an approved request; completion notifies the customer and clerk without unlocking", async () => {
+test("only the admin sends design versions, one review at a time, and only the owner answers them", async () => {
   const id = await designFixture("Pending");
-  await assert.rejects(deliverDesign(db, customer, id, { images: [privateImage] }), isError(403));
-  await assert.rejects(deliverDesign(db, clerk, id, { images: [privateImage] }), isError(403));
-  await assert.rejects(deliverDesign(db, admin, id, { images: [privateImage] }), isError(409));
+  await assert.rejects(uploadDesignVersion(db, customer, id, { images: [privateImage] }), isError(403));
+  await assert.rejects(uploadDesignVersion(db, clerk, id, { images: [privateImage] }), isError(403));
+  await assert.rejects(uploadDesignVersion(db, admin, id, { images: [privateImage] }), isError(409));
   await db.collection("design_requests").updateOne({ _id: new ObjectId(id) }, { $set: { status: "Approved" } });
-  await deliverDesign(db, admin, id, { images: [privateImage] });
-  const requests = await listCustomerDesigns(db, customer);
-  assert.equal(requests[0].access, "awaiting-invoice");
-  assert.equal(requests[0].imageCount, 1);
-  assert.ok(!JSON.stringify(requests).includes(privateImage));
-  assert.equal(await db.collection("notifications").countDocuments({ kind: "design-fee" }), 1);
-  await assert.rejects(deliverDesign(db, admin, id, { images: [privateImage] }), isError(409));
-  await assert.rejects(getCustomerDesignImage(db, customer, id, 0), isError(403));
+  await assert.rejects(respondToDesign(db, customer, id, { decision: "approved" }), isError(409));
+  await uploadDesignVersion(db, admin, id, { images: [privateImage] });
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "design-review" }), 1);
+  await assert.rejects(uploadDesignVersion(db, admin, id, { images: [privateImage] }), isError(409));
+  await assert.rejects(respondToDesign(db, other, id, { decision: "approved" }), isError(404));
+  await assert.rejects(respondToDesign(db, admin, id, { decision: "approved" }), isError(403));
+  await assert.rejects(respondToDesign(db, customer, id, { decision: "changes", note: "" }), ZodError);
+  await assert.rejects(getDesignVersionImage(db, other, id, 1, 0), isError(404));
+  await assert.rejects(getDesignVersionImage(db, clerk, id, 1, 0), isError(403));
+  await assert.rejects(getDesignVersionImage(db, customer, id, 2, 0), isError(404));
+  await getDesignVersionImage(db, admin, id, 1, 0);
+  await respondToDesign(db, customer, id, { decision: "changes", note: "Add a second bathroom." });
+  await assert.rejects(respondToDesign(db, customer, id, { decision: "approved" }), isError(409));
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "design-changes" }), 1);
+  const workflow = await getDesignWorkflow(db, admin, id);
+  assert.equal(workflow.status, "Changes requested");
+  assert.equal(workflow.versions[0].response?.note, "Add a second bathroom.");
+  await assert.rejects(getDesignWorkflow(db, customer, id), isError(403));
 });
 
-test("delivering without an approved source does not store images or send notifications", async () => {
+test("design versions need an approved feasibility record and blueprint files need an approved design", async () => {
   const id = await designFixture();
   await db.collection("approvals").deleteMany({});
-  await assert.rejects(deliverDesign(db, admin, id, { images: [privateImage] }), isError(409));
-  assert.equal((await db.collection("design_requests").findOne({ _id: new ObjectId(id) }))?.completedDesignImages, undefined);
+  await assert.rejects(uploadDesignVersion(db, admin, id, { images: [privateImage] }), isError(409));
+  assert.equal(await db.collection("design_versions").countDocuments(), 0);
   assert.equal(await db.collection("notifications").countDocuments(), 0);
+  await assert.rejects(uploadBlueprintFile(db, admin, id, { name: "plan.pdf", dataUrl: blueprintPdf }), isError(409));
+  await db.collection("design_requests").updateOne({ _id: new ObjectId(id) }, { $set: { status: "Design approved" } });
+  await assert.rejects(uploadBlueprintFile(db, customer, id, { name: "plan.pdf", dataUrl: blueprintPdf }), isError(403));
+  await assert.rejects(uploadBlueprintFile(db, admin, id, { name: "fake.pdf", dataUrl: "data:application/pdf;base64,aGVsbG8=" }), isError(400));
+  const file = await uploadBlueprintFile(db, admin, id, { name: "plan.pdf", dataUrl: blueprintPdf });
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
+  await deleteBlueprintFile(db, admin, id, file.id);
+  assert.equal(await db.collection("blueprint_files").countDocuments(), 0);
 });
 
 test("design fees require completed work, remain separate from contracts, and have only one active invoice", async () => {
   const id = await designFixture();
   await assert.rejects(createInvoice(db, clerk, feeInput(id)), isError(409));
-  await deliverDesign(db, admin, id, { images: [privateImage] });
+  await deliverLegacy(id);
   await assert.rejects(createInvoice(db, admin, feeInput(id)), isError(403));
   const results = await Promise.allSettled([1, 2].map(() => createInvoice(db, clerk, feeInput(id))));
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
@@ -331,7 +408,7 @@ test("payment reversal immediately locks design access again and preserves the v
 test("a paid invoice for another design or a construction payment cannot unlock a request", async () => {
   const { designId, invoiceId } = await deliveredFee();
   const otherId = await designFixture();
-  await deliverDesign(db, admin, otherId, { images: [privateImage] });
+  await deliverLegacy(otherId);
   const id = await submitPayment(db, customer, payment(invoiceId, 5000));
   await reviewPayment(db, clerk, id, { action: "verify" });
   await getCustomerDesignImage(db, customer, designId, 0);
@@ -374,7 +451,7 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_billing_tests");
-  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,

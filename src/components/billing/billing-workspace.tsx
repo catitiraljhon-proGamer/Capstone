@@ -10,7 +10,7 @@ import { InvoiceActionDialog, InvoiceForm, PayOnlineDialog, PaymentForm, Payment
 import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import type { PaymongoCheckoutDto } from "@/types/paymongo";
-import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
+import { designFeeLabels, paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 
 const emptyData: BillingData = { designRequests: [], projects: [], invoices: [], payments: [], activity: [] };
 type Dialog =
@@ -190,12 +190,12 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
     {loading && <p role="status" className="text-sm text-stone-500">Loading billing records…</p>}
     {!error && !loading && <>
       {!customer && ["Dashboard", "Progress Billings"].includes(section) && data.designRequests.some((design) => !design.invoiceId) && <BillingPanel>
-        <h2 className="text-lg font-semibold tracking-tight">Completed designs awaiting fee invoice</h2><p className="mt-1 text-sm text-stone-600">The admin has delivered these designs. Prepare the agreed fee so the customer can pay and unlock their images.</p>
-        <div className="mt-4 divide-y divide-stone-200">{data.designRequests.filter((design) => !design.invoiceId).map((design) => <div key={design.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">{design.customerName}</p><p className="mt-1 text-xs text-stone-500">{design.label}</p></div><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", designRequestId: design.id })}>Prepare design fee</Button></div>)}</div>
+        <h2 className="text-lg font-semibold tracking-tight">Blueprints and designs awaiting fee invoice</h2><p className="mt-1 text-sm text-stone-600">These customers accepted their cost estimate and the admin uploaded the blueprint (or, for older requests, delivered the design). Prepare the agreed fee so the customer can pay and unlock their files.</p>
+        <div className="mt-4 divide-y divide-stone-200">{data.designRequests.filter((design) => !design.invoiceId).map((design) => <div key={design.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">{design.customerName}</p><p className="mt-1 text-xs text-stone-500">{designFeeLabels[design.feeType]} · {design.label}</p></div><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", designRequestId: design.id })}>Prepare {designFeeLabels[design.feeType].toLowerCase()}</Button></div>)}</div>
       </BillingPanel>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(customer ? [
-          { label: "Total invoiced", value: formatPeso(sumMoney(issued.map((invoice) => invoice.amount))), note: "Construction and design fee invoices", icon: FileText },
+          { label: "Total invoiced", value: formatPeso(sumMoney(issued.map((invoice) => invoice.amount))), note: "Construction, blueprint, and design fee invoices", icon: FileText },
           { label: "Verified payments", value: formatPeso(sumMoney(verified.map((payment) => payment.amount))), note: "Confirmed payments only", icon: WalletCards },
           { label: "Outstanding balance", value: formatPeso(sumMoney(unpaid.map((invoice) => invoice.balance))), note: "Unpaid portion of issued invoices", icon: ReceiptText },
           { label: "Awaiting verification", value: String(pending.length), note: "Payment submissions under review", icon: Clock3 },
@@ -246,7 +246,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
     {dialog?.type === "invoice" && <BillingDialog title={dialog.invoice.invoiceNumber} onClose={close}>
       <div className="space-y-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-xl font-semibold">{dialog.invoice.label}</h3><p className="mt-1 text-sm text-stone-600">{dialog.invoice.customerName}</p><p className="mt-1 text-xs text-stone-500">{dialog.invoice.projectName}</p></div><BillingBadge status={dialog.invoice.status} /></div>
         <div className="grid gap-3 rounded-lg bg-stone-50 p-4 sm:grid-cols-3">{[["Invoice amount", dialog.invoice.amount], ["Verified paid", dialog.invoice.paid], ["Remaining balance", dialog.invoice.balance]].map(([label, value]) => <div key={label}><p className="text-xs text-stone-500">{label}</p><p className="mt-1 font-semibold">{dialog.invoice.status === "Void" && label === "Remaining balance" ? "—" : formatPeso(Number(value))}</p></div>)}</div>
-        <p className="text-sm text-stone-600">Due {billingDate(dialog.invoice.dueDate)}{dialog.invoice.designRequestId ? " · Design fee" : " · Project progress: " + dialog.invoice.progressPercentage + "%"}{dialog.invoice.overdue ? " · Overdue balance" : ""}</p>
+        <p className="text-sm text-stone-600">Due {billingDate(dialog.invoice.dueDate)}{dialog.invoice.designRequestId ? ` · ${designFeeLabels[dialog.invoice.feeType ?? "design"]}` : " · Project progress: " + dialog.invoice.progressPercentage + "%"}{dialog.invoice.overdue ? " · Overdue balance" : ""}</p>
         <div><p className="text-sm font-semibold">Billing basis</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-600">{dialog.invoice.basis || "No reference recorded. Add the billing basis before issuing."}</p></div>
         {dialog.invoice.voidReason && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800">Void reason: {dialog.invoice.voidReason}</p>}
         <div className="flex flex-wrap gap-2">
