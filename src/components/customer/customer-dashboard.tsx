@@ -24,8 +24,6 @@ import { useSessionUser } from "@/lib/session-store";
 import { useCustomerDashboardData } from "@/lib/customer-dashboard-data";
 import {
   ClipboardList,
-  CreditCard,
-  FilePlus2,
   FileText,
   Gauge,
   Home,
@@ -244,26 +242,6 @@ export function CustomerDashboard() {
               <p className="mt-2 text-xl font-semibold">{dashboard.pendingRequests}</p>
             </Panel>
           </div>
-
-          <Panel className="p-5">
-            <h2 className="text-lg font-semibold tracking-tight">Next Steps</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {[
-                { title: "View Finished Designs", href: "/customer/finished-designs", icon: Home },
-                { title: "Request a house design", href: "/customer/design-requests", icon: FilePlus2 },
-                { title: "Review billing status", href: "/customer/billing", icon: CreditCard },
-              ].map((action) => (
-                <Link
-                  key={action.title}
-                  href={action.href}
-                  className="flex items-center gap-3 rounded-lg border border-stone-200 p-4 text-sm font-semibold hover:border-red-200 hover:bg-red-50"
-                >
-                  <action.icon className="h-5 w-5 text-red-700" />
-                  {action.title}
-                </Link>
-              ))}
-            </div>
-          </Panel>
         </div>
 
         <div className="space-y-6">
