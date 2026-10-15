@@ -7,6 +7,7 @@ import {
   type EstimateDocument,
   type InvoiceDocument,
   type NotificationDocument,
+  type PaymentDocument,
   type ProjectDocument,
   type ProjectMilestoneDocument,
   type ScheduleDocument,
@@ -43,14 +44,56 @@ const idPattern = /^[a-f\d]{24}$/i;
 const dateOnly = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 /**
- * G4 Builders is VAT-exempt. Estimates made before that change and not yet accepted drop their VAT, so the contract
- * total is the sum of the scope-of-work amounts. Accepted estimates keep the total the customer agreed to.
+ * G4 Builders is VAT-exempt. Estimates made before that change drop their VAT, so the contract total is the sum of
+ * the scope-of-work amounts, unless billing already started on the accepted project.
  */
 async function removeVatFromOpenEstimates(db: Db) {
   await db.collection<EstimateDocument>(collections.estimates).updateMany(
     { status: { $in: ["Requested", "Draft", "Sent", "Revision requested"] }, vat: { $gt: 0 } },
     [{ $set: { vat: 0, vatRate: 0, total: "$subtotal" } }],
   );
+  const accepted = await db.collection<EstimateDocument>(collections.estimates)
+    .find({ status: "Accepted", vat: { $gt: 0 }, projectId: { $exists: true } }, { projection: { _id: 1 } }).toArray();
+  for (const { _id } of accepted) await removeVatFromUnbilledProject(db, _id);
+}
+
+/**
+ * Accepted estimates with VAT drop it too while nothing has been billed: no invoice issued and no payment made.
+ * The contract, payment schedule, draft invoices, and calendar amounts are recomputed from the VAT-free total.
+ * Once an invoice is issued or a payment exists, the agreed total stays as it is.
+ */
+async function removeVatFromUnbilledProject(db: Db, estimateId: ObjectId) {
+  await billingTransaction(db, async (session) => {
+    const estimates = db.collection<EstimateDocument>(collections.estimates);
+    const estimate = await estimates.findOne({ _id: estimateId, status: "Accepted", vat: { $gt: 0 } }, { session });
+    if (!estimate?.projectId || !estimate.downpaymentPercent || !estimate.scheduleTemplate?.length) return;
+    const projects = db.collection<ProjectDocument>(collections.projects);
+    const project = await projects.findOne({ _id: estimate.projectId }, { session });
+    if (!project?.paymentSchedule?.length) return;
+    const invoices = await db.collection<InvoiceDocument>(collections.invoices)
+      .find({ projectId: project._id, status: { $ne: "Void" } }, { session }).toArray();
+    if (invoices.some((invoice) => !["Draft", "Ready"].includes(invoice.status))) return;
+    if (await db.collection<PaymentDocument>(collections.payments).countDocuments({ projectId: project._id, status: { $in: ["Pending", "Verified"] } }, { session })) return;
+
+    const total = estimate.subtotal ?? 0;
+    if (!(total > 0)) return;
+    const rows = buildPaymentSchedule(total, estimate.scheduleTemplate, estimate.downpaymentPercent);
+    if (rows.length !== project.paymentSchedule.length) return;
+    const schedule = project.paymentSchedule.map((milestone, index) => ({ ...milestone, amount: rows[index].amount, percentage: rows[index].percentage }));
+    const now = new Date();
+    await projects.updateOne({ _id: project._id }, { $set: { contractPrice: total, subtotal: total, vat: 0, paymentSchedule: schedule, updatedAt: now } }, { session });
+    for (const milestone of schedule) {
+      await db.collection<InvoiceDocument>(collections.invoices).updateMany(
+        { projectId: project._id, milestoneId: milestone.id, status: { $in: ["Draft", "Ready"] } },
+        { $set: { amount: milestone.amount, updatedAt: now } }, { session },
+      );
+      await db.collection<ScheduleDocument>(collections.schedules).updateMany(
+        { projectId: project._id, milestoneId: milestone.id },
+        { $set: { expectedAmount: milestone.amount, updatedAt: now } }, { session },
+      );
+    }
+    await estimates.updateOne({ _id: estimate._id }, { $set: { vat: 0, vatRate: 0, total, updatedAt: now } }, { session });
+  });
 }
 const isoDate = (value?: Date | null) => (value ? value.toISOString().slice(0, 10) : null);
 const addDays = (date: string, days: number) => {
@@ -444,6 +487,7 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
 export async function listProjects(db: Db, actor: SessionUser): Promise<ConstructionProjectDto[]> {
   requireRole(actor, ["customer", "admin", "billing-clerk"], "You do not have access to construction projects.");
   await promoteScheduledProjects(db);
+  await removeVatFromOpenEstimates(db);
   const projects = await db.collection<ProjectDocument>(collections.projects)
     .find(actor.role === "customer" ? { customerId: new ObjectId(actor.id) } : {}).sort({ createdAt: -1 }).limit(500).toArray();
   return toProjectDtos(db, projects, actor.role);

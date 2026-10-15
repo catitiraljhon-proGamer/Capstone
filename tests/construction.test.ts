@@ -117,16 +117,38 @@ beforeEach(async () => {
 });
 after(async () => { await db?.client.close(); await mongo?.stop(); });
 
-test("estimates saved with VAT drop it until accepted; accepted ones keep the agreed total", async () => {
+test("estimates saved with VAT drop it, unless billing already started on the accepted project", async () => {
   const open = await sentEstimate();
-  const { estimate: acceptedEstimate } = await acceptedProject();
+  const unbilled = await acceptedProject();
+  const billed = await acceptedProject();
+  // Simulate records saved before G4 Builders became VAT-exempt.
   const withVat = { subtotal: 6_000_000, vatRate: 0.12, vat: 720_000, total: 6_720_000 };
   await db.collection("cost_estimates").updateMany({}, { $set: withVat });
+  for (const { projectId } of [unbilled, billed]) {
+    const project = await db.collection<ProjectDocument>("projects").findOne({ _id: new ObjectId(projectId) });
+    const schedule = project!.paymentSchedule!.map((milestone, index) => ({ ...milestone, amount: [2_016_000, 2_016_000, 2_016_000, 672_000][index] }));
+    await db.collection<ProjectDocument>("projects").updateOne({ _id: project!._id }, { $set: { contractPrice: 6_720_000, subtotal: 6_000_000, vat: 720_000, paymentSchedule: schedule } });
+    await db.collection<InvoiceDocument>("invoices").updateMany({ projectId: project!._id }, { $set: { amount: 2_016_000 } });
+  }
+  // Read the invoice straight from the database: listing projects would already remove the VAT.
+  const billedProject = await db.collection<ProjectDocument>("projects").findOne({ _id: new ObjectId(billed.projectId) });
+  await changeInvoice(db, clerk, billedProject!.paymentSchedule![0].invoiceId!.toHexString(), { action: "issue" });
+
   const estimates = await listEstimates(db, admin);
   const reopened = estimates.find((estimate) => estimate.id === open.id)!;
   assert.deepEqual([reopened.subtotal, reopened.vat, reopened.total], [6_000_000, 0, 6_000_000]);
-  const kept = estimates.find((estimate) => estimate.id === acceptedEstimate.id)!;
+  const freed = estimates.find((estimate) => estimate.id === unbilled.estimate.id)!;
+  assert.deepEqual([freed.vat, freed.total], [0, 6_000_000]);
+  const unbilledProject = await projectDto(unbilled.projectId);
+  assert.deepEqual([unbilledProject.contractPrice, unbilledProject.vat], [6_000_000, 0]);
+  assert.deepEqual(unbilledProject.milestones.map((milestone) => milestone.amount), [1_800_000, 1_800_000, 1_800_000, 600_000]);
+  assert.equal(unbilledProject.milestones[0].invoice?.amount, 1_800_000);
+  const event = await db.collection("schedules").findOne({ projectId: new ObjectId(unbilled.projectId), milestoneId: unbilledProject.milestones[0].id });
+  assert.equal(event?.expectedAmount, 1_800_000);
+  // An issued invoice means the customer was already billed on the agreed total.
+  const kept = estimates.find((estimate) => estimate.id === billed.estimate.id)!;
   assert.deepEqual([kept.vat, kept.total], [720_000, 6_720_000]);
+  assert.equal((await projectDto(billed.projectId)).contractPrice, 6_720_000);
   // Accepting the open estimate uses the VAT-free total.
   const { projectId } = await changeEstimate(db, customer, open.id, { action: "accept", downpaymentPercent: 30 });
   assert.equal((await projectDto(projectId!)).contractPrice, 6_000_000);
