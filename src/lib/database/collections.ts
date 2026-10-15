@@ -17,7 +17,7 @@ import type {
 } from "@/types/approvals";
 import type { ObjectId } from "mongodb";
 import type { AddressDetails, ClientDetails } from "@/types/clients";
-import type { ReceiptSnapshot } from "@/types/billing";
+import type { ReceiptSnapshot, StoredPaymentMethod } from "@/types/billing";
 import type { RequestedHouseDesign } from "@/types/design-requests";
 import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
@@ -304,7 +304,7 @@ export type PaymentDocument = {
   projectId?: ObjectId;
   invoiceId?: ObjectId;
   amount: number;
-  method: "Cash" | "Bank transfer" | "Card" | "E-wallet" | "Check";
+  method: StoredPaymentMethod;
   status: "Pending" | "Verified" | "Rejected" | "Reversed";
   paidAt: Date;
   createdAt: Date;

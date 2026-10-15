@@ -1,8 +1,14 @@
 import type { PaymentMilestoneDto } from "@/types/construction";
 import type { PaymongoMethod } from "@/types/paymongo";
 
-export const paymentMethods = ["Cash", "Bank transfer", "Card", "E-wallet", "Check"] as const;
+export const paymentMethods = ["Cash", "Bank transfer", "Card", "E-wallet", "Cheque"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
+/** Payments saved before the "Cheque" spelling may still read "Check" in MongoDB. */
+export type StoredPaymentMethod = PaymentMethod | "Check";
+
+export function normalizePaymentMethod(method: StoredPaymentMethod): PaymentMethod {
+  return method === "Check" ? "Cheque" : method;
+}
 export type BillingSection = "Dashboard" | "Progress Billings" | "Invoices" | "Payments" | "Customer Accounts" | "Reports";
 
 export type ReceiptSnapshot = {

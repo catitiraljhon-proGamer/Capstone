@@ -4,7 +4,7 @@ import { collections, type AuditLogDocument, type DesignRequestDocument, type In
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { insertNotifications } from "@/lib/server/notifications";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
-import { paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
+import { normalizePaymentMethod, paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
 import type { SessionUser, UserRole } from "@/types/domain";
 
 export class BillingError extends Error {
@@ -272,7 +272,7 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
     const submissionKey = `${actor.id}:${input.submissionKey}`;
     const existing = await db.collection<PaymentDocument>(collections.payments).findOne({ submissionKey }, { session });
     if (existing) {
-      if (!existing.invoiceId?.equals(invoice._id) || existing.amount !== input.amount || existing.method !== input.method || existing.transactionReference !== input.transactionReference) {
+      if (!existing.invoiceId?.equals(invoice._id) || existing.amount !== input.amount || normalizePaymentMethod(existing.method) !== input.method || existing.transactionReference !== input.transactionReference) {
         throw new BillingError("This submission was already used for a different payment.", 409);
       }
       return existing._id.toHexString();
@@ -362,7 +362,7 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
       number: await nextReference(db, session, "RCT", now), customerName: customer.name, projectName: invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : `${project!.reference} · ${project!.name}`,
       invoiceNumber: invoice.invoiceNumber, invoiceLabel: invoice.label, invoiceAmount: invoice.amount,
       amount: payment.amount, balanceAfterPayment: fromCentavos(toCentavos(invoice.amount) - toCentavos(updatedPaid)),
-      method: payment.method, transactionReference: payment.transactionReference || payment.reference,
+      method: normalizePaymentMethod(payment.method), transactionReference: payment.transactionReference || payment.reference,
       paidAt: payment.paidAt.toISOString(), issuedAt: now.toISOString(), verifiedByName: verifier.name,
     },
   } }, { session });
@@ -487,7 +487,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
       invoiceNumber: payment.invoiceId ? invoiceNumbers.get(payment.invoiceId.toHexString()) ?? "Unavailable invoice" : "Legacy / unallocated",
       customerId: payment.customerId.toHexString(), customerName: customerNames.get(payment.customerId.toHexString()) ?? "Unknown customer",
       projectId: payment.projectId?.toHexString() ?? "", projectName: invoiceDtos.find((invoice) => invoice.id === payment.invoiceId?.toHexString())?.projectName ?? projectNames.get(payment.projectId?.toHexString() ?? "") ?? "Unknown project",
-      amount: payment.amount, method: payment.method, status: payment.status, paidAt: payment.paidAt.toISOString(),
+      amount: payment.amount, method: normalizePaymentMethod(payment.method), status: payment.status, paidAt: payment.paidAt.toISOString(),
       transactionReference: payment.transactionReference ?? "", notes: payment.notes ?? "", hasProof: proofIds.has(payment._id.toHexString()),
       reviewNote: payment.reviewNote, receiptNumber: payment.receipt?.number, reversalReason: payment.reversalReason,
       ...(payment.gateway === "paymongo" && payment.gatewayMethod && payment.gatewaySessionId
@@ -509,5 +509,6 @@ export async function getOwnedPayment(db: Db, actor: SessionUser, id: string) {
 export async function getReceipt(db: Db, actor: SessionUser, id: string): Promise<BillingReceipt> {
   const payment = await getOwnedPayment(db, actor, id);
   if (!payment.receipt || (payment.status !== "Verified" && payment.status !== "Reversed")) throw new BillingError("No receipt is available for this payment.", 404);
-  return { receipt: payment.receipt, status: payment.status, reversalReason: payment.reversalReason, reversedAt: payment.reversedAt?.toISOString() };
+  const receipt = { ...payment.receipt, method: normalizePaymentMethod(payment.receipt.method) };
+  return { receipt, status: payment.status, reversalReason: payment.reversalReason, reversedAt: payment.reversedAt?.toISOString() };
 }
