@@ -19,7 +19,7 @@ const benefits = [
   "Browse available house designs",
   "Request and track cost estimates",
   "Review project billing and payments",
-  "Keep project documents in one place",
+  "Download your blueprint, invoices, and receipts",
 ];
 
 export function RegisterAccountPage({
@@ -485,7 +485,7 @@ export function RegisterAccountPage({
             </h2>
             <p className="mt-3 text-sm leading-6 text-red-100">
               Your account connects estimates, design requests, project
-              progress, documents, and invoices to one secure client
+              progress, blueprints, and invoices to one secure client
               profile.
             </p>
 

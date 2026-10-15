@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Customer Dashboard | G4 Builders Inc",
   description:
-    "Customer homepage for house design progress, billing, and documents.",
+    "Customer homepage for house design progress, cost estimates, and billing.",
 };
 
 export default function CustomerPage() {

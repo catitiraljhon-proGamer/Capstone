@@ -24,7 +24,6 @@ import { useSessionUser } from "@/lib/session-store";
 import { useCustomerDashboardData } from "@/lib/customer-dashboard-data";
 import {
   ClipboardList,
-  FileText,
   Gauge,
   Home,
   Menu,
@@ -42,7 +41,6 @@ type CustomerSection =
   | "dream-house"
   | "requests"
   | "billing"
-  | "documents"
   | "profile";
 
 const houseImage = "/House/image.png";
@@ -57,7 +55,6 @@ const customerNav: {
   { label: "Dream House", icon: Home, href: "/customer/dream-house", section: "dream-house" },
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
-  { label: "Documents", icon: FileText, href: "/customer/documents", section: "documents" },
 ];
 
 const customerAccountLinks: AccountMenuLink[] = [
@@ -535,18 +532,6 @@ export function CustomerBillingPage() {
   return <CustomerShell activeSection="billing" title="Billing & Payments" description="View invoices, submit payment details, and download your receipts."><BillingWorkspace customer section="Invoices" /></CustomerShell>;
 }
 
-export function CustomerDocumentsPage() {
-  return (
-    <CustomerShell activeSection="documents" title="Documents" description="View files, plans, estimates, and approvals.">
-      <Panel className="p-5">
-        <h1 className="text-xl font-semibold tracking-tight">Project Documents</h1>
-        <div className="mt-5">
-          <EmptyState title="No documents uploaded yet." body="Blueprints, estimates, approvals, invoices, and reports will appear here." />
-        </div>
-      </Panel>
-    </CustomerShell>
-  );
-}
 
 export function CustomerProfilePage() {
   return (

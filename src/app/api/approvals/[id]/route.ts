@@ -24,7 +24,7 @@ const customerHrefs: Record<ApprovalRecordType, string> = {
   "Design request": "/customer/design-requests",
   "Cost estimate": "/customer/dream-house",
   Billing: "/customer/billing",
-  Document: "/customer/documents",
+  Document: "/customer",
 };
 
 async function sourceExists(

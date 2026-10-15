@@ -70,7 +70,7 @@ const roleGuide = [
   {
     role: "customer" as const,
     title: "Customer",
-    description: "Can manage personal projects, requests, documents, and billing.",
+    description: "Can manage personal projects, design requests, blueprints, and billing.",
     icon: UserRound,
   },
   {
