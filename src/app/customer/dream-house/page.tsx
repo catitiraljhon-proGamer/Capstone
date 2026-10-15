@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Dream House | G4 Builders Inc",
   robots: { index: false, follow: false },
-  description: "Follow your requested designs from payment to construction cost estimation and project billing.",
+  description: "Review your requested designs, get a construction cost estimate, and follow blueprint and project billing.",
 };
 
 type SearchParams = Promise<{ design?: string | string[]; designRequestId?: string | string[]; estimate?: string | string[] }>;

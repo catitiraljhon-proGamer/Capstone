@@ -295,7 +295,7 @@ export function CustomerDashboard() {
 
 export function CustomerDreamHousePage({ designId, designRequestId, estimateId }: { designId?: string; designRequestId?: string; estimateId?: string }) {
   return (
-    <CustomerShell activeSection="dream-house" title="Dream House" description="Follow each design from request and payment through construction cost estimation.">
+    <CustomerShell activeSection="dream-house" title="Dream House" description="Review your design for free, get your cost estimate, then pay for the blueprint and construction.">
       <CustomerDreamHouse designId={designId} designRequestId={designRequestId} estimateId={estimateId} />
     </CustomerShell>
   );
