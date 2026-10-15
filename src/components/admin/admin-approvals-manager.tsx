@@ -24,7 +24,6 @@ import {
   ShieldCheck,
   UserRound,
   X,
-  XCircle,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -577,7 +576,7 @@ export function AdminApprovalsManager() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard
           label="All approvals"
           value={summary.total}
@@ -598,13 +597,6 @@ export function AdminApprovalsManager() {
           icon={CheckCircle2}
           active={statusFilter === "Approved"}
           onClick={() => setSummaryFilter("Approved")}
-        />
-        <SummaryCard
-          label="Rejected"
-          value={summary.rejected}
-          icon={XCircle}
-          active={statusFilter === "Rejected"}
-          onClick={() => setSummaryFilter("Rejected")}
         />
       </div>
 
@@ -684,7 +676,6 @@ export function AdminApprovalsManager() {
               <option value="all">All statuses</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
-              <option value="Rejected">Rejected</option>
             </select>
           </label>
         </div>
