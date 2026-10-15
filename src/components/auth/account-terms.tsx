@@ -13,15 +13,15 @@ export function AccountTermsDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Pops up when the customer clicks Create Client Account or Sign up with Google. The account is created only after
- * they agree, and the agreement is saved with it, so these terms are never asked again.
+ * Opens first on the register page: the sign-up form can be filled in only after the customer agrees. The agreement
+ * is saved with the new account, so these terms are never asked again.
  */
 export function AccountTermsConsent({ onAgree, onDecline }: { onAgree: () => void; onDecline: () => void }) {
   return (
     <TermsDialog
       terms={accountTerms} notice={notice} onAgree={onAgree} onDecline={onDecline}
-      agreeLabel="I agree, create my account" declineLabel="Cancel"
-      helperText="You only agree once. Your account is created after you agree."
+      agreeLabel="I agree, continue to sign up" declineLabel="Go back"
+      helperText="You only agree once. Next, fill in your details to create your account."
     />
   );
 }

@@ -43,9 +43,8 @@ export function RegisterAccountPage({
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
-  /** Which sign-up the Terms and Conditions pop-up is confirming; null when it is closed. */
-  const [consentFor, setConsentFor] = useState<"email" | "google" | null>(null);
-  const pendingRegistration = useRef<Record<string, unknown> | null>(null);
+  /** The Terms and Conditions open first; the form can be filled in only after the customer agrees. */
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const normalizedEmail = email.trim().toLowerCase();
@@ -132,15 +131,7 @@ export function RegisterAccountPage({
     const addressDetails = readAddressDetails(formData);
     const occupation = String(formData.get("occupation") ?? "").trim();
 
-    // The account is created only after the customer agrees in the Terms and Conditions pop-up.
-    pendingRegistration.current = { name, email, password, contactNumber, addressDetails, occupation, verificationCode };
-    setConsentFor("email");
-  };
-
-  const createAccount = async () => {
-    const details = pendingRegistration.current;
-    setConsentFor(null);
-    if (!details || isSubmitting) return;
+    const details = { name, email, password, contactNumber, addressDetails, occupation, verificationCode };
     setIsSubmitting(true);
 
     try {
@@ -166,7 +157,6 @@ export function RegisterAccountPage({
         return;
       }
 
-      pendingRegistration.current = null;
       window.location.replace(payload.redirectTo);
     } catch {
       setErrorMessage("Unable to reach the server. Try again.");
@@ -202,6 +192,8 @@ export function RegisterAccountPage({
             </p>
           </div>
 
+          {agreedToTerms ? (
+          <>
           <div className="mt-8 max-w-xl space-y-6">
             {googleError ? (
               <p
@@ -211,7 +203,14 @@ export function RegisterAccountPage({
                 {googleError}
               </p>
             ) : null}
-            <GoogleAuthButton mode="register" disabled={isSubmitting} onClick={() => setConsentFor("google")} />
+            <GoogleAuthButton
+              mode="register"
+              disabled={isSubmitting}
+              onClick={() => {
+                const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: accountTerms.version });
+                window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
+              }}
+            />
             <p className="text-xs leading-5 text-stone-500">
               Registering with Google? Add your contact number and address
               in your client profile after signing in.
@@ -434,8 +433,8 @@ export function RegisterAccountPage({
             </div>
 
             <p className="text-xs leading-5 text-stone-500">
-              Client registration cannot create staff or administrator accounts. You will be asked to read and agree to
-              the Terms and Conditions before your account is created.
+              Client registration cannot create staff or administrator accounts. Your agreement to the Terms and
+              Conditions is saved with your new account.
             </p>
 
             {errorMessage ? (
@@ -466,6 +465,13 @@ export function RegisterAccountPage({
               </Link>
             </p>
           </form>
+          </>
+          ) : (
+          <div className="mt-8 max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-5">
+            <p className="text-sm font-semibold text-red-900">Read and agree to the Terms and Conditions first</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">The sign-up form opens after you agree. You only agree once.</p>
+          </div>
+          )}
         </section>
 
         <aside className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-950 via-red-800 to-rose-700 p-7 text-white shadow-lg lg:p-9">
@@ -497,14 +503,10 @@ export function RegisterAccountPage({
           </div>
         </aside>
       </main>
-      {consentFor && (
+      {!agreedToTerms && (
         <AccountTermsConsent
-          onDecline={() => setConsentFor(null)}
-          onAgree={() => {
-            if (consentFor === "email") { void createAccount(); return; }
-            const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: accountTerms.version });
-            window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
-          }}
+          onAgree={() => setAgreedToTerms(true)}
+          onDecline={() => window.location.assign(backHref)}
         />
       )}
     </div>
