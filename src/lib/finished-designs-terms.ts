@@ -1,6 +1,6 @@
 // Keep published versions unchanged; bump the version whenever the terms change.
 export const finishedDesignsTerms = {
-  version: "2026-10-15",
+  version: "2026-10-16",
   title: "Finished Designs Terms and Conditions",
   introduction:
     "Please read these terms before viewing the finished house designs of G4 Builders Inc.",
@@ -12,15 +12,15 @@ export const finishedDesignsTerms = {
       body: "All designs, images, and plans shown here are original works of G4 Builders Inc. They are protected by copyright under RA 8293, the Intellectual Property Code of the Philippines, from the moment they are created.",
     },
     {
-      title: "Allowed use",
+      title: "Allowed Use",
       body: "You may view the designs in this portal only to compare options, see estimated costs, and request a design from G4 Builders Inc.",
     },
     {
-      title: "Not allowed",
+      title: "Not Allowed",
       body: "Without written permission from G4 Builders Inc, you may not screenshot, download, copy, print, or share the designs, post them online, remove their watermark, or use them to build a house.",
     },
     {
-      title: "Paid blueprints",
+      title: "Paid Blueprints",
       body: "Paying the blueprint fee allows you to build the design once, for the project in your request. G4 Builders Inc still owns the design, so you may not reuse or resell it for another project.",
     },
     {

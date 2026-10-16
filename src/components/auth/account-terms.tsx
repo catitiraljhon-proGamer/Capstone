@@ -5,7 +5,7 @@ import { useState } from "react";
 import { TermsDialog } from "@/components/customer/terms-dialog";
 import { accountTerms } from "@/lib/account-terms";
 
-const notice = { title: "Protected designs · Only the blueprint is paid", body: accountTerms.notice, icon: ShieldAlert };
+const notice = { title: "Protected Designs · Only the Blueprint Is Paid", body: accountTerms.notice, icon: ShieldAlert };
 
 /** Read-only Terms and Conditions, opened from the login page or a design request. */
 export function AccountTermsDialog({ onClose }: { onClose: () => void }) {
@@ -20,7 +20,7 @@ export function AccountTermsConsent({ onAgree, onDecline }: { onAgree: () => voi
   return (
     <TermsDialog
       terms={accountTerms} notice={notice} onAgree={onAgree} onDecline={onDecline}
-      agreeLabel="I agree, continue to sign up" declineLabel="Go back"
+      agreeLabel="I Agree, Continue to Sign Up" declineLabel="Go Back"
       helperText="You only agree once. Next, fill in your details to create your account."
     />
   );

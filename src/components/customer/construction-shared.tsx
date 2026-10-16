@@ -52,7 +52,7 @@ export function ScheduleTable({ rows }: { rows: ScheduleRow[] }) {
             <th scope="col" className="px-3 py-2.5">Milestone</th>
             <th scope="col" className="px-3 py-2.5 text-right">%</th>
             <th scope="col" className="px-3 py-2.5 text-right">Amount</th>
-            <th scope="col" className="px-3 py-2.5">Target date</th>
+            <th scope="col" className="px-3 py-2.5">Target Date</th>
             {showStatus && <th scope="col" className="px-3 py-2.5">Status</th>}
           </tr>
         </thead>

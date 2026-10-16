@@ -291,7 +291,7 @@ function ApprovalReviewDialog({
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-              Request details
+              Request Details
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-stone-700">
               {approval.description}
@@ -305,7 +305,7 @@ function ApprovalReviewDialog({
 
           {approval.selectedDesign ? (
             <section className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected published design</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Published Design</p>
               <h3 className="mt-2 font-semibold">{approval.selectedDesign.name}</h3>
               <p className="mt-1 text-sm text-stone-600">{approval.selectedDesign.houseType} · {approval.selectedDesign.floorArea} sqm · {approval.selectedDesign.finish} · {approval.selectedDesign.rooms}</p>
               {approval.selectedDesignImages?.[0] ? (
@@ -319,7 +319,7 @@ function ApprovalReviewDialog({
           {approval.recordType === "Design request" ? (
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-                {approval.selectedDesign ? "Additional client references" : "Client inspiration"}
+                {approval.selectedDesign ? "Additional Client References" : "Client Inspiration"}
               </p>
               {inspirationImages.length > 0 ? (
                 <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -352,7 +352,7 @@ function ApprovalReviewDialog({
           {approval.status === "Pending" ? (
             <div className="border-t border-stone-200 pt-5">
               <label className="text-sm font-semibold text-stone-700">
-                Review note
+                Review Note
                 <span className="ml-1 font-normal text-stone-500">
                   (optional)
                 </span>
@@ -578,14 +578,14 @@ export function AdminApprovalsManager() {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard
-          label="All approvals"
+          label="All Approvals"
           value={summary.total}
           icon={FileCheck2}
           active={statusFilter === "all"}
           onClick={() => setSummaryFilter("all")}
         />
         <SummaryCard
-          label="Pending review"
+          label="Pending Review"
           value={summary.pending}
           icon={Clock}
           active={statusFilter === "Pending"}
@@ -614,7 +614,7 @@ export function AdminApprovalsManager() {
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-stone-200 p-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Approval queue</h1>
+            <h1 className="text-xl font-semibold tracking-tight">Approval Queue</h1>
             <p className="mt-1 text-sm text-stone-600">
               Review connected design, estimate, billing, and document records.
             </p>
@@ -655,7 +655,7 @@ export function AdminApprovalsManager() {
               }}
               className={`${fieldClass} w-full`}
             >
-              <option value="all">All record types</option>
+              <option value="all">All Record Types</option>
               {approvalRecordTypes.map((recordType) => (
                 <option key={recordType} value={recordType}>
                   {recordType}
@@ -673,7 +673,7 @@ export function AdminApprovalsManager() {
               }}
               className={`${fieldClass} w-full`}
             >
-              <option value="all">All statuses</option>
+              <option value="all">All Statuses</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
             </select>
@@ -758,7 +758,7 @@ export function AdminApprovalsManager() {
         ) : (
           <div className="p-12 text-center">
             <ShieldCheck className="mx-auto h-10 w-10 text-stone-300" />
-            <p className="mt-4 font-semibold">No matching approvals</p>
+            <p className="mt-4 font-semibold">No Matching Approvals</p>
             <p className="mt-1 text-sm text-stone-500">
               {statusFilter === "Pending" && !search && typeFilter === "all"
                 ? "The review queue is clear. New connected requests will appear here automatically."

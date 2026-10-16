@@ -201,7 +201,7 @@ export function AdminHouseDesignManager() {
     ...(selectedHouseType
       ? [{ label: selectedHouseType, onClick: () => goToStep("designs") }]
       : []),
-    ...(activeStep === "create" ? [{ label: "New design" }] : []),
+    ...(activeStep === "create" ? [{ label: "New Design" }] : []),
     ...((activeStep === "details" || activeStep === "edit") && selectedDesign
       ? [{ label: selectedDesign.name }]
       : []),
@@ -438,7 +438,7 @@ export function AdminHouseDesignManager() {
                   type="button"
                   onClick={() => handleStatusChange("Archived")}
                 >
-                  Confirm archive
+                  Confirm Archive
                 </Button>
               </div>
             ) : (
@@ -455,7 +455,7 @@ export function AdminHouseDesignManager() {
                       className="mr-2 h-4 w-4"
                       aria-hidden="true"
                     />
-                    Restore as draft
+                    Restore as Draft
                   </Button>
                 ) : null}
 

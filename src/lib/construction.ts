@@ -23,9 +23,9 @@ export function estimateTotals(lines: Pick<EstimateLineItemInput, "quantity" | "
 
 const defaultStages: Omit<MilestoneTemplate, "targetDate">[] = [
   { label: "Downpayment / Mobilization", percentage: 30, description: "Due on acceptance. Covers permits, mobilization, and first materials. Construction starts after this is verified." },
-  { label: "Structural works", percentage: 30, description: "Billed when the foundation, columns, beams, and slabs are complete." },
-  { label: "Roofing, masonry & rough-ins", percentage: 30, description: "Billed when the roof, walls, and plumbing/electrical rough-ins are complete." },
-  { label: "Completion & turnover", percentage: 10, description: "Billed after final inspection, punch-list, and handover of the house." },
+  { label: "Structural Works", percentage: 30, description: "Billed when the foundation, columns, beams, and slabs are complete." },
+  { label: "Roofing, Masonry & Rough-Ins", percentage: 30, description: "Billed when the roof, walls, and plumbing/electrical rough-ins are complete." },
+  { label: "Completion & Turnover", percentage: 10, description: "Billed after final inspection, punch-list, and handover of the house." },
 ];
 
 function addDays(date: string, days: number) {

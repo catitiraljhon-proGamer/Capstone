@@ -243,7 +243,7 @@ export function SignInPage({
                       onClick={onResetPassword}
                       className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
                     >
-                      Reset password
+                      Reset Password
                     </button>
                   ) : null}
                 </div>
@@ -256,7 +256,7 @@ export function SignInPage({
                   {isSubmitting
                     ? "Signing in…"
                     : googleLinkEmail
-                      ? "Connect Google and sign in"
+                      ? "Connect Google and Sign In"
                       : "Sign In"}
                 </button>
 

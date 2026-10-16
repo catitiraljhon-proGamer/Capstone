@@ -183,7 +183,7 @@ export function RegisterAccountPage({
               Client registration
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-              Create your client account
+              Create Your Client Account
             </h1>
             <p className="mt-3 text-sm leading-6 text-stone-600">
               Register to request estimates and follow your construction project
@@ -231,7 +231,7 @@ export function RegisterAccountPage({
                 htmlFor="name"
                 className="text-sm font-medium text-stone-700"
               >
-                Full name <RequiredIndicator />
+                Full Name <RequiredIndicator />
               </label>
               <input
                 id="name"
@@ -253,7 +253,7 @@ export function RegisterAccountPage({
                 htmlFor="email"
                 className="text-sm font-medium text-stone-700"
               >
-                Email address <RequiredIndicator />
+                Email Address <RequiredIndicator />
               </label>
               <div className="flex gap-2">
                 <input
@@ -287,8 +287,8 @@ export function RegisterAccountPage({
                     : codeMatchesEmail
                       ? resendIn > 0
                         ? `Resend in ${resendIn}s`
-                        : "Resend code"
-                      : "Send code"}
+                        : "Resend Code"
+                      : "Send Code"}
                 </button>
               </div>
               <p id="email-hint" className="text-xs text-stone-500">
@@ -308,7 +308,7 @@ export function RegisterAccountPage({
                   </span>
                 </p>
                 <label htmlFor="verificationCode" className="block text-sm font-medium text-stone-700">
-                  Verification code <RequiredIndicator />
+                  Verification Code <RequiredIndicator />
                 </label>
                 <input
                   ref={codeRef}
@@ -335,7 +335,7 @@ export function RegisterAccountPage({
 
             <div className="space-y-2">
               <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
-                Contact number <RequiredIndicator />
+                Contact Number <RequiredIndicator />
               </label>
               <ContactNumberInput
                 id="contactNumber"
@@ -414,7 +414,7 @@ export function RegisterAccountPage({
                   htmlFor="confirmPassword"
                   className="text-sm font-medium text-stone-700"
                 >
-                  Confirm password <RequiredIndicator />
+                  Confirm Password <RequiredIndicator />
                 </label>
                 <input
                   id="confirmPassword"
@@ -481,7 +481,7 @@ export function RegisterAccountPage({
               <HardHat className="h-6 w-6" />
             </span>
             <h2 className="mt-7 text-2xl font-semibold tracking-tight">
-              Your project information in one place
+              Your Project Information in One Place
             </h2>
             <p className="mt-3 text-sm leading-6 text-red-100">
               Your account connects estimates, design requests, project

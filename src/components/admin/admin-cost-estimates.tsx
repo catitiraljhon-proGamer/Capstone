@@ -84,7 +84,7 @@ export function AdminCostEstimates({ initialEstimateId }: { initialEstimateId: s
       <div className="min-w-0 space-y-5">
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <Button type="button" variant="ghost" size="sm" className="-ml-3 mb-2" onClick={() => open(null)}>
-            <ArrowLeft className="mr-1.5 h-4 w-4" /> All estimates
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> All Estimates
           </Button>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -139,12 +139,12 @@ export function AdminCostEstimates({ initialEstimateId }: { initialEstimateId: s
       ) : visible.length > 0 ? (
         <div className="-mx-5 mt-5 overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse">
-            <caption className="sr-only">Cost estimates</caption>
+            <caption className="sr-only">Cost Estimates</caption>
             <thead className="border-y border-stone-200 bg-stone-50">
               <tr>
-                <th className={head}>Reference / customer</th>
+                <th className={head}>Reference / Customer</th>
                 <th className={head}>Design</th>
-                <th className={head}>Preferred start</th>
+                <th className={head}>Preferred Start</th>
                 <th className={head}>Needed by</th>
                 <th className={`${head} text-right`}>Total</th>
                 <th className={head}>Status</th>

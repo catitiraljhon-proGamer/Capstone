@@ -335,10 +335,10 @@ export function AdminUsersRolesManager() {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {[
-          { label: "Total accounts", value: summary.total, icon: Users },
+          { label: "Total Accounts", value: summary.total, icon: Users },
           { label: "Active", value: summary.active, icon: UserCheck },
           { label: "Customers", value: summary.customers, icon: UserRound },
-          { label: "Staff access", value: summary.staff, icon: ShieldCheck },
+          { label: "Staff Access", value: summary.staff, icon: ShieldCheck },
           { label: "Disabled", value: summary.disabled, icon: UserRoundX },
         ].map((item) => (
           <section
@@ -382,10 +382,10 @@ export function AdminUsersRolesManager() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                {editingUser ? "Account settings" : "New access"}
+                {editingUser ? "Account Settings" : "New Access"}
               </p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                {editingUser ? `Edit ${editingUser.name}` : "Create user account"}
+                {editingUser ? `Edit ${editingUser.name}` : "Create User Account"}
               </h2>
               <p className="mt-1 text-sm text-stone-600">
                 {editingUser
@@ -414,7 +414,7 @@ export function AdminUsersRolesManager() {
             className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5"
           >
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-              Full name
+              Full Name
               <input
                 required
                 minLength={2}
@@ -430,7 +430,7 @@ export function AdminUsersRolesManager() {
             </label>
 
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-              Email address
+              Email Address
               <input
                 required
                 type="email"
@@ -464,7 +464,7 @@ export function AdminUsersRolesManager() {
             </label>
 
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-              {editingUser ? "New temporary password (optional)" : "Temporary password"}
+              {editingUser ? "New Temporary Password (optional)" : "Temporary Password"}
               <span className="relative block">
                 <KeyRound className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-stone-400" />
                 <input
@@ -488,7 +488,7 @@ export function AdminUsersRolesManager() {
             </label>
 
             <label className="text-sm font-medium text-stone-700">
-              Account status
+              Account Status
               <select
                 value={form.status}
                 disabled={isEditingCurrentUser}
@@ -514,7 +514,7 @@ export function AdminUsersRolesManager() {
                 ) : (
                   <UserPlus className="mr-2 h-4 w-4" />
                 )}
-                {isSaving ? "Saving…" : editingUser ? "Save changes" : "Create account"}
+                {isSaving ? "Saving…" : editingUser ? "Save Changes" : "Create Account"}
               </Button>
               <Button type="button" variant="outline" onClick={closeForm} disabled={isSaving}>
                 Cancel
@@ -567,7 +567,7 @@ export function AdminUsersRolesManager() {
       <section id="user-directory" className="scroll-mt-28 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-stone-200 p-5 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">User directory</h2>
+            <h2 className="text-lg font-semibold tracking-tight">User Directory</h2>
             <p className="mt-1 text-sm text-stone-600">
               Search accounts, review access, and disable access without removing account history.
             </p>
@@ -584,7 +584,7 @@ export function AdminUsersRolesManager() {
             </Button>
             <Button type="button" onClick={openCreateForm}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Add user
+              Add User
             </Button>
           </div>
         </div>
@@ -614,7 +614,7 @@ export function AdminUsersRolesManager() {
               }}
               className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
             >
-              <option value="all">All roles</option>
+              <option value="all">All Roles</option>
               <option value="customer">Customer</option>
               <option value="billing-clerk">Billing Clerk</option>
               <option value="admin">Admin</option>
@@ -630,7 +630,7 @@ export function AdminUsersRolesManager() {
               }}
               className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
             >
-              <option value="all">All statuses</option>
+              <option value="all">All Statuses</option>
               <option value="active">Active</option>
               <option value="disabled">Disabled</option>
             </select>
@@ -748,7 +748,7 @@ export function AdminUsersRolesManager() {
         ) : (
           <div className="p-12 text-center">
             <Users className="mx-auto h-9 w-9 text-stone-300" />
-            <p className="mt-3 font-semibold">No matching accounts</p>
+            <p className="mt-3 font-semibold">No Matching Accounts</p>
             <p className="mt-1 text-sm text-stone-500">
               Try a different search or filter selection.
             </p>

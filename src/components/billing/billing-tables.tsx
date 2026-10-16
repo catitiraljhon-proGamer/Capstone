@@ -17,7 +17,7 @@ export function GatewayPills({ payment }: { payment: BillingPayment }) {
   if (!gateway) return null;
   return <span className="mt-1.5 flex flex-wrap gap-1">
     <span className="inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">Online · PayMongo ({paymongoMethodLabels[gateway.method] ?? gateway.method})</span>
-    {!gateway.livemode && <span className="inline-flex rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-inset ring-stone-200">Test mode</span>}
+    {!gateway.livemode && <span className="inline-flex rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-inset ring-stone-200">Test Mode</span>}
   </span>;
 }
 
@@ -33,8 +33,8 @@ export function InvoiceTable({ invoices, milestoneLabels, onView }: { invoices: 
   const [requestedPage, setPage] = useState(0);
   const page = Math.min(requestedPage, Math.max(0, Math.ceil(invoices.length / 10) - 1));
   if (!invoices.length) return <BillingEmpty />;
-  return <><div className="-mx-5 overflow-x-auto"><table className="w-full min-w-[780px] border-collapse"><caption className="sr-only">Billing and invoice records</caption>
-    <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Invoice / customer", "Billing stage", "Amount / paid", "Balance", "Due / status", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
+  return <><div className="-mx-5 overflow-x-auto"><table className="w-full min-w-[780px] border-collapse"><caption className="sr-only">Billing and Invoice Records</caption>
+    <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Invoice / Customer", "Billing Stage", "Amount / Paid", "Balance", "Due / Status", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
     <tbody className="divide-y divide-stone-100">{invoices.slice(page * 10, page * 10 + 10).map((invoice) => <tr key={invoice.id} className="hover:bg-rose-50/30">
       <td className={cell}><p className="font-semibold">{invoice.invoiceNumber}</p><p className="mt-1 text-stone-600">{invoice.customerName}</p></td>
       <td className={cell}><p className="max-w-56 break-words font-medium">{invoice.label}</p>{invoice.milestoneId && milestoneLabels?.[invoice.milestoneId] && <p className="mt-1 max-w-56 text-xs font-medium text-red-700">Milestone: {milestoneLabels[invoice.milestoneId]}</p>}<p className="mt-1 max-w-56 text-xs text-stone-500">{invoice.projectName}</p></td>
@@ -50,8 +50,8 @@ export function PaymentTable({ payments, customer, onView }: { payments: Billing
   const [requestedPage, setPage] = useState(0);
   const page = Math.min(requestedPage, Math.max(0, Math.ceil(payments.length / 10) - 1));
   if (!payments.length) return <BillingEmpty />;
-  return <><div className="-mx-5 overflow-x-auto"><table className="w-full min-w-[820px] border-collapse"><caption className="sr-only">Payments and receipts</caption>
-    <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Payment / invoice", "Customer / method", "Amount", "Date / status", "Receipt", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
+  return <><div className="-mx-5 overflow-x-auto"><table className="w-full min-w-[820px] border-collapse"><caption className="sr-only">Payments and Receipts</caption>
+    <thead className="border-y border-stone-200 bg-stone-50"><tr>{["Payment / Invoice", "Customer / Method", "Amount", "Date / Status", "Receipt", ""].map((label, index) => <th scope="col" key={index} className={head}>{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
     <tbody className="divide-y divide-stone-100">{payments.slice(page * 10, page * 10 + 10).map((payment) => <tr key={payment.id} className="hover:bg-rose-50/30">
       <td className={cell}><p className="font-semibold">{payment.reference}</p><p className="mt-1 text-xs text-stone-500">{payment.invoiceNumber}</p></td>
       <td className={cell}><p>{payment.customerName}</p><p className="mt-1 text-xs text-stone-500">{payment.method}</p><GatewayPills payment={payment} /></td>

@@ -107,7 +107,7 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{revision ? "Revision" : "Design production"}</p>
-      <h3 className="mt-1 font-semibold">{revision ? "Upload the revised design and floor plan" : "Upload the design and floor plan"}</h3>
+      <h3 className="mt-1 font-semibold">{revision ? "Upload the Revised Design and Floor Plan" : "Upload the Design and Floor Plan"}</h3>
       <p className="mt-1 text-sm leading-6 text-stone-600">
         The customer sees these right away as a watermarked preview and can approve them or request changes. Nothing is billed at this stage.
       </p>
@@ -129,7 +129,7 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
           <label className="grid min-h-32 cursor-pointer place-items-center rounded-lg border border-dashed border-rose-300 bg-white p-4 text-center hover:bg-rose-50">
             <span>
               <ImagePlus className="mx-auto h-7 w-7 text-red-700" />
-              <span className="mt-2 block text-sm font-semibold">{images.length ? "Add more images" : "Select design and floor plan images"}</span>
+              <span className="mt-2 block text-sm font-semibold">{images.length ? "Add More Images" : "Select Design and Floor Plan Images"}</span>
               <span className="mt-1 block text-xs text-stone-500">Up to 6 · JPG, PNG, or WebP · 750 KB each, 3 MB total</span>
             </span>
             <input type="file" multiple accept={embeddedImageAccept} disabled={busy} onChange={(event) => void addImages(event)} className="sr-only" />
@@ -137,7 +137,7 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
         )}
       </div>
       <label className="mt-4 block text-sm font-semibold text-stone-700">
-        Note to the customer <span className="font-normal text-stone-500">(optional)</span>
+        Note to the Customer <span className="font-normal text-stone-500">(optional)</span>
         <textarea rows={3} maxLength={1_000} value={note} disabled={busy} onChange={(event) => setNote(event.target.value)}
           placeholder={revision ? "Explain what changed in this version." : "Describe the design and floor plan."}
           className="mt-2 w-full resize-y rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15" />
@@ -145,7 +145,7 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
       <div className="mt-3 flex justify-end">
         <Button type="button" disabled={busy || !images.length} onClick={() => void send()}>
           {busy ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-          {busy ? "Sending…" : "Send to customer for review"}
+          {busy ? "Sending…" : "Send to Customer for Review"}
         </Button>
       </div>
     </div>
@@ -212,7 +212,7 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
   return (
     <div className="rounded-xl border border-stone-200 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Blueprint</p>
-      <h3 className="mt-1 font-semibold">Blueprint files</h3>
+      <h3 className="mt-1 font-semibold">Blueprint Files</h3>
       <p className="mt-1 text-sm leading-6 text-stone-600">
         {estimateText} Upload every blueprint file, then submit the blueprint so the Billing Clerk can bill its fee. The customer downloads these only after full payment is verified.
       </p>
@@ -252,12 +252,12 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <label className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold hover:bg-stone-100 ${busy ? "pointer-events-none opacity-60" : ""}`}>
               {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-              {busy ? "Working…" : "Add blueprint file"}
+              {busy ? "Working…" : "Add Blueprint File"}
               <input type="file" accept={blueprintAccept} disabled={busy} onChange={(event) => void upload(event)} className="sr-only" />
             </label>
             {workflow.blueprintFiles.length > 0 && (
               <Button type="button" disabled={busy || !estimateAccepted} onClick={() => void submit()}>
-                <Send className="mr-2 h-4 w-4" />Submit blueprint to Billing Clerk
+                <Send className="mr-2 h-4 w-4" />Submit Blueprint to Billing Clerk
               </Button>
             )}
           </div>
@@ -318,7 +318,7 @@ export function AdminDesignWorkflow({ designRequestId, onNotice }: { designReque
       {workflow.status === "Design approved" && <BlueprintFiles workflow={workflow} onChanged={changed} />}
       {workflow.versions.length > 0 && (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Review history</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Review History</p>
           <ol className="mt-2 space-y-3">{[...workflow.versions].reverse().map((version) => <VersionCard key={version.version} designId={workflow.id} version={version} />)}</ol>
         </div>
       )}

@@ -351,7 +351,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
           <div role="status" className="mt-4 flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
             <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
             <div>
-              <p className="font-semibold text-red-900">Request limit reached</p>
+              <p className="font-semibold text-red-900">Request Limit Reached</p>
               <p className="mt-1 leading-6 text-stone-700">{designRequestLimitMessage}</p>
             </div>
           </div>
@@ -374,13 +374,13 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
               {selectionUnavailable ? (
                 <div role="alert">
                   <p className="text-sm text-red-700">{catalogError ?? "This design is no longer available. Please choose another published design."}</p>
-                  <Link href="/customer/finished-designs" className="mt-2 inline-block text-sm font-semibold text-red-700 underline">Choose another design</Link>
+                  <Link href="/customer/finished-designs" className="mt-2 inline-block text-sm font-semibold text-red-700 underline">Choose Another Design</Link>
                 </div>
               ) : selectedDesign ? (
                 <div className="flex flex-col gap-4 sm:flex-row">
                   {selectedDesign.images[0] ? <div className="relative h-28 w-full shrink-0 overflow-hidden rounded-lg sm:w-40"><Image src={selectedDesign.images[0]} alt={selectedDesign.name} fill unoptimized className="object-cover" /></div> : null}
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected design</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Design</p>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType} · {selectedDesign.area} sqm · {selectedDesign.finish}</p>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
@@ -547,7 +547,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
           <div className="mt-5 outline-none" id={fieldIds.images} tabIndex={-1}>
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold">{hasDesignSelection ? "Additional reference images (optional)" : "House inspiration images"}</p>
+                <p className="text-sm font-semibold">{hasDesignSelection ? "Additional Reference Images (optional)" : "House Inspiration Images"}</p>
                 <p className="mt-1 text-xs text-stone-500">
                   {hasDesignSelection ? "Up to 6 optional images; your selected design is already included." : "1–6 images"} · JPG, PNG, or WebP · maximum 750 KB each
                 </p>
@@ -558,7 +558,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                   onClick={() => setInspirationImages([])}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:text-red-900"
                 >
-                  <X className="h-4 w-4" /> Clear all
+                  <X className="h-4 w-4" /> Clear All
                 </button>
               ) : null}
             </div>
@@ -595,7 +595,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                   <label className="grid min-h-36 cursor-pointer place-items-center rounded-lg border border-dashed border-stone-300 bg-stone-50 p-4 text-center hover:border-red-300 hover:bg-red-50/40">
                     <span>
                       <ImagePlus className="mx-auto h-7 w-7 text-red-700" />
-                      <span className="mt-2 block text-xs font-semibold">Add more images</span>
+                      <span className="mt-2 block text-xs font-semibold">Add More Images</span>
                     </span>
                     <input
                       type="file"
@@ -612,7 +612,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                 <span>
                   <ImagePlus className="mx-auto h-9 w-9 text-red-700" />
                   <span className="mt-3 block text-sm font-semibold">
-                    {isReadingImage ? "Reading images…" : hasDesignSelection ? "Add reference images (optional)" : "Upload inspiration images"}
+                    {isReadingImage ? "Reading images…" : hasDesignSelection ? "Add Reference Images (optional)" : "Upload Inspiration Images"}
                   </span>
                   <span className="mt-1 block text-xs text-stone-500">
                     {hasDesignSelection ? "Add images only if you want to explain a change." : "Choose a photo that represents the house you want."}

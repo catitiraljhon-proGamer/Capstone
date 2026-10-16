@@ -226,7 +226,7 @@ export function NotificationBell() {
               <div className="p-8 text-center">
                 <Bell className="mx-auto h-6 w-6 text-stone-300" />
                 <p className="mt-2 text-sm font-semibold text-stone-700">
-                  No notifications yet
+                  No Notifications Yet
                 </p>
                 <p className="mt-1 text-xs leading-5 text-stone-500">
                   Project, billing, and system updates will appear here.

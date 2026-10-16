@@ -145,7 +145,7 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
       <div className="flex items-start gap-3">
         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-rose-50 text-red-700"><HardHat className="h-6 w-6" /></div>
         <div className="min-w-0">
-          <Eyebrow>Construction request</Eyebrow>
+          <Eyebrow>Construction Request</Eyebrow>
           <h2 className="mt-1 text-xl font-semibold tracking-tight">Build {designTitle(design)}</h2>
           <p className="mt-2 text-sm leading-6 text-stone-600">
             Tell us where and when you want to build. G4 Builders will prepare an itemized cost estimate with a payment schedule for you to review. Nothing is charged until you accept it.
@@ -155,7 +155,7 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
 
       {showDesignFacts && <dl className="mt-5 grid gap-3 rounded-lg bg-stone-50 p-4 text-sm sm:grid-cols-3">
         <div><dt className="text-xs text-stone-500">Design</dt><dd className="mt-1 font-semibold">{designTitle(design)}</dd></div>
-        <div><dt className="text-xs text-stone-500">Floor area</dt><dd className="mt-1 font-semibold">{design.floorArea} sqm</dd></div>
+        <div><dt className="text-xs text-stone-500">Floor Area</dt><dd className="mt-1 font-semibold">{design.floorArea} sqm</dd></div>
         <div><dt className="text-xs text-stone-500">Finish</dt><dd className="mt-1 font-semibold">{design.finish}</dd></div>
       </dl>}
 
@@ -214,7 +214,7 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
         <BillingErrorMessage message={error} />
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" className="min-h-11" disabled={saving} onClick={onCancel}>Cancel</Button>
-          <Button type="submit" className="min-h-11" disabled={saving}>{saving ? "Sending request…" : "Send construction request"}</Button>
+          <Button type="submit" className="min-h-11" disabled={saving}>{saving ? "Sending request…" : "Send Construction Request"}</Button>
         </div>
       </form>
     </BillingPanel>

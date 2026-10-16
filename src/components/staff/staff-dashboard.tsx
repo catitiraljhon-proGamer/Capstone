@@ -323,7 +323,7 @@ function AdminDashboardOverview() {
           value={summary.activeProjects}
           note={
             summary.activeProjects === 0
-              ? "No active projects yet"
+              ? "No Active Projects Yet"
               : `${summary.activeProjects} active projects`
           }
           href="/admin/projects"
@@ -334,7 +334,7 @@ function AdminDashboardOverview() {
           value={summary.pendingApprovals}
           note={
             summary.pendingApprovals === 0
-              ? "No pending approvals"
+              ? "No Pending Approvals"
               : `${summary.pendingApprovals} records waiting for review`
           }
           href="/admin/approvals"
@@ -346,8 +346,8 @@ function AdminDashboardOverview() {
           value={summary.totalClients}
           note={
             summary.totalClients === 0
-              ? "No registered clients yet"
-              : "Registered clients"
+              ? "No Registered Clients Yet"
+              : "Registered Clients"
           }
           href="/admin/clients"
           icon={Users}

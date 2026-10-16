@@ -27,7 +27,7 @@ export function ClientProfileForm() {
   const { client, setClient, error, loading, retry } = useClientProfile();
   const [saved, setSaved] = useState(false);
   if (loading) return <p role="status" className="text-sm text-stone-500">Loading client information…</p>;
-  if (error || !client) return <div role="alert" className="space-y-3 text-sm text-red-700"><p>{error || "Client information could not be loaded."}</p><button onClick={retry} className="min-h-11 font-semibold underline">Try again</button></div>;
+  if (error || !client) return <div role="alert" className="space-y-3 text-sm text-red-700"><p>{error || "Client information could not be loaded."}</p><button onClick={retry} className="min-h-11 font-semibold underline">Try Again</button></div>;
   return <div className="space-y-5">
     {saved && <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm">Your client information has been saved.</p>}
     <ClientInformationForm key={`${client.id}:${client.updatedAt}`} client={client} onSave={async (input) => {
@@ -44,7 +44,7 @@ export function ClientInformationReminder() {
   const { client } = useClientProfile();
   if (!client || client.profileComplete) return null;
   return <section className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-    <div><h2 className="font-semibold text-stone-950">Complete your client information</h2><p className="mt-1 text-sm leading-6 text-stone-600">Add your contact number and address so the G4 Builders team can coordinate your project.</p></div>
-    <Link href="/customer/complete-profile" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Complete my profile</Link>
+    <div><h2 className="font-semibold text-stone-950">Complete Your Client Information</h2><p className="mt-1 text-sm leading-6 text-stone-600">Add your contact number and address so the G4 Builders team can coordinate your project.</p></div>
+    <Link href="/customer/complete-profile" className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Complete My Profile</Link>
   </section>;
 }

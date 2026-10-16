@@ -79,8 +79,8 @@ export function AdminClientManager() {
 
   return <div className="space-y-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div><h1 className="text-xl font-semibold tracking-tight">{creating ? "Add client" : "Client records"}</h1><p className="mt-1 text-sm leading-6 text-stone-600">Personal and contact details for registered clients. Clients update their own information in My Profile.</p></div>
-      {!creating && <button type="button" disabled={savingId !== null} onClick={() => { setCreating(true); setSuccess(""); setConfirmingArchiveId(null); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"><Plus className="h-4 w-4" />Add client</button>}
+      <div><h1 className="text-xl font-semibold tracking-tight">{creating ? "Add Client" : "Client Records"}</h1><p className="mt-1 text-sm leading-6 text-stone-600">Personal and contact details for registered clients. Clients update their own information in My Profile.</p></div>
+      {!creating && <button type="button" disabled={savingId !== null} onClick={() => { setCreating(true); setSuccess(""); setConfirmingArchiveId(null); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50"><Plus className="h-4 w-4" />Add Client</button>}
     </div>
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-white p-4 text-sm">{success}</p>}
     {creating ? <section className="max-w-3xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6">
@@ -116,14 +116,14 @@ export function AdminClientManager() {
       </form>
       {error && <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
       {loading ? <p role="status" className="text-sm text-stone-500">Loading clients…</p> : payload.clients.length === 0 ?
-        !error && <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center"><Users className="mx-auto h-8 w-8 text-stone-400" /><h2 className="mt-3 font-semibold">{query ? "No matching clients" : view === "archived" ? "No archived clients" : "No clients yet"}</h2><p className="mt-2 text-sm text-stone-600">{query ? "Try a different name or contact detail." : view === "archived" ? "Clients you archive will appear here and can be unarchived anytime." : "Add a client or have them register for an account."}</p></div> :
+        !error && <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center"><Users className="mx-auto h-8 w-8 text-stone-400" /><h2 className="mt-3 font-semibold">{query ? "No Matching Clients" : view === "archived" ? "No Archived Clients" : "No Clients Yet"}</h2><p className="mt-2 text-sm text-stone-600">{query ? "Try a different name or contact detail." : view === "archived" ? "Clients you archive will appear here and can be unarchived anytime." : "Add a client or have them register for an account."}</p></div> :
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {payload.clients.map((client) => <article key={client.id} className="min-w-0 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2><span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.archivedAt ? "Archived" : client.status === "active" ? "Active" : "Disabled"}</span></div>
             <p className="mt-1 text-sm break-all text-stone-500">{client.email}</p>
             <dl className="mt-5 space-y-3 text-sm">
-              <div><dt className="text-xs text-stone-500">Contact number</dt><dd className="mt-1 break-words">{client.contactNumber || "Not provided"}</dd></div>
-              <div><dt className="text-xs text-stone-500">Complete address</dt><dd className="mt-1 whitespace-pre-wrap break-words">{client.address || "Not provided"}</dd></div>
+              <div><dt className="text-xs text-stone-500">Contact Number</dt><dd className="mt-1 break-words">{client.contactNumber || "Not provided"}</dd></div>
+              <div><dt className="text-xs text-stone-500">Complete Address</dt><dd className="mt-1 whitespace-pre-wrap break-words">{client.address || "Not provided"}</dd></div>
               <div><dt className="text-xs text-stone-500">Occupation</dt><dd className="mt-1 break-words">{client.occupation || "Not provided"}</dd></div>
             </dl>
             {!client.profileComplete && <p className="mt-4 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">Client information is incomplete.</p>}
@@ -144,7 +144,7 @@ export function AdminClientManager() {
                 <p className="text-sm text-stone-700">Archive {client.name}? You can unarchive this client from Archived.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button type="button" disabled={savingId !== null} onClick={() => void changeArchiveStatus(client, true)} className="min-h-11 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 disabled:opacity-50">
-                    {savingId === client.id ? "Archiving…" : "Confirm archive"}
+                    {savingId === client.id ? "Archiving…" : "Confirm Archive"}
                   </button>
                   <button type="button" disabled={savingId !== null} onClick={() => setConfirmingArchiveId(null)} className={actionClass}>Cancel</button>
                 </div>

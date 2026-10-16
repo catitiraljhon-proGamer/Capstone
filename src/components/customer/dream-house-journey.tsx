@@ -2,8 +2,8 @@ import { Check } from "lucide-react";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
 
-const blueprintSteps = ["Design request", "Design review", "Design approved", "Cost estimate", "Blueprint paid", "Downpayment", "Construction"] as const;
-const legacySteps = ["Design request", "Design delivered", "Design fee paid", "Construction estimate", "Downpayment", "Construction"] as const;
+const blueprintSteps = ["Design Request", "Design Review", "Design Approved", "Cost Estimate", "Blueprint Paid", "Downpayment", "Construction"] as const;
+const legacySteps = ["Design Request", "Design Delivered", "Design Fee Paid", "Construction Estimate", "Downpayment", "Construction"] as const;
 
 export function journeySteps(design: DesignRequestDto): readonly string[] {
   return design.workflow === "blueprint" ? blueprintSteps : legacySteps;
@@ -66,7 +66,7 @@ export function journeyStageText(design: DesignRequestDto, estimate?: CostEstima
     if (project) return project.status === "Awaiting downpayment" ? "Awaiting downpayment" : `Project ${project.status.toLowerCase()}`;
     return "Blueprint paid";
   }
-  if (design.access === "awaiting-invoice") return "Design ready · Awaiting fee invoice";
+  if (design.access === "awaiting-invoice") return "Design Ready · Awaiting Fee Invoice";
   if (design.access === "payment-required") return design.invoice?.pending ? "Design fee payment under verification" : "Design fee payment required";
   if (design.access !== "unlocked") return designStatusText[design.status];
   if (project) return project.status === "Awaiting downpayment" ? "Awaiting downpayment" : project.status === "Pending" ? "Project in progress" : `Project ${project.status.toLowerCase()}`;

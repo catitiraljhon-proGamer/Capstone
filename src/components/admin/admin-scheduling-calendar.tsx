@@ -346,21 +346,21 @@ export function AdminSchedulingCalendar() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {[
           {
-            label: "Events this month",
+            label: "Events This Month",
             value: currentMonthSchedules.length,
             icon: CalendarDays,
           },
-          { label: "Scheduled meetings", value: scheduledMeetings, icon: Users },
-          { label: "Completed meetings", value: completedMeetings, icon: CalendarDays },
-          { label: "Cancelled meetings", value: cancelledMeetings, icon: Clock3 },
+          { label: "Scheduled Meetings", value: scheduledMeetings, icon: Users },
+          { label: "Completed Meetings", value: completedMeetings, icon: CalendarDays },
+          { label: "Cancelled Meetings", value: cancelledMeetings, icon: Clock3 },
           {
-            label: "Customer payments due this month",
+            label: "Customer Payments Due This Month",
             value: unpaidMonthDues.length,
             note: `${formatPeso(unpaidMonthDues.reduce((sum, due) => sum + due.balance, 0))} outstanding`,
             icon: Banknote,
           },
           {
-            label: "Overdue customer payments",
+            label: "Overdue Customer Payments",
             value: overdueDues.length,
             note: overdueDues.length ? `${formatPeso(overdueDues.reduce((sum, due) => sum + due.balance, 0))} past due` : "None past due",
             icon: AlertTriangle,
@@ -404,7 +404,7 @@ export function AdminSchedulingCalendar() {
         <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold tracking-tight">New schedule</h2>
+              <h2 className="text-lg font-semibold tracking-tight">New Schedule</h2>
               <p className="mt-1 text-sm text-stone-600">
                 Arrange a client meeting and record its agenda.
               </p>
@@ -421,7 +421,7 @@ export function AdminSchedulingCalendar() {
 
           <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-              Schedule title
+              Schedule Title
               <input
                 required
                 value={form.title}
@@ -432,7 +432,7 @@ export function AdminSchedulingCalendar() {
             </label>
 
             <label className="text-sm font-medium text-stone-700">
-              Schedule type
+              Schedule Type
               <select
                 value={form.eventType}
                 onChange={(event) => {
@@ -475,7 +475,7 @@ export function AdminSchedulingCalendar() {
                 onChange={(event) => setForm({ ...form, projectId: event.target.value })}
                 className={fieldClass}
               >
-                <option value="">No linked project</option>
+                <option value="">No Linked Project</option>
                 {clientProjects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.reference} · {project.name}
@@ -485,7 +485,7 @@ export function AdminSchedulingCalendar() {
             </label>
 
             <label className="text-sm font-medium text-stone-700">
-              Date and time
+              Date and Time
               <input
                 required
                 type="datetime-local"
@@ -524,7 +524,7 @@ export function AdminSchedulingCalendar() {
             </label>
 
             <label className="text-sm font-medium text-stone-700">
-              Schedule status
+              Schedule Status
               <select
                 value={form.status}
                 onChange={(event) =>
@@ -554,7 +554,7 @@ export function AdminSchedulingCalendar() {
                 Cancel
               </Button>
               <Button type="submit" disabled={isSaving || clients.length === 0}>
-                {isSaving ? "Saving…" : "Add to calendar"}
+                {isSaving ? "Saving…" : "Add to Calendar"}
               </Button>
             </div>
           </form>
@@ -599,7 +599,7 @@ export function AdminSchedulingCalendar() {
               </Button>
               <Button type="button" onClick={openForm}>
                 <Plus className="mr-2 h-4 w-4" />
-                New schedule
+                New Schedule
               </Button>
             </div>
           </div>
@@ -698,7 +698,7 @@ export function AdminSchedulingCalendar() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                Selected day
+                Selected Day
               </p>
               <h2 className="mt-1 text-lg font-semibold tracking-tight">
                 {new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-PH", {
@@ -716,7 +716,7 @@ export function AdminSchedulingCalendar() {
 
           {selectedDues.length > 0 ? (
             <div className="mt-5 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Customer payments due</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Customer Payments Due</p>
               {selectedDues.map((due) => (
                 <article key={due.id} className={`rounded-xl border p-4 ${paymentDueClass[due.status]}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
@@ -786,7 +786,7 @@ export function AdminSchedulingCalendar() {
 
                   <div className="mt-4 grid gap-3 border-t border-stone-200 pt-4">
                     <label className="text-xs font-semibold text-stone-600">
-                      Schedule status
+                      Schedule Status
                       <select
                         value={schedule.status}
                         disabled={updatingId === schedule.id}
@@ -809,12 +809,12 @@ export function AdminSchedulingCalendar() {
           ) : selectedDues.length > 0 ? null : (
             <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-6 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
-              <p className="mt-3 text-sm font-medium text-stone-700">No schedules for this day</p>
+              <p className="mt-3 text-sm font-medium text-stone-700">No Schedules for This Day</p>
               <p className="mt-1 text-xs leading-5 text-stone-500">
                 Add a client meeting to this date.
               </p>
               <Button type="button" size="sm" className="mt-4" onClick={openForm}>
-                Add schedule
+                Add Schedule
               </Button>
             </div>
           )}

@@ -113,7 +113,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 
 function DetailsCard({ estimate }: { estimate: CostEstimateDto }) {
   return (
-    <Card title="Request details">
+    <Card title="Request Details">
       {estimate.revisionNote ? (
         <div role="note" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-stone-800">
           <p className="font-semibold text-red-800">Customer requested a revision</p>
@@ -133,10 +133,10 @@ function DetailsCard({ estimate }: { estimate: CostEstimateDto }) {
             </span>
           ) : null}
         </Detail>
-        <Detail label="Preferred start date">{formatEstimateDate(estimate.preferredStartDate)}</Detail>
+        <Detail label="Preferred Start Date">{formatEstimateDate(estimate.preferredStartDate)}</Detail>
         <Detail label="Needed by">{formatEstimateDate(estimate.neededBy)}</Detail>
-        <Detail label="Site address">{estimate.siteAddress || "—"}</Detail>
-        <Detail label="Customer notes">
+        <Detail label="Site Address">{estimate.siteAddress || "—"}</Detail>
+        <Detail label="Customer Notes">
           <span className="whitespace-pre-wrap">{estimate.customerNotes || "—"}</span>
         </Detail>
       </dl>
@@ -149,7 +149,7 @@ function TotalsBox({ total }: { total: number }) {
   return (
     <dl className="ml-auto mt-4 w-full max-w-sm text-sm">
       <div className="flex justify-between gap-4 border-t border-stone-200 pt-3 text-base">
-        <dt className="font-semibold">Contract total</dt>
+        <dt className="font-semibold">Contract Total</dt>
         <dd className="font-semibold tabular-nums text-red-700">{formatPeso(total)}</dd>
       </div>
     </dl>
@@ -168,7 +168,7 @@ function SchedulePreview({ total, template, downpaymentPercent }: { total: numbe
   if (!rows) return null;
   return (
     <div className="mt-4 min-w-0">
-      <p className="text-sm font-semibold">Payment preview</p>
+      <p className="text-sm font-semibold">Payment Preview</p>
       <div className="mt-2 overflow-x-auto rounded-lg border border-stone-200">
         <table className="w-full min-w-[560px] border-collapse text-sm">
           <thead className="bg-stone-50">
@@ -176,7 +176,7 @@ function SchedulePreview({ total, template, downpaymentPercent }: { total: numbe
               <th className={headClass}>Milestone</th>
               <th className={`${headClass} text-right`}>%</th>
               <th className={`${headClass} text-right`}>Amount</th>
-              <th className={headClass}>Target date</th>
+              <th className={headClass}>Target Date</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
@@ -203,12 +203,12 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
     <div className="space-y-5">
       <DetailsCard estimate={estimate} />
 
-      <Card title="Scope of works">
+      <Card title="Scope of Works">
         <div className="-mx-5 overflow-x-auto px-5">
           <table className="w-full min-w-[420px] border-collapse text-sm">
             <thead className="border-y border-stone-200 bg-stone-50">
               <tr>
-                <th className={headClass}>Scope of works</th>
+                <th className={headClass}>Scope of Works</th>
                 <th className={`${headClass} text-right`}>Amount</th>
               </tr>
             </thead>
@@ -225,7 +225,7 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
         <TotalsBox total={estimate.total} />
       </Card>
 
-      <Card title="Payment schedule">
+      <Card title="Payment Schedule">
         {estimate.status === "Accepted" && estimate.downpaymentPercent != null ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm">
             <p>
@@ -250,7 +250,7 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
                 <th className={headClass}>Milestone</th>
                 <th className={headClass}>Description</th>
                 <th className={`${headClass} text-right`}>Template %</th>
-                <th className={headClass}>Target date</th>
+                <th className={headClass}>Target Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
@@ -273,7 +273,7 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
       </Card>
 
       {estimate.adminNotes ? (
-        <Card title="Admin notes">
+        <Card title="Admin Notes">
           <p className="whitespace-pre-wrap text-sm text-stone-700">{estimate.adminNotes}</p>
         </Card>
       ) : null}
@@ -307,7 +307,7 @@ function scheduleErrors(row: ScheduleRow, index: number, previous: ScheduleRow |
     label: textError(row.label, { label: "Milestone name", min: 3, max: 120 }),
     percentage,
     targetDate: dateError(row.targetDate, {
-      label: "Target date",
+      label: "Target Date",
       min: previous && isoDate.test(previous.targetDate) ? previous.targetDate : undefined,
       minLabel: "the previous milestone's date",
     }),
@@ -357,7 +357,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
 
   function collectIssues(mode: "save" | "send"): Issue[] {
     const issues: Issue[] = [];
-    if (lines.length === 0) issues.push({ id: "est-add-line", where: "Scope of works", message: "Add at least one scope of work." });
+    if (lines.length === 0) issues.push({ id: "est-add-line", where: "Scope of Works", message: "Add at least one scope of work." });
     lines.forEach((row, index) => {
       const errors = lineErrorRows[index];
       (["scope", "amount"] as const).forEach((name) => {
@@ -378,9 +378,9 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     if (mode === "send") {
       if (scheduleError && !issues.some((issue) => issue.id.startsWith("est-sched-"))) {
         const last = schedule[schedule.length - 1];
-        issues.push({ id: schedule.length < 2 || !last ? "est-add-milestone" : `est-sched-${last.key}-percentage`, where: "Payment schedule", message: scheduleError });
+        issues.push({ id: schedule.length < 2 || !last ? "est-add-milestone" : `est-sched-${last.key}-percentage`, where: "Payment Schedule", message: scheduleError });
       }
-      if (totalError) issues.push({ id: lines[0] ? `est-line-${lines[0].key}-amount` : "est-add-line", where: "Scope of works", message: totalError });
+      if (totalError) issues.push({ id: lines[0] ? `est-line-${lines[0].key}-amount` : "est-add-line", where: "Scope of Works", message: totalError });
     }
     return issues;
   }
@@ -477,7 +477,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     <div className="space-y-5">
       <DetailsCard estimate={estimate} />
 
-      <Card title="Scope of works" note="List each scope of work and its amount. The contract total is the sum of the amounts.">
+      <Card title="Scope of Works" note="List each scope of work and its amount. The contract total is the sum of the amounts.">
         <div className="mb-4 flex flex-wrap gap-2">
           <Button
             id="est-add-line"
@@ -487,14 +487,14 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
             disabled={Boolean(busy)}
             onClick={() => setLines((current) => [...current, blankLine()])}
           >
-            <Plus className="mr-1.5 h-4 w-4" /> Add scope of work
+            <Plus className="mr-1.5 h-4 w-4" /> Add Scope of Work
           </Button>
         </div>
         <div className="-mx-5 overflow-x-auto px-5">
           <table className="w-full min-w-[520px] border-collapse text-sm">
             <thead className="border-y border-stone-200 bg-stone-50">
               <tr>
-                <th className={headClass}>Scope of works</th>
+                <th className={headClass}>Scope of Works</th>
                 <th className={headClass}>Amount</th>
                 <th className={headClass}><span className="sr-only">Remove</span></th>
               </tr>
@@ -539,7 +539,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
       </Card>
 
       <Card
-        title="Payment schedule"
+        title="Payment Schedule"
         note={`The first row is the downpayment (at least ${MIN_DOWNPAYMENT_PERCENT}%). Percentages must add up to 100%, with 2 to 8 milestones.`}
       >
         <div className="-mx-5 overflow-x-auto px-5">
@@ -549,7 +549,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
                 <th className={headClass}>Milestone</th>
                 <th className={headClass}>Description</th>
                 <th className={headClass}>%</th>
-                <th className={headClass}>Target date</th>
+                <th className={headClass}>Target Date</th>
                 <th className={headClass}><span className="sr-only">Remove</span></th>
               </tr>
             </thead>
@@ -595,7 +595,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <Button id="est-add-milestone" type="button" variant="outline" size="sm" disabled={Boolean(busy) || schedule.length >= 8} onClick={addScheduleRow}>
-            <Plus className="mr-1.5 h-4 w-4" /> Add milestone
+            <Plus className="mr-1.5 h-4 w-4" /> Add Milestone
           </Button>
           <p className={`text-sm font-medium tabular-nums ${Math.abs(percentTotal - 100) > 0.001 ? "text-red-700" : "text-stone-600"}`}>
             Total: {Math.round(percentTotal * 100) / 100}%
@@ -609,7 +609,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
         <SchedulePreview total={totals.total} template={template} />
       </Card>
 
-      <Card title="Admin notes" note="Shown to the customer with the estimate. Mention inclusions, exclusions, or validity.">
+      <Card title="Admin Notes" note="Shown to the customer with the estimate. Mention inclusions, exclusions, or validity.">
         <textarea
           rows={4}
           maxLength={2000}
@@ -633,11 +633,11 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" variant="outline" disabled={Boolean(busy)} onClick={() => void saveDraft()}>
-          {busy === "save" ? "Saving…" : "Save draft"}
+          {busy === "save" ? "Saving…" : "Save Draft"}
         </Button>
         <Button type="button" disabled={Boolean(busy)} onClick={() => void sendToCustomer()}>
           <Send className="mr-1.5 h-4 w-4" />
-          {busy === "send" ? "Sending…" : "Send to customer"}
+          {busy === "send" ? "Sending…" : "Send to Customer"}
         </Button>
       </div>
     </div>

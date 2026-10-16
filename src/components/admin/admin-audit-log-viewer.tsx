@@ -206,9 +206,9 @@ export function AdminAuditLogViewer() {
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "Total events", value: payload.summary.total, icon: Activity },
-          { label: "Events today", value: payload.summary.today, icon: CalendarDays },
-          { label: "Recorded actors", value: payload.summary.actors, icon: Users },
+          { label: "Total Events", value: payload.summary.total, icon: Activity },
+          { label: "Events Today", value: payload.summary.today, icon: CalendarDays },
+          { label: "Recorded Actors", value: payload.summary.actors, icon: Users },
           { label: "Event types", value: payload.summary.eventTypes, icon: ShieldCheck },
         ].map((item) => (
           <section
@@ -245,7 +245,7 @@ export function AdminAuditLogViewer() {
             <div>
               <div className="flex items-center gap-2">
                 <ListFilter className="h-5 w-5 text-red-700" aria-hidden="true" />
-                <h2 className="text-lg font-semibold tracking-tight">System activity</h2>
+                <h2 className="text-lg font-semibold tracking-tight">System Activity</h2>
               </div>
               <p className="mt-1 text-sm text-stone-600">
                 Review who performed an action, what changed, and when it happened.
@@ -291,7 +291,7 @@ export function AdminAuditLogViewer() {
                 }}
                 className={`${fieldClass} w-full`}
               >
-                <option value="">All actions</option>
+                <option value="">All Actions</option>
                 {payload.filters.actions.map((option) => (
                   <option key={option} value={option}>
                     {actionLabel(option)}
@@ -310,7 +310,7 @@ export function AdminAuditLogViewer() {
                 }}
                 className={`${fieldClass} w-full`}
               >
-                <option value="">All targets</option>
+                <option value="">All Targets</option>
                 {payload.filters.entityTypes.map((option) => (
                   <option key={option} value={option}>
                     {humanize(option)}
@@ -373,7 +373,7 @@ export function AdminAuditLogViewer() {
                   <th className="border-b border-stone-200 px-5 py-3">Activity</th>
                   <th className="border-b border-stone-200 px-5 py-3">Target</th>
                   <th className="border-b border-stone-200 px-5 py-3">Details</th>
-                  <th className="border-b border-stone-200 px-5 py-3">Date and time</th>
+                  <th className="border-b border-stone-200 px-5 py-3">Date and Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -420,7 +420,7 @@ export function AdminAuditLogViewer() {
                                 <dd className="break-words text-xs text-stone-700">
                                   {key === "termsSnapshot" ? (
                                     <details>
-                                      <summary className="cursor-pointer rounded font-semibold text-red-700 focus-visible:outline-2 focus-visible:outline-red-600">View recorded terms</summary>
+                                      <summary className="cursor-pointer rounded font-semibold text-red-700 focus-visible:outline-2 focus-visible:outline-red-600">View Recorded Terms</summary>
                                       <p className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap leading-5">{detailValue(value)}</p>
                                     </details>
                                   ) : detailValue(value)}
@@ -444,7 +444,7 @@ export function AdminAuditLogViewer() {
         ) : (
           <div className="p-10 text-center">
             <ShieldCheck className="mx-auto h-9 w-9 text-stone-300" aria-hidden="true" />
-            <p className="mt-3 font-semibold">No audit events found</p>
+            <p className="mt-3 font-semibold">No Audit Events Found</p>
             <p className="mt-1 text-sm text-stone-500">
               {hasFilters
                 ? "Try clearing or changing the current filters."

@@ -174,7 +174,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
       {nothingYet && (
         <section className="rounded-xl border border-dashed border-stone-200 bg-white p-8 text-center sm:p-10">
           <HardHat className="mx-auto h-10 w-10 text-stone-400" />
-          <h2 className="mt-4 text-lg font-semibold">No dream house yet</h2>
+          <h2 className="mt-4 text-lg font-semibold">No Dream House Yet</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-stone-600">
             Your journey starts with a design. Explore finished designs for inspiration, or send your own requirements in Design Requests. Once you approve your design, you can ask G4 Builders to estimate construction right here.
           </p>
@@ -208,7 +208,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
 
       {hasOther && (
         <section aria-labelledby="other-projects-heading" className="space-y-4">
-          <h2 id="other-projects-heading" className="text-lg font-semibold tracking-tight">Other projects</h2>
+          <h2 id="other-projects-heading" className="text-lg font-semibold tracking-tight">Other Projects</h2>
           {orphanEstimates.map((estimate) => (
             <ConstructionEstimateCard key={estimate.id} estimate={estimate} highlighted={estimate.id === focusOrphanEstimateId} onChanged={refresh} />
           ))}

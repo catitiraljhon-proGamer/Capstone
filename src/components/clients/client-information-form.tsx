@@ -187,7 +187,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
       <fieldset disabled={saving} className="grid min-w-0 gap-5 disabled:opacity-70 sm:grid-cols-2">
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
-            Full name <RequiredIndicator />
+            Full Name <RequiredIndicator />
             <input name="name" autoComplete="name" required minLength={2} maxLength={100} placeholder="Enter full name" defaultValue={client?.name ?? ""} className={fieldClass} {...describe("name")} />
           </label>
           <FieldError id={errorId("name")} message={fieldError("name")} />
@@ -202,7 +202,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         </div>
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
-            Contact number <RequiredIndicator />
+            Contact Number <RequiredIndicator />
             <ContactNumberInput required placeholder="Enter contact number" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
             <span className="mt-1 block text-xs font-normal text-stone-500">Philippine mobile number: {phContactNumberExample}.</span>
           </label>
@@ -226,7 +226,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         </div>
         {creating && <div className="min-w-0 sm:col-span-2">
           <label className="block text-sm font-medium text-stone-700">
-            Initial account password <RequiredIndicator />
+            Initial Account Password <RequiredIndicator />
             <input name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} placeholder="Enter initial account password" className={fieldClass} {...describe("password")} />
             <span className="mt-1 block text-xs font-normal text-stone-500">At least 8 characters. The new account will have client access.</span>
           </label>
@@ -237,7 +237,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         {onCancel && <button type="button" disabled={saving} onClick={onCancel} className="min-h-11 rounded-lg border border-stone-200 px-5 py-2.5 text-sm font-semibold disabled:opacity-50">Cancel</button>}
         <button type="submit" disabled={saving} className="min-h-11 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50">
-          {saving ? "Saving…" : submitLabel ?? (creating ? "Create client" : "Save client information")}
+          {saving ? "Saving…" : submitLabel ?? (creating ? "Create Client" : "Save Client Information")}
         </button>
       </div>
     </form>

@@ -41,7 +41,7 @@ export function TermsDialog<T>({
   notice,
   acceptUrl,
   onAgree,
-  agreeLabel = "Yes, I have read and agree",
+  agreeLabel = "Yes, I Have Read and Agree",
   declineLabel,
   helperText,
   onAccept,

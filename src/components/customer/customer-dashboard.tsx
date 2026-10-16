@@ -199,7 +199,7 @@ export function CustomerDashboard() {
             <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/20" />
             <div className="relative max-w-md p-8">
               <h1 className="text-3xl font-semibold leading-tight tracking-tight text-stone-950">
-                Your home planning workspace
+                Your Home Planning Workspace
               </h1>
               <p className="mt-4 text-sm leading-6 text-stone-600">
                 Start with the essentials. Open each menu item for full details.

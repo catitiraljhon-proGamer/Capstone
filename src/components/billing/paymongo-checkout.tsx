@@ -54,9 +54,9 @@ export function PaymongoCheckout({ sessionId }: { sessionId: string }) {
     </div>
     <main className="mx-auto w-full max-w-xl px-4 py-6 sm:py-10">
       {loadError ? <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-semibold tracking-tight">Checkout unavailable</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Checkout Unavailable</h1>
         <BillingErrorMessage message={loadError} />
-        <Button asChild variant="outline"><Link href="/customer/billing"><ArrowLeft className="mr-2 h-4 w-4" />Return to billing</Link></Button>
+        <Button asChild variant="outline"><Link href="/customer/billing"><ArrowLeft className="mr-2 h-4 w-4" />Return to Billing</Link></Button>
       </section> : !checkout ? <p role="status" className="py-16 text-center text-sm text-stone-500">Loading checkout…</p> : <div className="space-y-4">
         <section className="min-w-0 rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-5 text-white shadow-sm sm:p-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Pay to</p>
@@ -69,10 +69,10 @@ export function PaymongoCheckout({ sessionId }: { sessionId: string }) {
         {!open ? <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold tracking-tight">{statusText[checkout.status as Exclude<CheckoutStatus, "open">]}</h2>
           {checkout.failureReason && <p className="text-sm text-stone-600">{checkout.failureReason}</p>}
-          <Button asChild><Link href={returnUrl(checkout)}><ArrowLeft className="mr-2 h-4 w-4" />Return to billing</Link></Button>
+          <Button asChild><Link href={returnUrl(checkout)}><ArrowLeft className="mr-2 h-4 w-4" />Return to Billing</Link></Button>
         </section> : <section className="min-w-0 space-y-5 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
           <fieldset disabled={busy !== null} className="min-w-0">
-            <legend className="text-sm font-semibold">Choose a payment method</legend>
+            <legend className="text-sm font-semibold">Choose a Payment Method</legend>
             <div className="mt-3 grid gap-2">{paymongoMethods.map((item) => {
               const Icon = methodIcons[item];
               return <label key={item} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium transition has-[:checked]:border-red-700 has-[:checked]:bg-rose-50 has-[:checked]:ring-1 has-[:checked]:ring-red-700 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-600 has-[:disabled]:opacity-60">
@@ -84,7 +84,7 @@ export function PaymongoCheckout({ sessionId }: { sessionId: string }) {
 
           {method === "card" && <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
             <p className="text-sm font-semibold">Test card (no real card used)</p>
-            <label className="block text-xs font-semibold text-stone-600">Card number<input disabled readOnly value="4343 4343 4343 4345" autoComplete="off" className={field} /></label>
+            <label className="block text-xs font-semibold text-stone-600">Card Number<input disabled readOnly value="4343 4343 4343 4345" autoComplete="off" className={field} /></label>
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-xs font-semibold text-stone-600">Expiry<input disabled readOnly value={futureExpiry()} autoComplete="off" className={field} /></label>
               <label className="block text-xs font-semibold text-stone-600">CVC<input disabled readOnly value="123" autoComplete="off" className={field} /></label>
@@ -95,8 +95,8 @@ export function PaymongoCheckout({ sessionId }: { sessionId: string }) {
           <BillingErrorMessage message={error} />
           <div className="space-y-2">
             <Button className="min-h-11 w-full" disabled={busy !== null} onClick={() => void run({ action: "pay", method })}><ShieldCheck className="mr-2 h-4 w-4" />{busy === "pay" ? "Processing payment…" : `Pay ${formatPeso(checkout.amount)}`}</Button>
-            <Button variant="outline" className="min-h-11 w-full" disabled={busy !== null} onClick={() => void run({ action: "fail", method })}>{busy === "fail" ? "Processing payment…" : "Simulate failed payment"}</Button>
-            <Button variant="ghost" className="min-h-11 w-full" disabled={busy !== null} onClick={() => void run({ action: "cancel" })}>{busy === "cancel" ? "Cancelling…" : "Cancel and return"}</Button>
+            <Button variant="outline" className="min-h-11 w-full" disabled={busy !== null} onClick={() => void run({ action: "fail", method })}>{busy === "fail" ? "Processing payment…" : "Simulate Failed Payment"}</Button>
+            <Button variant="ghost" className="min-h-11 w-full" disabled={busy !== null} onClick={() => void run({ action: "cancel" })}>{busy === "cancel" ? "Cancelling…" : "Cancel and Return"}</Button>
           </div>
           <p className="text-center text-xs leading-5 text-stone-500">Paying records the payment on your invoice automatically, just as a real online payment would. Use “Simulate failed payment” to see how a declined payment is handled.</p>
         </section>}

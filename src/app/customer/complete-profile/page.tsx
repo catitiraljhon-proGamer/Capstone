@@ -42,7 +42,7 @@ export default async function CompleteProfilePage() {
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700">Welcome, {client.name}</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Complete your client information
+              Complete Your Client Information
             </h1>
             <p className="mt-2 text-sm leading-6 text-stone-600">
               Before you start, tell us how to reach you. The G4 Builders team

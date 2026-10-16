@@ -111,7 +111,7 @@ function ProjectCard({
 
         <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Start date</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Start Date</dt>
             <dd className="mt-1">{date(project.startDate)}</dd>
           </div>
           <div>
@@ -119,7 +119,7 @@ function ProjectCard({
             <dd className="mt-1">{date(project.neededBy)}</dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Next milestone</dt>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Next Milestone</dt>
             <dd className="mt-1 break-words">
               {project.nextMilestone
                 ? `${project.nextMilestone.label} · ${formatPeso(project.nextMilestone.amount)} · ${date(project.nextMilestone.targetDate)}`
@@ -139,12 +139,12 @@ function ProjectCard({
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {canActivate ? (
             <Button type="button" size="sm" disabled={Boolean(busy)} onClick={() => void changeStatus("Active")}>
-              {busy === "Active" ? "Saving…" : "Mark active"}
+              {busy === "Active" ? "Saving…" : "Mark Active"}
             </Button>
           ) : null}
           {canHold ? (
             <Button type="button" size="sm" variant="outline" disabled={Boolean(busy)} onClick={() => void changeStatus("On hold")}>
-              {busy === "On hold" ? "Saving…" : "Put on hold"}
+              {busy === "On hold" ? "Saving…" : "Put on Hold"}
             </Button>
           ) : null}
           {isActive ? (
@@ -155,7 +155,7 @@ function ProjectCard({
               disabled={Boolean(busy) || !allPaid}
               onClick={() => void changeStatus("Completed")}
             >
-              {busy === "Completed" ? "Saving…" : "Mark completed"}
+              {busy === "Completed" ? "Saving…" : "Mark Completed"}
             </Button>
           ) : null}
           {isActive && !allPaid ? (
@@ -170,7 +170,7 @@ function ProjectCard({
               aria-expanded={expanded}
               onClick={() => setExpanded((value) => !value)}
             >
-              Payment schedule
+              Payment Schedule
               <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
             </Button>
           ) : null}
@@ -186,7 +186,7 @@ function ProjectCard({
                 <th className={head}>Milestone</th>
                 <th className={`${head} text-right`}>%</th>
                 <th className={`${head} text-right`}>Amount</th>
-                <th className={head}>Target date</th>
+                <th className={head}>Target Date</th>
                 <th className={head}>Invoice</th>
                 <th className={head}>Status</th>
               </tr>
@@ -205,7 +205,7 @@ function ProjectCard({
                         <BillingBadge status={milestone.invoice.status} />
                       </div>
                     ) : (
-                      <span className="text-stone-400">Not invoiced</span>
+                      <span className="text-stone-400">Not Invoiced</span>
                     )}
                   </td>
                   <td className="px-3 py-3">

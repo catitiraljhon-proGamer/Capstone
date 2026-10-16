@@ -22,23 +22,23 @@ export function BillingDocument({ id, customer, kind }: { id: string; customer: 
   }, [url]);
   const r = receipt?.receipt;
   const rows: [string, string][] = r ? [
-    ["Receipt number", r.number], ["Customer", r.customerName], ["Project / design request", r.projectName],
-    ["Invoice", r.invoiceNumber], ["Billing stage", r.invoiceLabel], ["Payment date", billingDate(r.paidAt)],
-    ["Payment method", r.method], ["Transaction reference", r.transactionReference],
-    ["Invoice amount", formatPeso(r.invoiceAmount)], ["Amount received", formatPeso(r.amount)],
-    ["Invoice balance after this payment", formatPeso(r.balanceAfterPayment)],
-    ["Verified by", r.verifiedByName], ["Receipt issued", billingDate(r.issuedAt)],
+    ["Receipt Number", r.number], ["Customer", r.customerName], ["Project / Design Request", r.projectName],
+    ["Invoice", r.invoiceNumber], ["Billing Stage", r.invoiceLabel], ["Payment Date", billingDate(r.paidAt)],
+    ["Payment Method", r.method], ["Transaction Reference", r.transactionReference],
+    ["Invoice Amount", formatPeso(r.invoiceAmount)], ["Amount Received", formatPeso(r.amount)],
+    ["Invoice Balance After This Payment", formatPeso(r.balanceAfterPayment)],
+    ["Verified By", r.verifiedByName], ["Receipt Issued", billingDate(r.issuedAt)],
   ] : invoice ? [
-    ["Invoice number", invoice.invoiceNumber], ["Customer", invoice.customerName], ["Project / design request", invoice.projectName],
-    ["Billing stage", invoice.label], ["Billing basis", invoice.basis], [invoice.designRequestId ? "Billing type" : "Project progress", invoice.designRequestId ? designFeeLabels[invoice.feeType ?? "design"] : `${invoice.progressPercentage}%`],
-    ["Due date", billingDate(invoice.dueDate)], ["Invoice amount", formatPeso(invoice.amount)],
-    ["Verified payments", formatPeso(invoice.paid)], ["Current balance", invoice.status === "Void" ? "—" : formatPeso(invoice.balance)],
+    ["Invoice Number", invoice.invoiceNumber], ["Customer", invoice.customerName], ["Project / Design Request", invoice.projectName],
+    ["Billing Stage", invoice.label], ["Billing Basis", invoice.basis], [invoice.designRequestId ? "Billing Type" : "Project Progress", invoice.designRequestId ? designFeeLabels[invoice.feeType ?? "design"] : `${invoice.progressPercentage}%`],
+    ["Due Date", billingDate(invoice.dueDate)], ["Invoice Amount", formatPeso(invoice.amount)],
+    ["Verified Payments", formatPeso(invoice.paid)], ["Current Balance", invoice.status === "Void" ? "—" : formatPeso(invoice.balance)],
     ["Status", invoice.status === "Sent" ? "Issued" : invoice.status],
   ] : [];
   return <main className="billing-document mx-auto max-w-3xl px-5 py-8 text-stone-950">
     <style>{`@media print { .document-toolbar, [data-chat-widget] { display: none !important; } .billing-document { max-width: none; padding: 0; } .document-sheet { border: 0; box-shadow: none; } @page { margin: 18mm; } }`}</style>
     <div className="document-toolbar mb-6 flex flex-wrap items-center justify-between gap-3">
-      <Button variant="outline" asChild><a href={customer ? "/customer/billing" : kind === "receipt" ? "/billing-clerk/payments" : "/billing-clerk/invoices"}><ArrowLeft className="mr-2 h-4 w-4" />Back to billing</a></Button>
+      <Button variant="outline" asChild><a href={customer ? "/customer/billing" : kind === "receipt" ? "/billing-clerk/payments" : "/billing-clerk/invoices"}><ArrowLeft className="mr-2 h-4 w-4" />Back to Billing</a></Button>
       <div className="flex flex-wrap gap-2"><Button variant="outline" asChild disabled={!rows.length}><a aria-disabled={!rows.length} href={rows.length ? url + "?download=1" : undefined}><Download className="mr-2 h-4 w-4" />Download HTML</a></Button><Button disabled={!rows.length} onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / Save PDF</Button></div>
     </div>
     <BillingErrorMessage message={error} />

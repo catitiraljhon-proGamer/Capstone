@@ -15,14 +15,14 @@ export function ContactDetails() {
         className="flex min-h-14 items-center gap-3 rounded-lg border border-stone-200 p-3 text-stone-950 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700"
       >
         <Phone aria-hidden="true" className="h-5 w-5 shrink-0 text-red-700" />
-        <span><span className="block text-xs text-stone-500">Call us</span><span className="mt-1 block font-semibold">(043) 407 3561</span></span>
+        <span><span className="block text-xs text-stone-500">Call Us</span><span className="mt-1 block font-semibold">(043) 407 3561</span></span>
       </a>
       <a
         href="mailto:g4builders2014@gmail.com"
         className="flex min-h-14 items-center gap-3 rounded-lg border border-stone-200 p-3 text-stone-950 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700"
       >
         <Mail aria-hidden="true" className="h-5 w-5 shrink-0 text-red-700" />
-        <span className="min-w-0"><span className="block text-xs text-stone-500">Email us</span><span className="mt-1 block break-all font-semibold">g4builders2014@gmail.com</span></span>
+        <span className="min-w-0"><span className="block text-xs text-stone-500">Email Us</span><span className="mt-1 block break-all font-semibold">g4builders2014@gmail.com</span></span>
       </a>
       <a
         href={mapsUrl}

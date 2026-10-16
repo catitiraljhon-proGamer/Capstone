@@ -26,9 +26,9 @@ export function AccountTermsGate() {
   return (
     <TermsDialog<AccountTermsAcceptance>
       terms={accountTerms}
-      notice={{ title: "Protected designs · Only the blueprint is paid", body: accountTerms.notice, icon: ShieldAlert }}
+      notice={{ title: "Protected Designs · Only the Blueprint Is Paid", body: accountTerms.notice, icon: ShieldAlert }}
       acceptUrl="/api/account/terms"
-      declineLabel="Decline and sign out"
+      declineLabel="Decline and Sign Out"
       helperText="You only need to agree once. Declining signs you out."
       // Reload so pages fetched before agreeing (such as full design galleries) load with access.
       onAccept={() => window.location.reload()}

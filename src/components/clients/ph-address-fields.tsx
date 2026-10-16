@@ -146,7 +146,7 @@ export function PhAddressFields({
   return (
     <fieldset className="min-w-0 space-y-4">
       <legend className={`${labelClassName} mb-2`}>
-        Complete address <RequiredIndicator />
+        Complete Address <RequiredIndicator />
       </legend>
       <p className="text-xs text-stone-500">We currently serve projects in Luzon only.</p>
       {legacyAddress && !defaultValue ? (
@@ -184,7 +184,7 @@ export function PhAddressFields({
         </div>
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-city`}>
-            City / municipality <RequiredIndicator />
+            City / Municipality <RequiredIndicator />
             <select
               id={`${id}-city`}
               name={fieldNames.cityCode}
@@ -234,7 +234,7 @@ export function PhAddressFields({
       <div className="grid min-w-0 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-street`}>
-            House no. / street (optional)
+            House No. / Street (optional)
             <input
               id={`${id}-street`}
               name={fieldNames.street}
@@ -251,7 +251,7 @@ export function PhAddressFields({
         </div>
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-postal`}>
-            Postal code <RequiredIndicator />
+            Postal Code <RequiredIndicator />
             <input
               id={`${id}-postal`}
               name={fieldNames.postalCode}

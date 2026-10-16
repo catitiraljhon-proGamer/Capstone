@@ -62,8 +62,8 @@ export function GoogleAuthButton({
       {isRedirecting
         ? "Connecting to Google…"
         : mode === "register"
-          ? "Sign up with Google"
-          : "Sign in with Google"}
+          ? "Sign Up with Google"
+          : "Sign In with Google"}
     </button>
   );
 }

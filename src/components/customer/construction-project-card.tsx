@@ -42,7 +42,7 @@ function NextPayment({ milestone }: { milestone: PaymentMilestoneDto | null }) {
   if (!milestone) {
     return (
       <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <p className="text-sm font-semibold">All payments received</p>
+        <p className="text-sm font-semibold">All Payments Received</p>
         <p className="mt-1 text-sm text-stone-600">Every milestone on your payment schedule has been paid.</p>
       </div>
     );
@@ -52,7 +52,7 @@ function NextPayment({ milestone }: { milestone: PaymentMilestoneDto | null }) {
     <div className="rounded-xl border border-red-200 bg-rose-50/60 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <Eyebrow>Next payment</Eyebrow>
+          <Eyebrow>Next Payment</Eyebrow>
           <p className="mt-1 break-words text-base font-semibold text-stone-950">{milestone.label}</p>
           <p className="mt-2 text-2xl font-semibold tracking-tight text-red-700">{formatPeso(balance)}</p>
           <p className="mt-1 text-xs text-stone-600">
@@ -93,7 +93,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
         <Stepper project={project} />
 
         <dl className="grid gap-4 sm:grid-cols-3">
-          <Fact label="Start date" value={dateOrDash(project.startDate)} />
+          <Fact label="Start Date" value={dateOrDash(project.startDate)} />
           <Fact label="Needed by" value={dateOrDash(project.neededBy)} />
           <Fact label="Downpayment" value={project.downpaymentPercent ? `${project.downpaymentPercent}%` : "—"} />
         </dl>
@@ -102,7 +102,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
           <div className="rounded-lg border border-stone-200 p-4">
             <h3 className="text-sm font-semibold">Contract</h3>
             <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-3"><dt className="font-semibold">Contract total</dt><dd className="font-semibold tabular-nums text-red-700">{formatPeso(project.contractPrice)}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="font-semibold">Contract Total</dt><dd className="font-semibold tabular-nums text-red-700">{formatPeso(project.contractPrice)}</dd></div>
             </dl>
           </div>
           <div className="rounded-lg border border-stone-200 p-4">
@@ -121,7 +121,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
           <>
             <NextPayment milestone={project.nextMilestone} />
             <div>
-              <h3 className="text-base font-semibold tracking-tight">Payment milestones</h3>
+              <h3 className="text-base font-semibold tracking-tight">Payment Milestones</h3>
               <div className="mt-3"><ScheduleTable rows={project.milestones} /></div>
             </div>
           </>

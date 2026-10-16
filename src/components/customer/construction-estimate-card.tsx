@@ -24,10 +24,10 @@ async function sendAction(id: string, action: EstimateAction) {
 function RequestSummary({ estimate }: { estimate: CostEstimateDto }) {
   return (
     <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Fact label="Preferred start" value={dateOrDash(estimate.preferredStartDate)} />
+      <Fact label="Preferred Start" value={dateOrDash(estimate.preferredStartDate)} />
       <Fact label="Needed by" value={dateOrDash(estimate.neededBy)} />
       <Fact label="Submitted" value={dateOrDash(estimate.createdAt)} />
-      <Fact label="Site address" value={estimate.siteAddress || "—"} />
+      <Fact label="Site Address" value={estimate.siteAddress || "—"} />
     </dl>
   );
 }
@@ -38,7 +38,7 @@ function ScopeOfWorksTable({ estimate }: { estimate: CostEstimateDto }) {
       <table className="w-full min-w-[20rem] border-collapse text-left text-sm">
         <thead className="bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
           <tr>
-            <th scope="col" className="px-3 py-2.5">Scope of works</th>
+            <th scope="col" className="px-3 py-2.5">Scope of Works</th>
             <th scope="col" className="px-3 py-2.5 text-right">Amount</th>
           </tr>
         </thead>
@@ -51,7 +51,7 @@ function ScopeOfWorksTable({ estimate }: { estimate: CostEstimateDto }) {
           ))}
         </tbody>
         <tfoot className="border-t border-stone-200 text-sm">
-          <tr className="bg-rose-50"><td className="px-3 py-3 text-right font-semibold text-stone-950">Contract total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
+          <tr className="bg-rose-50"><td className="px-3 py-3 text-right font-semibold text-stone-950">Contract Total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
         </tfoot>
       </table>
     </div>
@@ -113,7 +113,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-base font-semibold tracking-tight">Scope of works</h3>
+        <h3 className="text-base font-semibold tracking-tight">Scope of Works</h3>
         <p className="mt-1 text-sm text-stone-600">Each scope of work for building your house and its amount.</p>
         <div className="mt-3"><ScopeOfWorksTable estimate={estimate} /></div>
       </div>
@@ -126,11 +126,11 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
       )}
 
       <div>
-        <h3 className="text-base font-semibold tracking-tight">Payment schedule</h3>
+        <h3 className="text-base font-semibold tracking-tight">Payment Schedule</h3>
         <p className="mt-1 text-sm text-stone-600">You pay in stages as construction progresses. Choose how much to pay as your downpayment. A larger downpayment lowers the later stages.</p>
         <div className="mt-4 grid gap-4 rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-5 text-white sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] sm:items-end">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your downpayment</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your Downpayment</p>
             <p className="mt-2 break-words text-3xl font-semibold tracking-tight">{formatPeso(downpayment)}</p>
             <p className="mt-1 text-xs text-rose-100">{percentError ? "Fix the percentage to see your amount." : `${Number.isInteger(percent) ? percent : percent.toFixed(2)}% of the ${formatPeso(estimate.total)} contract total`}</p>
           </div>
@@ -155,7 +155,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
 
       <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:justify-end">
         <Button variant="outline" className="min-h-11" onClick={() => { setError(null); setReason(""); setReasonTouched(false); setDialog("revise"); }}>Request revision</Button>
-        <Button className="min-h-11" onClick={openAccept}><ClipboardCheck className="mr-2 h-4 w-4" />Accept estimate</Button>
+        <Button className="min-h-11" onClick={openAccept}><ClipboardCheck className="mr-2 h-4 w-4" />Accept Estimate</Button>
       </div>
 
       {dialog === "accept" && (
@@ -163,26 +163,26 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
           <div className="space-y-4 text-sm leading-6 text-stone-600">
             <p>You are accepting estimate <span className="font-semibold text-stone-950">{estimate.reference}</span> for a contract total of <span className="font-semibold text-stone-950">{formatPeso(estimate.total)}</span>.</p>
             <div className="rounded-lg bg-rose-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Downpayment due</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Downpayment Due</p>
               <p className="mt-1 text-2xl font-semibold text-red-700">{formatPeso(downpayment)}</p>
               <p className="mt-1 text-xs text-stone-600">{percent}% of the contract total</p>
             </div>
             <p>The Billing Clerk will issue your downpayment invoice. Construction is scheduled once that payment is verified.</p>
             <BillingErrorMessage message={error} />
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Go back</Button>
-              <Button className="min-h-11" disabled={busy} onClick={() => void run({ action: "accept", downpaymentPercent: percent }, "Estimate accepted. Your project is created and the Billing Clerk will issue your downpayment invoice.")}>{busy ? "Accepting…" : "Confirm and accept"}</Button>
+              <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Go Back</Button>
+              <Button className="min-h-11" disabled={busy} onClick={() => void run({ action: "accept", downpaymentPercent: percent }, "Estimate accepted. Your project is created and the Billing Clerk will issue your downpayment invoice.")}>{busy ? "Accepting…" : "Confirm and Accept"}</Button>
             </div>
           </div>
         </BillingDialog>
       )}
 
       {dialog === "revise" && (
-        <BillingDialog title="Request a revision" busy={busy} onClose={() => setDialog(null)}>
+        <BillingDialog title="Request a Revision" busy={busy} onClose={() => setDialog(null)}>
           <form noValidate className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (reasonError) { setReasonTouched(true); reasonRef.current?.focus(); return; } void run({ action: "request-revision", reason: reason.trim() }, "Revision requested. G4 Builders will send you an updated estimate."); }}>
             <p className="text-sm leading-6 text-stone-600">Tell G4 Builders what to change, such as scope, materials, or the payment schedule. We will send you an updated estimate.</p>
             <label className={constructionLabelClass}>
-              Reason for revision <RequiredIndicator />
+              Reason for Revision <RequiredIndicator />
               <textarea
                 required maxLength={1000} rows={5} value={reason} autoFocus
                 ref={reasonRef} id="estimate-revision-reason"
@@ -200,7 +200,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
             <BillingErrorMessage message={error} />
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Cancel</Button>
-              <Button type="submit" className="min-h-11" disabled={busy}>{busy ? "Sending…" : "Send revision request"}</Button>
+              <Button type="submit" className="min-h-11" disabled={busy}>{busy ? "Sending…" : "Send Revision Request"}</Button>
             </div>
           </form>
         </BillingDialog>
@@ -239,7 +239,7 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
                 <div><p className="text-sm font-semibold">G4 Builders is preparing your cost estimate</p><p className="mt-1 text-sm leading-6 text-stone-600">Our team is pricing your build and setting your payment schedule. You will be notified as soon as it is ready for your review.</p></div>
               </div>
               <RequestSummary estimate={estimate} />
-              {estimate.customerNotes && <p className="whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600"><span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">Your notes</span>{estimate.customerNotes}</p>}
+              {estimate.customerNotes && <p className="whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600"><span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">Your Notes</span>{estimate.customerNotes}</p>}
             </>
           )}
 
@@ -249,7 +249,7 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
                 <Hourglass className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
                 <div className="min-w-0"><p className="text-sm font-semibold">Waiting for the revised estimate</p><p className="mt-1 text-sm leading-6 text-stone-600">G4 Builders received your revision request and will send an updated estimate.</p></div>
               </div>
-              {estimate.revisionNote && <p className="whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600"><span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">Your revision request</span>{estimate.revisionNote}</p>}
+              {estimate.revisionNote && <p className="whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600"><span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">Your Revision Request</span>{estimate.revisionNote}</p>}
               <RequestSummary estimate={estimate} />
             </>
           )}
@@ -270,7 +270,7 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
                   <p className="mt-1 text-sm leading-6 text-stone-600">Contract total {formatPeso(estimate.total)}{estimate.downpaymentPercent ? ` · ${estimate.downpaymentPercent}% downpayment` : ""}.</p>
                 </div>
               </div>
-              {estimate.projectId && <Button asChild variant="outline"><a href={`#project-${estimate.projectId}`}>View project</a></Button>}
+              {estimate.projectId && <Button asChild variant="outline"><a href={`#project-${estimate.projectId}`}>View Project</a></Button>}
             </div>
           )}
         </div>

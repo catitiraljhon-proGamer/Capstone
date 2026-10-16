@@ -68,14 +68,14 @@ const fieldOrder: FieldName[] = [
 ];
 
 const fieldLabels: Record<FieldName, string> = {
-  name: "Design name",
-  houseType: "House type",
-  area: "Floor area",
-  rate: "Cost rate",
-  rooms: "Room setup",
-  images: "Design images",
-  materialPrices: "Material prices",
-  customItems: "Custom exterior items",
+  name: "Design Name",
+  houseType: "House Type",
+  area: "Floor Area",
+  rate: "Cost Rate",
+  rooms: "Room Setup",
+  images: "Design Images",
+  materialPrices: "Material Prices",
+  customItems: "Custom Exterior Items",
 };
 
 const fieldIds: Record<FieldName, string> = {
@@ -619,7 +619,7 @@ export function HouseDesignForm({
 
               <Field
                 htmlFor="design-style"
-                label="Style label"
+                label="Style Label"
                 hint="Optional. Defaults to the house type."
               >
                 <input
@@ -633,7 +633,7 @@ export function HouseDesignForm({
                 />
               </Field>
 
-              <Field htmlFor="design-finish" label="Finish level">
+              <Field htmlFor="design-finish" label="Finish Level">
                 <select
                   id="design-finish"
                   name="finish"
@@ -653,7 +653,7 @@ export function HouseDesignForm({
 
               <Field
                 htmlFor={fieldIds.area}
-                label="Floor area (sqm)"
+                label="Floor Area (sqm)"
                 required
                 error={errors.area}
               >
@@ -680,7 +680,7 @@ export function HouseDesignForm({
 
               <Field
                 htmlFor={fieldIds.rate}
-                label="Cost rate (PHP / sqm)"
+                label="Cost Rate (PHP / sqm)"
                 hint="Base estimate is floor area multiplied by this rate."
                 required
                 error={errors.rate}
@@ -888,7 +888,7 @@ export function HouseDesignForm({
                       <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <Field
                           htmlFor={`${item.id}-item`}
-                          label="Item name"
+                          label="Item Name"
                           required
                           error={itemError(item, "item") ?? undefined}
                         >
@@ -967,7 +967,7 @@ export function HouseDesignForm({
                         </Field>
                         <Field
                           htmlFor={`${item.id}-price`}
-                          label="Unit price (PHP)"
+                          label="Unit Price (PHP)"
                           required
                           error={itemError(item, "unitPrice") ?? undefined}
                         >
@@ -1031,7 +1031,7 @@ export function HouseDesignForm({
               id={customItems.length === 0 ? fieldIds.customItems : undefined}
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              Add custom item
+              Add Custom Item
             </Button>
           </fieldset>
         </div>
@@ -1072,7 +1072,7 @@ export function HouseDesignForm({
                     <div className="flex items-center justify-between gap-1 px-1 py-1">
                       {index === 0 ? (
                         <span className="px-1 text-[11px] text-stone-600">
-                          Main image
+                          Main Image
                         </span>
                       ) : (
                         <Button
@@ -1127,7 +1127,7 @@ export function HouseDesignForm({
               )}
             >
               <ImagePlus className="mr-2 h-4 w-4" aria-hidden="true" />
-              {images.length > 0 ? "Add more images" : "Upload design images"}
+              {images.length > 0 ? "Add More Images" : "Upload Design Images"}
             </Button>
 
             {errors.images ? (
@@ -1150,13 +1150,13 @@ export function HouseDesignForm({
             </p>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Base estimate</dt>
+                <dt className="text-stone-600">Base Estimate</dt>
                 <dd className="font-medium tabular-nums">
                   {formatPeso(preview.baseEstimate)}
                 </dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Exterior materials</dt>
+                <dt className="text-stone-600">Exterior Materials</dt>
                 <dd className="font-medium tabular-nums">
                   {formatPeso(preview.exteriorTotal)}
                 </dd>

@@ -137,7 +137,7 @@ export function LogoutButton({ onLogout }: { onLogout?: () => void }) {
       className="flex w-full items-center gap-4 rounded-lg px-4 py-3 text-sm font-medium text-stone-500 transition hover:bg-stone-100 hover:text-stone-950 disabled:opacity-60"
     >
       <LogOut aria-hidden="true" className="h-5 w-5" />
-      {isPending ? "Logging out…" : "Log out"}
+      {isPending ? "Logging out…" : "Log Out"}
     </button>
     {isOpen ? createPortal(
       <LogoutConfirmation

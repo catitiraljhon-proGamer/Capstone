@@ -72,7 +72,7 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
       <BillingErrorMessage message={error} />
       {mode === "changes" ? (
         <div>
-          <label className="block text-sm font-medium text-stone-700" htmlFor={`changes-${design.id}`}>Changes you want</label>
+          <label className="block text-sm font-medium text-stone-700" htmlFor={`changes-${design.id}`}>Changes You Want</label>
           <textarea
             id={`changes-${design.id}`} rows={4} maxLength={1_000} value={note} disabled={busy}
             onChange={(event) => { setNote(event.target.value); setError(null); }}
@@ -83,13 +83,13 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
           {noteError && <p className="mt-1.5 text-sm text-red-700">{noteError}</p>}
           <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="ghost" disabled={busy} onClick={() => { setMode("idle"); setNote(""); setError(null); }}>Cancel</Button>
-            <Button disabled={busy} onClick={() => void respond("changes")}><Send className="mr-2 h-4 w-4" />{busy ? "Sending…" : "Send changes"}</Button>
+            <Button disabled={busy} onClick={() => void respond("changes")}><Send className="mr-2 h-4 w-4" />{busy ? "Sending…" : "Send Changes"}</Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button disabled={busy} onClick={() => void respond("approved")}><CheckCircle2 className="mr-2 h-4 w-4" />{busy ? "Saving…" : "Approve design"}</Button>
-          <Button variant="outline" disabled={busy} onClick={() => setMode("changes")}><MessageSquareText className="mr-2 h-4 w-4" />Request changes</Button>
+          <Button disabled={busy} onClick={() => void respond("approved")}><CheckCircle2 className="mr-2 h-4 w-4" />{busy ? "Saving…" : "Approve Design"}</Button>
+          <Button variant="outline" disabled={busy} onClick={() => setMode("changes")}><MessageSquareText className="mr-2 h-4 w-4" />Request Changes</Button>
         </div>
       )}
     </div>
@@ -125,7 +125,7 @@ function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestD
               ? "Payment submitted — awaiting Billing Clerk verification. The blueprint unlocks once the full fee is verified."
               : "Pay the blueprint fee to unlock your blueprint. Partial payments do not unlock it. Your downpayment invoice follows after this."}
           </p>
-          <Button asChild><Link href={`/customer/billing?invoice=${design.invoice?.id}`}>Pay / review blueprint fee</Link></Button>
+          <Button asChild><Link href={`/customer/billing?invoice=${design.invoice?.id}`}>Pay / Review Blueprint Fee</Link></Button>
         </div>
       )}
       {design.access === "unlocked" && (
@@ -156,7 +156,7 @@ export function DreamHouseDesignReview({ design, estimateAccepted, onChanged }: 
   const latest = design.versions.at(-1);
   return (
     <section aria-label="Design" className="space-y-4 p-5">
-      <Eyebrow>Design and floor plan</Eyebrow>
+      <Eyebrow>Design and Floor Plan</Eyebrow>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
         <span>Requested {billingDate(design.createdAt)}</span>
         {latest && <span>Version {latest.version} shared {billingDate(latest.createdAt)}</span>}

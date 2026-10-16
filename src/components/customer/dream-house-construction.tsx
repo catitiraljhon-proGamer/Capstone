@@ -60,7 +60,7 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
             <p className="text-sm font-semibold text-stone-950">Ready to build this design?</p>
             <p className="mt-1 max-w-xl text-sm leading-6 text-stone-600">G4 Builders will prepare an itemized cost estimate with a payment schedule for you to review. Nothing is charged until you accept it.</p>
           </div>
-          <Button className="h-auto min-h-11 w-full whitespace-normal sm:w-auto" onClick={onStart}><HardHat className="mr-2 h-4 w-4 shrink-0" />Proceed to construction cost estimation</Button>
+          <Button className="h-auto min-h-11 w-full whitespace-normal sm:w-auto" onClick={onStart}><HardHat className="mr-2 h-4 w-4 shrink-0" />Proceed to Construction Cost Estimation</Button>
         </div>
       )}
       {!estimate && starting && <ConstructionRequestForm design={design} showDesignFacts={false} onCancel={onCancelStart} onSubmitted={onSubmitted} />}
