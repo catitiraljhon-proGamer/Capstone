@@ -99,7 +99,6 @@ export type BillingData = {
   projects: BillingProject[];
   invoices: BillingInvoice[];
   payments: BillingPayment[];
-  activity: { id: string; action: string; actorName: string; date: string }[];
 };
 
 /** A customer payment date shown read-only on the admin calendar; billing itself stays with the Billing Clerk. */

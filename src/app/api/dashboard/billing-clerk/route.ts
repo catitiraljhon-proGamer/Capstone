@@ -13,7 +13,6 @@ export async function GET(request: Request) {
       overdueAccounts: new Set(unpaid.filter((invoice) => invoice.overdue).map((invoice) => invoice.customerId)).size,
       invoicesReady: data.invoices.filter((invoice) => ["Draft", "Ready"].includes(invoice.status)).length,
       queueItems: unpaid.slice(0, 8).map((invoice) => ({ title: invoice.invoiceNumber, meta: invoice.customerName, amount: invoice.balance, status: invoice.status })),
-      activityItems: data.activity.map((activity) => ({ title: activity.action, body: activity.actorName, date: activity.date })),
     });
   });
 }

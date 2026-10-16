@@ -497,12 +497,11 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     ...owner, status: { $nin: ["Draft", "Ready"] },
     $or: [{ status: { $ne: "Void" } }, { issuedAt: { $exists: true } }],
   };
-  const [projects, invoices, payments, users, activity, designs] = await Promise.all([
+  const [projects, invoices, payments, users, designs] = await Promise.all([
     db.collection<ProjectDocument>(collections.projects).find(owner).sort({ createdAt: -1 }).toArray(),
     db.collection<InvoiceDocument>(collections.invoices).find(invoiceFilter).sort({ createdAt: -1 }).toArray(),
     db.collection<PaymentDocument>(collections.payments).find(owner, { projection: { proofImage: 0 } }).sort({ createdAt: -1 }).toArray(),
     db.collection<UserDocument>(collections.users).find(clerk ? { role: "customer" } : { _id: recordId(actor.id) }, { projection: { name: 1 } }).toArray(),
-    clerk ? db.collection<AuditLogDocument>(collections.auditLogs).find({ entityType: { $in: ["invoice", "payment"] } }).sort({ createdAt: -1 }).limit(12).toArray() : [],
     clerk ? billableDesignRequests(db) : [],
   ]);
   const billing = projectBillingFrom(invoices, payments);
@@ -555,7 +554,6 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
       ...(payment.gateway === "paymongo" && payment.gatewayMethod && payment.gatewaySessionId
         ? { gateway: { provider: "paymongo" as const, method: payment.gatewayMethod, sessionId: payment.gatewaySessionId, livemode: payment.gatewayLivemode ?? false } } : {}),
     })),
-    activity: activity.map((item) => ({ id: item._id.toHexString(), action: item.action, actorName: item.actorName, date: item.createdAt.toISOString() })),
   };
 }
 

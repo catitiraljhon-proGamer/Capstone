@@ -12,7 +12,7 @@ import { manilaDate, sumMoney } from "@/lib/billing";
 import type { PaymongoCheckoutDto } from "@/types/paymongo";
 import { designFeeLabels, paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 
-const emptyData: BillingData = { designRequests: [], projects: [], invoices: [], payments: [], activity: [] };
+const emptyData: BillingData = { designRequests: [], projects: [], invoices: [], payments: [] };
 type Dialog =
   | { type: "invoice-form"; invoice?: BillingInvoice; designRequestId?: string }
   | { type: "invoice"; invoice: BillingInvoice }
@@ -215,7 +215,6 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
         </section>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Payments Awaiting Verification</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/payments">View Payments</Link></div><PaymentTable payments={pending.slice(0, 5)} customer={false} onView={viewPayment} /></BillingPanel>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Invoices Needing Follow-Up</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/invoices">View Invoices</Link></div><InvoiceTable invoices={[...unpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5)} onView={viewInvoice} /></BillingPanel>
-        <BillingPanel><h2 className="mb-4 text-lg font-semibold tracking-tight">Recent Billing Activity</h2>{!data.activity.length ? <BillingEmpty text="Activity will appear as billings and payments are recorded." /> : <div className="divide-y divide-stone-100">{data.activity.map((activity) => <div key={activity.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm"><p><span className="font-medium">{activity.actorName}</span><span className="ml-2 text-stone-600">{activity.action.replaceAll(".", " · ")}</span></p><time className="text-xs text-stone-500">{new Date(activity.date).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</time></div>)}</div>}</BillingPanel>
       </> : <>
         <BillingPanel>
           <div className="grid items-end gap-3 md:grid-cols-3">
