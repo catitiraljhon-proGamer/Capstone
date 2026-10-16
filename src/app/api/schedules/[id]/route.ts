@@ -1,72 +1,10 @@
-import {
-  collections,
-  type AuditLogDocument,
-  type ScheduleDocument,
-} from "@/lib/database/collections";
-import { getDatabase } from "@/lib/database/mongodb";
-import { apiError, forbidden, unauthorized } from "@/lib/server/api";
-import { insertNotifications } from "@/lib/server/notifications";
-import { scheduleStatusSchema, toScheduleDto } from "@/lib/server/schedules";
-import { readSession } from "@/lib/server/session";
-import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
+import { designRequestApi } from "@/lib/server/design-request-api";
+import { updateScheduleStatus } from "@/lib/server/schedules";
 
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
-  try {
-    const session = await readSession();
-    if (!session) return unauthorized();
-    if (session.role !== "admin") return forbidden();
-
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  return designRequestApi(request, ["admin", "billing-clerk"], async (db, actor) => {
     const { id } = await context.params;
-    if (!ObjectId.isValid(id)) {
-      return NextResponse.json({ error: "Invalid schedule id." }, { status: 400 });
-    }
-
-    const changes = scheduleStatusSchema.parse(await request.json());
-    if (changes.paymentStatus) return forbidden();
-    const db = await getDatabase();
-    const now = new Date();
-    const document = await db
-      .collection<ScheduleDocument>(collections.schedules)
-      .findOneAndUpdate(
-        { _id: new ObjectId(id), eventType: "Client meeting" },
-        { $set: { ...changes, updatedAt: now } },
-        { returnDocument: "after" },
-      );
-
-    if (!document) {
-      return NextResponse.json({ error: "Schedule not found." }, { status: 404 });
-    }
-
-    await Promise.all([
-      db.collection<AuditLogDocument>(collections.auditLogs).insertOne({
-        _id: new ObjectId(),
-        actorId: new ObjectId(session.id),
-        actorName: session.name,
-        actorRole: session.role,
-        action: "schedule.status-updated",
-        entityType: "schedule",
-        entityId: document._id,
-        details: {
-          ...(changes.status ? { status: changes.status } : {}),
-        },
-        createdAt: now,
-      }),
-      insertNotifications(db, [{
-        _id: new ObjectId(),
-        userId: document.clientId,
-        title: "Schedule status updated",
-        body: `${document.title}: ${changes.status}.`,
-        href: "/customer/notifications",
-        createdAt: now,
-      }]),
-    ]);
-
-    return NextResponse.json({ schedule: toScheduleDto(document) });
-  } catch (error) {
-    return apiError(error);
-  }
+    return NextResponse.json({ schedule: await updateScheduleStatus(db, actor, id, await request.json()) });
+  });
 }

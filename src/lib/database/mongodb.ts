@@ -109,6 +109,8 @@ async function ensureIndexes(db: Db) {
       db.collection("notifications").createIndex({ userId: 1, readAt: 1, createdAt: -1 }),
       db.collection("schedules").createIndex({ scheduledFor: 1, status: 1 }),
       db.collection("schedules").createIndex({ clientId: 1, scheduledFor: -1 }),
+      db.collection("meeting_requests").createIndex({ status: 1, createdAt: 1 }),
+      db.collection("meeting_requests").createIndex({ customerId: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ createdAt: -1 }),
       db.collection("audit_logs").createIndex({ action: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ entityType: 1, createdAt: -1 }),

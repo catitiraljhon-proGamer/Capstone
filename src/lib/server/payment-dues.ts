@@ -1,4 +1,4 @@
-import type { Db } from "mongodb";
+import type { Db, ObjectId } from "mongodb";
 import { collections, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type UserDocument } from "@/lib/database/collections";
 import { invoiceState, sumMoney } from "@/lib/billing";
 import type { PaymentDueDto } from "@/types/billing";
@@ -6,15 +6,16 @@ import type { PaymentDueDto } from "@/types/billing";
 const invoiceStatus = { Sent: "Due", "Partially Paid": "Partially paid", Paid: "Paid", Overdue: "Overdue" } as const;
 
 /**
- * Every customer payment date for the admin calendar: issued invoices (with their live paid status) plus scheduled
- * construction milestones that are not invoiced yet. Drafts and void invoices are left out.
+ * Every customer payment date for the staff calendars, or one customer's with `customerId`: issued invoices (with their
+ * live paid status) plus scheduled construction milestones that are not invoiced yet. Drafts and void invoices are left out.
  */
-export async function listPaymentDues(db: Db, now = new Date()): Promise<PaymentDueDto[]> {
+export async function listPaymentDues(db: Db, { customerId, now = new Date() }: { customerId?: ObjectId; now?: Date } = {}): Promise<PaymentDueDto[]> {
+  const owner = customerId ? { customerId } : {};
   const [invoices, projects] = await Promise.all([
     db.collection<InvoiceDocument>(collections.invoices)
-      .find({ status: { $nin: ["Draft", "Ready", "Void"] } }).sort({ dueDate: 1 }).limit(2_000).toArray(),
+      .find({ ...owner, status: { $nin: ["Draft", "Ready", "Void"] } }).sort({ dueDate: 1 }).limit(2_000).toArray(),
     db.collection<ProjectDocument>(collections.projects)
-      .find({ status: { $ne: "Completed" }, "paymentSchedule.0": { $exists: true } }).limit(1_000).toArray(),
+      .find({ ...owner, status: { $ne: "Completed" }, "paymentSchedule.0": { $exists: true } }).limit(1_000).toArray(),
   ]);
   const invoicedProjectIds = invoices.flatMap((invoice) => (invoice.projectId ? [invoice.projectId] : []));
   const [payments, invoicedProjects, customers] = await Promise.all([
@@ -25,7 +26,7 @@ export async function listPaymentDues(db: Db, now = new Date()): Promise<Payment
     invoicedProjectIds.length
       ? db.collection<ProjectDocument>(collections.projects).find({ _id: { $in: invoicedProjectIds } }, { projection: { reference: 1, name: 1, paymentSchedule: 1 } }).toArray()
       : [],
-    db.collection<UserDocument>(collections.users).find({ role: "customer" }, { projection: { name: 1 } }).toArray(),
+    db.collection<UserDocument>(collections.users).find(customerId ? { _id: customerId } : { role: "customer" }, { projection: { name: 1 } }).toArray(),
   ]);
   const customerNames = new Map(customers.map((customer) => [customer._id.toHexString(), customer.name]));
   const projectsById = new Map([...invoicedProjects, ...projects].map((project) => [project._id.toHexString(), project]));
@@ -45,6 +46,7 @@ export async function listPaymentDues(db: Db, now = new Date()): Promise<Payment
       id: `invoice-${invoice._id.toHexString()}`,
       kind: invoice.designRequestId ? (invoice.feeType === "blueprint" ? "Blueprint fee" : "Design fee") : milestone?.isDownpayment ? "Downpayment" : "Progress billing",
       label: invoice.label,
+      clientId: invoice.customerId.toHexString(),
       clientName: customerNames.get(invoice.customerId.toHexString()) ?? "Unknown customer",
       projectName: project ? `${project.reference} · ${project.name}` : designLabel,
       dueDate: invoice.dueDate.toISOString().slice(0, 10),
@@ -61,6 +63,7 @@ export async function listPaymentDues(db: Db, now = new Date()): Promise<Payment
       id: `milestone-${project._id.toHexString()}-${milestone.id}`,
       kind: milestone.isDownpayment ? "Downpayment" : "Progress billing",
       label: milestone.label,
+      clientId: project.customerId.toHexString(),
       clientName: customerNames.get(project.customerId.toHexString()) ?? "Unknown customer",
       projectName: `${project.reference} · ${project.name}`,
       dueDate: milestone.targetDate.toISOString().slice(0, 10),

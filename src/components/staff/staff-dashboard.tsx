@@ -54,6 +54,7 @@ const clerkNav = [
   { label: "Progress Billings", icon: ReceiptText, href: "/billing-clerk/progress-billings" },
   { label: "Payments", icon: WalletCards, href: "/billing-clerk/payments" },
   { label: "Invoices", icon: FileText, href: "/billing-clerk/invoices" },
+  { label: "Schedule", icon: CalendarDays, href: "/billing-clerk/schedule" },
   { label: "Customer Accounts", icon: Users, href: "/billing-clerk/customer-accounts" },
   { label: "Reports", icon: ClipboardCheck, href: "/billing-clerk/reports" },
 ];
@@ -451,8 +452,11 @@ export function AdminDashboard() {
   );
 }
 
-export function BillingClerkSectionPage({ activeLabel, title, description }: { activeLabel: BillingSection; title: string; description: string }) {
-  return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={<BillingWorkspace section={activeLabel} />} />;
+/** Billing workspace sections, or a page with its own content (such as the Schedule). */
+export function BillingClerkSectionPage({ activeLabel, title, description, mainContent }: { title: string; description: string } & (
+  { activeLabel: BillingSection; mainContent?: undefined } | { activeLabel: string; mainContent: ReactNode }
+)) {
+  return <StaffDashboard role="Billing Clerk" name="Billing Clerk" title={title} description={description} navItems={setActiveNav(clerkNav, activeLabel)} metrics={[]} primaryPanel={null} queueTitle="" queueItems={[]} activityItems={[]} mainContent={mainContent ?? <BillingWorkspace section={activeLabel as BillingSection} />} />;
 }
 
 export function AdminSectionPage({

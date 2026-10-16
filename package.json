@@ -17,6 +17,7 @@
     "test:construction": "node --import tsx --test tests/construction-pricing.test.ts tests/construction.test.ts",
     "test:paymongo": "node --import tsx --test tests/paymongo.test.ts",
     "test:security": "node --import tsx --test tests/security.test.ts",
+    "test:schedules": "node --import tsx --test tests/schedules.test.ts",
     "db:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-mongodb.ps1",
     "db:seed": "node scripts/seed-database.mjs"
   },

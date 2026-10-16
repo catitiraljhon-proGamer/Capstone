@@ -21,6 +21,7 @@ import type { ReceiptSnapshot, StoredPaymentMethod } from "@/types/billing";
 import type { DesignRequestStatus, RequestedHouseDesign } from "@/types/design-requests";
 import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
+import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -43,6 +44,7 @@ export const collections = {
   documents: "documents",
   notifications: "notifications",
   schedules: "schedules",
+  meetingRequests: "meeting_requests",
   auditLogs: "audit_logs",
   rateLimits: "rate_limits",
   emailVerifications: "email_verifications",
@@ -473,6 +475,30 @@ export type ScheduleDocument = {
   milestoneId?: string;
   createdBy: ObjectId;
   createdByName: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** A customer's request for a meeting; the admin approves it into a "Client meeting" schedule or declines it. */
+export type MeetingRequestDocument = {
+  _id: ObjectId;
+  customerId: ObjectId;
+  customerName: string;
+  projectId?: ObjectId;
+  projectName?: string;
+  topic: string;
+  details?: string;
+  mode: MeetingMode;
+  /** One to three times the customer can attend, in order of preference. */
+  preferredTimes: Date[];
+  status: MeetingRequestStatus;
+  /** The meeting created on approval. */
+  scheduleId?: ObjectId;
+  scheduledFor?: Date;
+  declineReason?: string;
+  reviewedBy?: ObjectId;
+  reviewedByName?: string;
+  reviewedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };

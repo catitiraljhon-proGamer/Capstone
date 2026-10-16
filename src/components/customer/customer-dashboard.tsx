@@ -22,7 +22,9 @@ import { AccountMenu, type AccountMenuLink } from "@/components/ui/account-menu"
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { useSessionUser } from "@/lib/session-store";
 import { useCustomerDashboardData } from "@/lib/customer-dashboard-data";
+import { CustomerSchedule } from "@/components/customer/customer-schedule";
 import {
+  CalendarDays,
   ClipboardList,
   Gauge,
   Home,
@@ -41,6 +43,7 @@ type CustomerSection =
   | "dream-house"
   | "requests"
   | "billing"
+  | "schedule"
   | "profile";
 
 const houseImage = "/House/image.png";
@@ -55,6 +58,7 @@ const customerNav: {
   { label: "Dream House", icon: Home, href: "/customer/dream-house", section: "dream-house" },
   { label: "Design Requests", icon: ClipboardList, href: "/customer/design-requests", section: "requests" },
   { label: "Billing Status", icon: ReceiptText, href: "/customer/billing", section: "billing" },
+  { label: "My Schedule", icon: CalendarDays, href: "/customer/schedule", section: "schedule" },
 ];
 
 const customerAccountLinks: AccountMenuLink[] = [
@@ -532,6 +536,9 @@ export function CustomerBillingPage() {
   return <CustomerShell activeSection="billing" title="Billing & Payments" description="View invoices, submit payment details, and download your receipts."><BillingWorkspace customer section="Invoices" /></CustomerShell>;
 }
 
+export function CustomerSchedulePage() {
+  return <CustomerShell activeSection="schedule" title="My Schedule" description="See your meetings and payment due dates, and request a meeting with the team."><CustomerSchedule /></CustomerShell>;
+}
 
 export function CustomerProfilePage() {
   return (

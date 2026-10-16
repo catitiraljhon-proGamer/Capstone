@@ -106,6 +106,7 @@ export type PaymentDueDto = {
   id: string;
   kind: "Downpayment" | "Progress billing" | "Blueprint fee" | "Design fee";
   label: string;
+  clientId: string;
   clientName: string;
   projectName: string;
   /** YYYY-MM-DD */
