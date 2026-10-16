@@ -11,17 +11,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { AccountTermsDialog } from "@/components/auth/account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { useHouseDesigns } from "@/lib/house-design-store";
 
 type StatProps = {
   label: string;
   value: string;
-};
-
-type SoftButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  children: ReactNode;
 };
 
 const Stat = ({ label, value }: StatProps) => (
@@ -32,42 +28,6 @@ const Stat = ({ label, value }: StatProps) => (
     <div className="text-sm text-stone-500">{label}</div>
   </div>
 );
-
-const SoftButton = ({ children, className = "", ...props }: SoftButtonProps) => (
-  <button
-    className={[
-      "inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition",
-      "hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2",
-      className,
-    ].join(" ")}
-    {...props}
-  >
-    {children}
-  </button>
-);
-
-const footerColumns = [
-  {
-    title: "Company",
-    links: ["About Us", "Our Team", "Careers", "Projects", "Contact"],
-  },
-  {
-    title: "Platform",
-    links: ["Estimates", "Billing", "BOQ", "Reports", "Approvals"],
-  },
-  {
-    title: "Resources",
-    links: ["Help Center", "Guides", "Templates", "Cost Library", "Updates"],
-  },
-  {
-    title: "Partners",
-    links: ["Suppliers", "Subcontractors", "Consultants", "Developers"],
-  },
-  {
-    title: "Legal",
-    links: ["Privacy Policy", "Terms of Service", "Security", "Cookie Policy"],
-  },
-];
 
 function MiniBars() {
   return (
@@ -174,133 +134,29 @@ function SwappingHouseShowcase() {
   );
 }
 
-function FooterLink({ children }: { children: ReactNode }) {
-  return (
-    <a href="#" className="text-sm text-stone-600 transition hover:text-red-700">
-      {children}
-    </a>
-  );
-}
-
-function SocialIcon({ label }: { label: string }) {
-  const iconClass = "h-4 w-4 fill-current";
-
-  if (label === "GitHub") {
-    return (
-      <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
-        <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.41-4.04-1.41-.55-1.38-1.34-1.75-1.34-1.75-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23A11.5 11.5 0 0 1 12 6.8c1.02 0 2.05.14 3.01.41 2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5Z" />
-      </svg>
-    );
-  }
-
-  if (label === "LinkedIn") {
-    return (
-      <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
-        <path d="M4.98 3.5a2.5 2.5 0 1 1 0 5.01 2.5 2.5 0 0 1 0-5.01ZM3 9.75h4v10.76H3V9.75Zm6.25 0h3.84v1.47h.05c.54-1.02 1.86-1.86 3.82-1.86 4.09 0 4.84 2.69 4.84 6.19v4.96h-4v-4.39c0-1.05-.02-2.4-1.46-2.4-1.46 0-1.69 1.14-1.69 2.32v4.47h-4V9.75Z" />
-      </svg>
-    );
-  }
-
-  if (label === "Facebook") {
-    return (
-      <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
-        <path d="M14.2 8.2V6.7c0-.72.48-.89.82-.89h2.08V2.2L14.24 2.2c-3.18 0-3.9 2.38-3.9 3.9v2.1H7.84v3.7h2.5V22h3.86V11.9h3.24l.43-3.7H14.2Z" />
-      </svg>
-    );
-  }
-
-  if (label === "YouTube") {
-    return (
-      <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
-        <path d="M23.5 6.2a3 3 0 0 0-2.1-2.12C19.55 3.58 12 3.58 12 3.58s-7.55 0-9.4.5A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.12c1.85.5 9.4.5 9.4.5s7.55 0 9.4-.5a3 3 0 0 0 2.1-2.12A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8ZM9.6 15.57V8.43L15.86 12 9.6 15.57Z" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
-      <path d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm0 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.8ZM12 7.2A4.8 4.8 0 1 1 12 16.8 4.8 4.8 0 0 1 12 7.2Zm0 2A2.8 2.8 0 1 0 12 14.8 2.8 2.8 0 0 0 12 9.2Zm5.1-2.55a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3Z" />
-    </svg>
-  );
-}
-
-const socialLinks = ["GitHub", "LinkedIn", "Facebook", "YouTube", "Instagram"];
-
+/** Footer with the brand and a working link to the Terms and Conditions; the site has no other public pages. */
 function LandingFooter() {
+  const [readingTerms, setReadingTerms] = useState(false);
   return (
     <footer className="border-t border-stone-200 bg-white">
-      <div className="mx-auto w-full max-w-[1244px] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+      <div className="mx-auto w-full max-w-[1244px] px-4 py-12 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           <BrandLogo />
-          <p className="mt-8 text-sm leading-7 text-stone-600">
+          <p className="mt-6 text-sm leading-7 text-stone-600">
             G4 Builders Inc helps project teams estimate construction costs,
             review BOQ items, manage progress billing, and keep project reports
             clear from site work to office approvals.
           </p>
         </div>
-
-        <div className="mt-12 grid grid-cols-2 gap-8 md:grid-cols-5 lg:grid-cols-[repeat(5,minmax(0,1fr))_1.45fr]">
-          {footerColumns.map((column) => (
-            <div key={column.title}>
-              <h3 className="text-sm font-semibold text-stone-950">
-                {column.title}
-              </h3>
-              <div className="mt-5 flex flex-col gap-3">
-                {column.links.map((link) => (
-                  <FooterLink key={link}>{link}</FooterLink>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          <div className="col-span-2 md:col-span-5 lg:col-span-1">
-            <h3 className="text-sm font-semibold text-stone-950">
-              For Owners & Site Teams
-            </h3>
-            <button className="mt-4 w-full rounded-lg border border-red-100 bg-red-50 px-5 py-3 text-sm font-semibold text-red-700 transition hover:border-red-200 hover:bg-red-100">
-              Get In Touch
-            </button>
-
-            <h3 className="mt-6 text-sm font-semibold text-stone-950">
-              Quick Links
-            </h3>
-            <div className="mt-4 flex flex-col gap-3">
-              {["Create Estimate", "Billing Dashboard", "Project Reports", "Support"].map(
-                (link) => (
-                  <FooterLink key={link}>{link}</FooterLink>
-                ),
-              )}
-            </div>
-
-            <div className="mt-6 border-t border-stone-200 pt-5">
-              <h3 className="text-sm font-semibold text-stone-950">
-                Follow Us
-              </h3>
-              <div className="mt-4 flex items-center gap-3 text-stone-500">
-                {socialLinks.map((label) => (
-                  <a
-                    key={label}
-                    href="#"
-                    className="grid h-8 w-8 place-items-center rounded border border-stone-200 bg-white text-stone-500 transition hover:border-stone-300 hover:bg-stone-100 hover:text-stone-950"
-                    aria-label={`${label} social link`}
-                  >
-                    <SocialIcon label={label} />
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-20 flex flex-col gap-4 text-xs text-stone-500 md:flex-row md:items-center md:justify-between">
+        {/* Kept on the left: the floating Contact Us button covers the bottom-right corner. */}
+        <div className="mt-10 flex flex-col items-start gap-3 border-t border-stone-200 pt-6 text-xs text-stone-500 sm:flex-row sm:items-center sm:gap-6">
           <p>Copyright {new Date().getFullYear()} G4 Builders Inc. All rights reserved.</p>
-          <div className="flex gap-8">
-            <FooterLink>Privacy</FooterLink>
-            <FooterLink>Terms</FooterLink>
-            <FooterLink>Sitemap</FooterLink>
-          </div>
+          <button type="button" onClick={() => setReadingTerms(true)} aria-haspopup="dialog" className="rounded text-xs font-medium text-stone-600 underline-offset-4 transition hover:text-red-700 hover:underline focus-visible:outline-2 focus-visible:outline-red-600">
+            Terms and Conditions
+          </button>
         </div>
       </div>
+      {readingTerms && <AccountTermsDialog onClose={() => setReadingTerms(false)} />}
     </footer>
   );
 }
@@ -332,23 +188,12 @@ export default function LandingPage() {
           <Link href="/" aria-label="G4 Builders home" className="min-w-0">
             <BrandLogo />
           </Link>
-          <div className="hidden items-center gap-6 lg:flex">
-            {["Estimates", "Billing", "Projects", "Reports"].map((item) => (
-              <a
-                key={item}
-                href="#"
-                className="text-sm text-stone-600 hover:text-stone-950"
-              >
-                {item}
-              </a>
-            ))}
-          </div>
           <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto">
             <Link
               href="/login"
               className="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
             >
-              Log in
+              Log In
             </Link>
             <Link
               href="/register"
@@ -483,9 +328,13 @@ export default function LandingPage() {
               Inc.
             </p>
             <div className="mt-8">
-              <SoftButton>
+              {/* Projects are viewed after signing in. */}
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+              >
                 Review Projects <ArrowUpRight className="ml-1 h-4 w-4" />
-              </SoftButton>
+              </Link>
             </div>
           </div>
 
