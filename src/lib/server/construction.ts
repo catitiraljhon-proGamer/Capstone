@@ -433,7 +433,7 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
   const blueprintFirst = Boolean(design && designWorkflow(design) === "blueprint");
   await notify(db, session, clerks.map((clerk) => clerk._id), blueprintFirst ? {
     title: "Blueprint fee ready to bill",
-    body: `${actor.name} accepted ${estimate.reference}. Once the admin uploads the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) can be issued after the blueprint is paid.`,
+    body: `${actor.name} accepted ${estimate.reference}. Once the admin submits the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) can be issued after the blueprint is paid.`,
     href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: estimate.designRequestId,
   } : {
     title: "Downpayment invoice ready to issue",
@@ -443,7 +443,7 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
   await notify(db, session, admins.map((admin) => admin._id), {
     title: "Cost estimate accepted",
     body: blueprintFirst
-      ? `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. Upload the blueprint files in Approvals so the Billing Clerk can bill the blueprint fee.`
+      ? `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. Upload the blueprint files in Approvals, then submit them so the Billing Clerk can bill the blueprint fee.`
       : `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. ${project.reference} is awaiting its downpayment.`,
     href: blueprintFirst ? "/admin/approvals" : `/admin/cost-estimates?estimate=${estimate._id.toHexString()}`, kind: "construction-project", entityId: projectId,
   });

@@ -155,7 +155,7 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
 function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; onChanged: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const locked = workflow.blueprintPaid;
+  const locked = workflow.blueprintPaid || Boolean(workflow.blueprintSubmittedAt);
 
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -191,8 +191,22 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
     }
   };
 
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await readJson(await fetch(`/api/design-requests/${workflow.id}/blueprint/submit`, { method: "POST" }));
+      onChanged("The blueprint was submitted. The Billing Clerk was notified to bill the blueprint fee.");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to submit the blueprint.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const estimateAccepted = workflow.estimate?.status === "Accepted";
   const estimateText = !workflow.estimate ? "The customer has not requested a cost estimate yet."
-    : workflow.estimate.status === "Accepted" ? `Estimate ${workflow.estimate.reference} accepted.`
+    : estimateAccepted ? `Estimate ${workflow.estimate.reference} accepted.`
       : `Estimate ${workflow.estimate.reference} is ${workflow.estimate.status.toLowerCase()}.`;
 
   return (
@@ -200,7 +214,7 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Blueprint</p>
       <h3 className="mt-1 font-semibold">Blueprint files</h3>
       <p className="mt-1 text-sm leading-6 text-stone-600">
-        {estimateText} The Billing Clerk can bill the blueprint fee once the estimate is accepted and at least one file is uploaded. The customer downloads these only after full payment is verified.
+        {estimateText} Upload every blueprint file, then submit the blueprint so the Billing Clerk can bill its fee. The customer downloads these only after full payment is verified.
       </p>
       {workflow.blueprintInvoice && (
         <p className="mt-2 text-sm text-stone-700">
@@ -226,16 +240,33 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
       ) : (
         <p className="mt-3 rounded-lg border border-dashed border-stone-200 p-4 text-sm text-stone-500">No blueprint files uploaded yet.</p>
       )}
-      {locked ? (
+      {workflow.blueprintPaid ? (
         <p className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" />Paid — the customer can download the blueprint. Files are locked.</p>
+      ) : workflow.blueprintSubmittedAt ? (
+        <p className="mt-3 flex items-start gap-2 text-sm font-medium text-stone-700">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
+          Submitted to the Billing Clerk on {formatDate(workflow.blueprintSubmittedAt)}. Files are locked while the blueprint fee is billed.
+        </p>
       ) : (
-        <label className={`mt-3 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold hover:bg-stone-100 ${busy ? "pointer-events-none opacity-60" : ""}`}>
-          {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-          {busy ? "Uploading…" : "Add blueprint file"}
-          <input type="file" accept={blueprintAccept} disabled={busy} onChange={(event) => void upload(event)} className="sr-only" />
-        </label>
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label className={`inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold hover:bg-stone-100 ${busy ? "pointer-events-none opacity-60" : ""}`}>
+              {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+              {busy ? "Working…" : "Add blueprint file"}
+              <input type="file" accept={blueprintAccept} disabled={busy} onChange={(event) => void upload(event)} className="sr-only" />
+            </label>
+            {workflow.blueprintFiles.length > 0 && (
+              <Button type="button" disabled={busy || !estimateAccepted} onClick={() => void submit()}>
+                <Send className="mr-2 h-4 w-4" />Submit blueprint to Billing Clerk
+              </Button>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-stone-500">PDF, JPG, PNG, or WebP · one file at a time · 3 MB each · up to 10 files</p>
+          {workflow.blueprintFiles.length > 0 && !estimateAccepted && (
+            <p className="mt-1 text-xs text-stone-500">You can submit once the customer accepts the construction cost estimate.</p>
+          )}
+        </>
       )}
-      {!locked && <p className="mt-2 text-xs text-stone-500">PDF, JPG, PNG, or WebP · one file at a time · 3 MB each · up to 10 files</p>}
     </div>
   );
 }

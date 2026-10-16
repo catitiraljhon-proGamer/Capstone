@@ -190,8 +190,8 @@ async function validateDesignInvoice(db: Db, session: ClientSession, id: ObjectI
     if (design.status !== "Design approved") throw new BillingError("The customer must approve the design before the blueprint fee is billed.", 409);
     const estimate = await db.collection<EstimateDocument>(collections.estimates).findOne({ designRequestId: design._id }, { session, projection: { status: 1 } });
     if (estimate?.status !== "Accepted") throw new BillingError("The customer must accept the construction cost estimate before the blueprint fee is billed.", 409);
-    if (!(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }, { session }))) {
-      throw new BillingError("The admin must upload the blueprint files before the blueprint fee is billed.", 409);
+    if (!design.blueprintSubmittedAt || !(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }, { session }))) {
+      throw new BillingError("The admin must submit the blueprint before the blueprint fee is billed.", 409);
     }
   }
   const customer = await db.collection<UserDocument>(collections.users).findOne({ _id: design.customerId, role: "customer", status: "active", clientArchivedAt: null }, { session });
@@ -480,20 +480,12 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
   });
 }
 
-/** Legacy delivered designs, plus approved designs whose estimate is accepted and whose blueprint is uploaded. */
+/** Legacy delivered designs, plus approved designs whose blueprint the admin submitted. */
 async function billableDesignRequests(db: Db) {
-  const designs = await db.collection<DesignRequestDocument>(collections.designRequests)
-    .find({ status: { $in: ["Completed", "Design approved"] } }, { projection: { customerId: 1, floorArea: 1, finish: 1, status: 1 } })
+  // Blueprint requests appear once the admin submits the blueprint, which requires an accepted estimate.
+  return db.collection<DesignRequestDocument>(collections.designRequests)
+    .find({ $or: [{ status: "Completed" }, { status: "Design approved", blueprintSubmittedAt: { $exists: true } }] }, { projection: { customerId: 1, floorArea: 1, finish: 1, status: 1 } })
     .sort({ updatedAt: -1 }).toArray();
-  const blueprintIds = designs.filter((design) => design.status === "Design approved").map((design) => design._id);
-  if (!blueprintIds.length) return designs;
-  // The Stable API (strict) has no distinct command, so read the linked ids with projected finds.
-  const [accepted, withFiles] = await Promise.all([
-    db.collection<EstimateDocument>(collections.estimates).find({ designRequestId: { $in: blueprintIds }, status: "Accepted" }, { projection: { designRequestId: 1 } }).toArray(),
-    db.collection<BlueprintFileDocument>(collections.blueprintFiles).find({ designRequestId: { $in: blueprintIds } }, { projection: { designRequestId: 1 } }).toArray(),
-  ]);
-  const has = (records: { designRequestId?: ObjectId }[], id: ObjectId) => records.some((record) => record.designRequestId?.equals(id));
-  return designs.filter((design) => design.status === "Completed" || (has(accepted, design._id) && has(withFiles, design._id)));
 }
 
 export async function getBillingData(db: Db, actor: SessionUser): Promise<BillingData> {

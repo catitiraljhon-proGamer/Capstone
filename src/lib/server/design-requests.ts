@@ -249,7 +249,39 @@ async function lockedForBlueprintChanges(db: Db, design: DesignRequestDocument) 
   if (designWorkflow(design) !== "blueprint" || design.status !== "Design approved") {
     throw new BillingError("Blueprint files can be added after the customer approves the design.", 409);
   }
+  if (design.blueprintSubmittedAt) throw new BillingError("The blueprint was already submitted to the Billing Clerk, so the files are locked.", 409);
   if ((await feeInvoiceState(db, design)).unlocked) throw new BillingError("The blueprint fee is already paid, so the files are locked.", 409);
+}
+
+/**
+ * The admin submits the finished blueprint once every file is uploaded and the customer accepted the estimate.
+ * Only then is the Billing Clerk asked to bill the blueprint fee, and the files are locked.
+ */
+export async function submitBlueprint(db: Db, actor: SessionUser, id: string) {
+  if (actor.role !== "admin") throw new BillingError("Only an administrator can submit blueprints.", 403);
+  const design = await findVisibleDesign(db, actor, id);
+  await lockedForBlueprintChanges(db, design);
+  if (!(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }))) {
+    throw new BillingError("Upload at least one blueprint file before submitting.", 409);
+  }
+  const estimate = await db.collection<EstimateDocument>(collections.estimates)
+    .findOne({ designRequestId: design._id, status: "Accepted" }, { projection: { reference: 1 } });
+  if (!estimate) throw new BillingError("Submit the blueprint after the customer accepts the construction cost estimate.", 409);
+  return billingTransaction(db, async (session) => {
+    const now = new Date();
+    const submitted = await db.collection<DesignRequestDocument>(collections.designRequests).updateOne(
+      { _id: design._id, blueprintSubmittedAt: { $exists: false } },
+      { $set: { blueprintSubmittedAt: now, blueprintSubmittedBy: requestId(actor.id), updatedAt: now } }, { session },
+    );
+    if (!submitted.matchedCount) throw new BillingError("The blueprint was already submitted.", 409);
+    await insertNotifications(db, (await activeUserIds(db, "billing-clerk")).map((clerkId) => ({
+      _id: new ObjectId(), userId: clerkId, title: "Blueprint ready for billing",
+      body: `The blueprint for ${estimate.reference} was submitted. Set the blueprint fee and issue its invoice.`,
+      href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: design._id, createdAt: now,
+    })), session);
+    await audit(db, session, actor, "design-request.blueprint-submitted", "design_request", design._id, { estimateReference: estimate.reference });
+    return { submittedAt: now.toISOString() };
+  });
 }
 
 /** One file per request keeps each upload under the hosting body limit. */
@@ -268,19 +300,8 @@ export async function uploadBlueprintFile(db: Db, actor: SessionUser, id: string
     _id: new ObjectId(), designRequestId: design._id, customerId: design.customerId, name: input.name,
     ...file, createdBy: requestId(actor.id), createdByName: actor.name, createdAt: now,
   };
-  const first = !(await files.countDocuments({ designRequestId: design._id }));
   await files.insertOne(record);
-  const estimate = first ? await db.collection<EstimateDocument>(collections.estimates).findOne({ designRequestId: design._id, status: "Accepted" }, { projection: { reference: 1 } }) : null;
-  await billingTransaction(db, async (session) => {
-    if (estimate) {
-      await insertNotifications(db, (await activeUserIds(db, "billing-clerk")).map((clerkId) => ({
-        _id: new ObjectId(), userId: clerkId, title: "Blueprint ready for billing",
-        body: `The blueprint for ${estimate.reference} is uploaded. Set the blueprint fee and issue its invoice.`,
-        href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: design._id, createdAt: now,
-      })), session);
-    }
-    await audit(db, session, actor, "design-request.blueprint-uploaded", "design_request", design._id, { fileName: input.name, size: file.size });
-  });
+  await billingTransaction(db, (session) => audit(db, session, actor, "design-request.blueprint-uploaded", "design_request", design._id, { fileName: input.name, size: file.size }));
   return { id: record._id.toHexString(), name: record.name, mimeType: record.mimeType, size: record.size, createdAt: now.toISOString() } satisfies BlueprintFileDto;
 }
 
@@ -318,5 +339,6 @@ export async function getDesignWorkflow(db: Db, actor: SessionUser, id: string):
     id, status: design.status, workflow: designWorkflow(design), versions, blueprintFiles,
     estimate: estimate ? { id: estimate._id.toHexString(), reference: estimate.reference, status: estimate.status } : null,
     blueprintInvoice: fee.invoice, blueprintPaid: fee.unlocked,
+    blueprintSubmittedAt: design.blueprintSubmittedAt?.toISOString() ?? null,
   };
 }

@@ -52,6 +52,8 @@ export type DesignWorkflowDto = {
   estimate: { id: string; reference: string; status: string } | null;
   blueprintInvoice: { id: string; number: string; amount: number; paid: number; balance: number; pending: number } | null;
   blueprintPaid: boolean;
+  /** When the admin submitted the blueprint to the Billing Clerk; files are locked from then on. */
+  blueprintSubmittedAt: string | null;
 };
 
 export type DesignRequestDto = {

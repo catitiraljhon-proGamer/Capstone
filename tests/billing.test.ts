@@ -9,7 +9,7 @@ import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBilli
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
 import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
-import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
+import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, submitBlueprint, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
 import { acceptAccountTerms, requireAccountTerms } from "@/lib/server/account-terms";
 import { accountTerms, accountTermsText } from "@/lib/account-terms";
@@ -201,7 +201,15 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   await acceptedEstimate(request.id);
   await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
   const file = await uploadBlueprintFile(db, admin, request.id, { name: "A-101 floor plan.pdf", dataUrl: blueprintPdf });
+  // The Billing Clerk is asked to bill only after the admin submits the finished blueprint.
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
+  await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
+  assert.equal((await getBillingData(db, clerk)).designRequests.length, 0);
+  await assert.rejects(submitBlueprint(db, customer, request.id), isError(403));
+  await submitBlueprint(db, admin, request.id);
   assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
+  await assert.rejects(submitBlueprint(db, admin, request.id), isError(409));
+  await assert.rejects(uploadBlueprintFile(db, admin, request.id, { name: "late.pdf", dataUrl: blueprintPdf }), isError(409));
   await assert.rejects(getBlueprintFile(db, customer, request.id, file.id), isError(403));
   assert.equal((await getBillingData(db, clerk)).designRequests[0].feeType, "blueprint");
   const invoiceId = await createInvoice(db, clerk, feeInput(request.id));
@@ -361,7 +369,10 @@ test("design versions need an approved feasibility record and blueprint files ne
   await db.collection("design_requests").updateOne({ _id: new ObjectId(id) }, { $set: { status: "Design approved" } });
   await assert.rejects(uploadBlueprintFile(db, customer, id, { name: "plan.pdf", dataUrl: blueprintPdf }), isError(403));
   await assert.rejects(uploadBlueprintFile(db, admin, id, { name: "fake.pdf", dataUrl: "data:application/pdf;base64,aGVsbG8=" }), isError(400));
+  await assert.rejects(submitBlueprint(db, admin, id), isError(409));
   const file = await uploadBlueprintFile(db, admin, id, { name: "plan.pdf", dataUrl: blueprintPdf });
+  // Without an accepted estimate the blueprint cannot be submitted yet.
+  await assert.rejects(submitBlueprint(db, admin, id), isError(409));
   assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
   await deleteBlueprintFile(db, admin, id, file.id);
   assert.equal(await db.collection("blueprint_files").countDocuments(), 0);

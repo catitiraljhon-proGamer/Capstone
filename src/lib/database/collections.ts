@@ -213,6 +213,9 @@ export type DesignRequestDocument = {
   status: DesignRequestStatus;
   /** Latest design version uploaded for customer review. */
   currentVersion?: number;
+  /** When the admin submitted the finished blueprint to the Billing Clerk; the files are locked from then on. */
+  blueprintSubmittedAt?: Date;
+  blueprintSubmittedBy?: ObjectId;
   designApprovedAt?: Date;
   completedAt?: Date;
   completedBy?: ObjectId;
