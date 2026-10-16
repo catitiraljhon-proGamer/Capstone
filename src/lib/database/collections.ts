@@ -63,6 +63,8 @@ export type UserDocument = {
   autoArchivedAt?: Date;
   /** Start of the inactivity period the 7-day "account will be archived" notice was sent for, so it is sent once. */
   inactivityNoticeFor?: Date;
+  /** When that notice went out; archiving waits at least 7 days after it. */
+  inactivityNoticeSentAt?: Date;
   /** When an admin last unarchived the client; the 30-day inactivity count restarts from here. */
   reactivatedAt?: Date;
   /** Customer's one-time agreement to the Terms and Conditions; the audit log keeps the exact text. */
@@ -174,6 +176,7 @@ export type ProjectDocument = {
   estimateId?: ObjectId;
   designRequestId?: ObjectId;
   subtotal?: number;
+  /** Legacy: VAT on projects billed before G4 Builders became VAT-exempt. */
   vat?: number;
   downpaymentPercent?: number;
   paymentSchedule?: ProjectMilestoneDocument[];
@@ -290,6 +293,7 @@ export type EstimateDocument = {
   customerNotes?: string;
   lineItems?: EstimateLineItemDocument[];
   subtotal?: number;
+  /** Legacy: VAT saved before G4 Builders became VAT-exempt; removed by vat-cleanup unless already billed. */
   vatRate?: number;
   vat?: number;
   total: number;

@@ -164,7 +164,7 @@ function CustomerShell({
         </header>
 
         <main className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
-        <AccountTermsGate />
+        {user ? <AccountTermsGate userId={user.id} /> : null}
       </div>
     </div>
   );

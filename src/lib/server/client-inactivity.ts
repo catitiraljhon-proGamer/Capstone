@@ -40,8 +40,8 @@ async function hasOpenWork(db: Db, customerId: ObjectId, since: Date) {
 }
 
 /**
- * Daily job. When every project of a client is Completed and nothing else is open, the client is warned 7 days
- * before, then archived and disabled 30 days after the last completion. Unarchiving in Client restores access.
+ * Daily job. When every project of a client is Completed and nothing else is open, the client is warned, then archived
+ * and disabled 30 days after the last completion and at least 7 days after the warning. Unarchiving restores access.
  */
 export async function archiveInactiveClients(db: Db, now = new Date()) {
   const users = db.collection<UserDocument>(collections.users);
@@ -61,7 +61,11 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
     if (await hasOpenWork(db, customer._id, inactiveSince)) continue;
 
     const archiveOn = new Date(inactiveSince.getTime() + inactiveArchiveDays * day);
-    if (now >= archiveOn) {
+    // The customer is always warned first, and archived no sooner than 7 days after that warning. Clients already
+    // past 30 days when this started (or when a run was missed) still get their full 7 days.
+    const noticeSentAt = customer.inactivityNoticeFor?.getTime() === inactiveSince.getTime() ? customer.inactivityNoticeSentAt : undefined;
+    if (noticeSentAt) {
+      if (now.getTime() < Math.max(archiveOn.getTime(), noticeSentAt.getTime() + inactiveNoticeDays * day)) continue;
       const archived = await users.updateOne(
         { _id: customer._id, status: "active", clientArchivedAt: null },
         { $set: { clientArchivedAt: now, autoArchivedAt: now, status: "disabled", updatedAt: now }, $inc: { authVersion: 1 } },
@@ -79,13 +83,14 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
         href: "/admin/clients", kind: "client-auto-archived", entityId: customer._id, createdAt: now,
       })));
       result.archived += 1;
-    } else if (now.getTime() >= archiveOn.getTime() - inactiveNoticeDays * day && customer.inactivityNoticeFor?.getTime() !== inactiveSince.getTime()) {
+    } else if (now.getTime() >= archiveOn.getTime() - inactiveNoticeDays * day) {
       const marked = await users.updateOne(
         { _id: customer._id, inactivityNoticeFor: { $ne: inactiveSince } },
-        { $set: { inactivityNoticeFor: inactiveSince } },
+        { $set: { inactivityNoticeFor: inactiveSince, inactivityNoticeSentAt: now } },
       );
       if (!marked.modifiedCount) continue;
-      const closeOn = archiveOn.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long" });
+      const closeOn = new Date(Math.max(archiveOn.getTime(), now.getTime() + inactiveNoticeDays * day))
+        .toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long" });
       await insertNotifications(db, [{
         _id: new ObjectId(), userId: customer._id, title: `Your account will be archived on ${closeOn}`,
         body: `Your project is complete. With no new requests, your account will be archived and closed on ${closeOn}. Download your blueprint and receipts before then, or contact G4 Builders if you need more work.`,

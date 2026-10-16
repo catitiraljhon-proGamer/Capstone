@@ -284,6 +284,29 @@ export async function submitBlueprint(db: Db, actor: SessionUser, id: string) {
   });
 }
 
+/** A submitted blueprint can be reopened while no blueprint fee invoice is active (none yet, or the clerk voided it). */
+async function hasActiveFeeInvoice(db: Db, design: DesignRequestDocument) {
+  return Boolean(await db.collection<InvoiceDocument>(collections.invoices)
+    .countDocuments({ designRequestId: design._id, status: { $ne: "Void" } }));
+}
+
+/** Lets the admin correct the blueprint files after submitting, as long as nothing is being billed for them. */
+export async function reopenBlueprint(db: Db, actor: SessionUser, id: string) {
+  if (actor.role !== "admin") throw new BillingError("Only an administrator can reopen blueprints.", 403);
+  const design = await findVisibleDesign(db, actor, id);
+  if (!design.blueprintSubmittedAt) throw new BillingError("The blueprint has not been submitted yet.", 409);
+  if (await hasActiveFeeInvoice(db, design)) {
+    throw new BillingError("The Billing Clerk already prepared the blueprint fee invoice. Ask them to void it before changing the files.", 409);
+  }
+  return billingTransaction(db, async (session) => {
+    await db.collection<DesignRequestDocument>(collections.designRequests).updateOne(
+      { _id: design._id }, { $unset: { blueprintSubmittedAt: "", blueprintSubmittedBy: "" }, $set: { updatedAt: new Date() } }, { session },
+    );
+    await audit(db, session, actor, "design-request.blueprint-reopened", "design_request", design._id, {});
+    return { reopened: true };
+  });
+}
+
 /** One file per request keeps each upload under the hosting body limit. */
 export async function uploadBlueprintFile(db: Db, actor: SessionUser, id: string, raw: unknown) {
   if (actor.role !== "admin") throw new BillingError("Only an administrator can upload blueprints.", 403);
@@ -340,5 +363,6 @@ export async function getDesignWorkflow(db: Db, actor: SessionUser, id: string):
     estimate: estimate ? { id: estimate._id.toHexString(), reference: estimate.reference, status: estimate.status } : null,
     blueprintInvoice: fee.invoice, blueprintPaid: fee.unlocked,
     blueprintSubmittedAt: design.blueprintSubmittedAt?.toISOString() ?? null,
+    blueprintCanReopen: Boolean(design.blueprintSubmittedAt) && !fee.unlocked && !(await hasActiveFeeInvoice(db, design)),
   };
 }

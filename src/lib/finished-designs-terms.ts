@@ -53,23 +53,3 @@ export const finishedDesignsTerms = {
   acknowledgment:
     "I have read and agree to the Finished Designs Terms and Conditions. I will not screenshot, copy, share, or build any G4 Builders Inc design without a written agreement with G4 Builders Inc.",
 } as const;
-
-export const finishedDesignsTermsText = [
-  finishedDesignsTerms.title,
-  `Version ${finishedDesignsTerms.version}`,
-  finishedDesignsTerms.introduction,
-  finishedDesignsTerms.notice,
-  ...finishedDesignsTerms.sections.map(
-    (section, index) => `${index + 1}. ${section.title}\n${section.body}`,
-  ),
-  finishedDesignsTerms.cases.heading,
-  finishedDesignsTerms.cases.introduction,
-  ...finishedDesignsTerms.cases.items.map(
-    (item, index) =>
-      `Case ${index + 1}: ${item.act}\nLaw: ${item.law}\nConsequence: ${item.consequence}`,
-  ),
-  finishedDesignsTerms.acknowledgment,
-].join("\n\n");
-
-export const finishedDesignsCopyrightNotice =
-  "© G4 Builders Inc. These designs are protected by RA 8293 (Intellectual Property Code of the Philippines). Copying, sharing, or building them without permission is prohibited.";

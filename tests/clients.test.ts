@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, beforeEach, mock, test } from "node:test";
 import { compare } from "bcryptjs";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { type Db, type MongoClient, ObjectId } from "mongodb";
 import { accountTerms } from "@/lib/account-terms";
 import { getDatabase } from "@/lib/database/mongodb";
@@ -15,7 +15,7 @@ import { issueEmailVerificationCode } from "@/lib/server/email-verification";
 import { sessionCookieName } from "@/lib/server/session";
 import { phContactNumberError, sanitizePhContactNumberInput } from "@/lib/ph-contact-number";
 
-let mongo: MongoMemoryServer;
+let mongo: MongoMemoryReplSet;
 let db: Db;
 const admin: SessionUser = { id: new ObjectId().toHexString(), name: "Test Admin", email: "admin@example.test", role: "admin" };
 // Real PSGC codes: Barangay Baclaran, Balayan, Batangas.
@@ -50,7 +50,7 @@ function legacyUser(overrides: Partial<UserDocument> = {}): UserDocument {
 
 before(async () => {
   process.env.AUTH_SECRET = "isolated-client-test-secret-at-least-32-characters";
-  mongo = await MongoMemoryServer.create();
+  mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
   process.env.MONGODB_URI = mongo.getUri();
   process.env.MONGODB_DB = "isolated_client_tests";
   db = await getDatabase();

@@ -9,7 +9,7 @@ import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBilli
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
 import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
-import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, respondToDesign, submitBlueprint, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
+import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, reopenBlueprint, respondToDesign, submitBlueprint, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
 import { acceptAccountTerms, requireAccountTerms } from "@/lib/server/account-terms";
 import { accountTerms, accountTermsText } from "@/lib/account-terms";
@@ -210,10 +210,20 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
   await assert.rejects(submitBlueprint(db, admin, request.id), isError(409));
   await assert.rejects(uploadBlueprintFile(db, admin, request.id, { name: "late.pdf", dataUrl: blueprintPdf }), isError(409));
+  // Before anything is billed, the admin can reopen the blueprint to fix files, then submit again.
+  assert.equal((await getDesignWorkflow(db, admin, request.id)).blueprintCanReopen, true);
+  await assert.rejects(reopenBlueprint(db, customer, request.id), isError(403));
+  await reopenBlueprint(db, admin, request.id);
+  const extra = await uploadBlueprintFile(db, admin, request.id, { name: "A-102 elevations.pdf", dataUrl: blueprintPdf });
+  await deleteBlueprintFile(db, admin, request.id, extra.id);
+  await submitBlueprint(db, admin, request.id);
   await assert.rejects(getBlueprintFile(db, customer, request.id, file.id), isError(403));
   assert.equal((await getBillingData(db, clerk)).designRequests[0].feeType, "blueprint");
   const invoiceId = await createInvoice(db, clerk, feeInput(request.id));
   assert.equal((await db.collection<InvoiceDocument>("invoices").findOne({ _id: new ObjectId(invoiceId) }))?.feeType, "blueprint");
+  // Once the clerk prepares the fee invoice, the files stay locked until that invoice is voided.
+  assert.equal((await getDesignWorkflow(db, admin, request.id)).blueprintCanReopen, false);
+  await assert.rejects(reopenBlueprint(db, admin, request.id), isError(409));
   await changeInvoice(db, clerk, invoiceId, { action: "issue" });
 
   // Construction billing waits for the blueprint.
@@ -312,7 +322,7 @@ async function acceptedEstimate(designRequestId: string) {
   const now = new Date();
   await db.collection("cost_estimates").insertOne({
     _id: new ObjectId(), reference: `EST-${designRequestId.slice(-6)}`, customerId: new ObjectId(customer.id), designRequestId: new ObjectId(designRequestId),
-    lineItems: [], subtotal: 0, vatRate: 0.12, vat: 0, total: 0, scheduleTemplate: [], adminNotes: "", status: "Accepted", createdAt: now, updatedAt: now,
+    lineItems: [], subtotal: 0, total: 0, scheduleTemplate: [], adminNotes: "", status: "Accepted", createdAt: now, updatedAt: now,
   });
 }
 /** A construction project created from the request's accepted estimate. */

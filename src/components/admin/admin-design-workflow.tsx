@@ -204,6 +204,19 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
     }
   };
 
+  const reopen = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await readJson(await fetch(`/api/design-requests/${workflow.id}/blueprint/reopen`, { method: "POST" }));
+      onChanged("The blueprint was reopened. Fix the files, then submit it again.");
+    } catch (reopenError) {
+      setError(reopenError instanceof Error ? reopenError.message : "Unable to reopen the blueprint.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const estimateAccepted = workflow.estimate?.status === "Accepted";
   const estimateText = !workflow.estimate ? "The customer has not requested a cost estimate yet."
     : estimateAccepted ? `Estimate ${workflow.estimate.reference} accepted.`
@@ -243,10 +256,19 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
       {workflow.blueprintPaid ? (
         <p className="mt-3 flex items-center gap-2 text-sm font-medium text-emerald-700"><CheckCircle2 className="h-4 w-4" />Paid — the customer can download the blueprint. Files are locked.</p>
       ) : workflow.blueprintSubmittedAt ? (
-        <p className="mt-3 flex items-start gap-2 text-sm font-medium text-stone-700">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
-          Submitted to the Billing Clerk on {formatDate(workflow.blueprintSubmittedAt)}. Files are locked while the blueprint fee is billed.
-        </p>
+        <div className="mt-3 space-y-2">
+          <p className="flex items-start gap-2 text-sm font-medium text-stone-700">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-red-700" />
+            Submitted to the Billing Clerk on {formatDate(workflow.blueprintSubmittedAt)}. Files are locked while the blueprint fee is billed.
+          </p>
+          {workflow.blueprintCanReopen ? (
+            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void reopen()}>
+              Reopen to Edit Files
+            </Button>
+          ) : (
+            <p className="text-xs text-stone-500">To change the files, ask the Billing Clerk to void the blueprint fee invoice first.</p>
+          )}
+        </div>
       ) : (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2">

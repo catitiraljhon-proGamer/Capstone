@@ -3,10 +3,11 @@ import { finishedDesignsTerms } from "@/lib/finished-designs-terms";
 
 /**
  * The one Terms and Conditions a customer agrees to when registering (or on first sign-in for older accounts).
- * It combines the Finished Designs and Design Request terms; the version changes whenever either part changes.
+ * It combines the Finished Designs and Design Request terms; its version is the newer of their two versions.
  */
 export const accountTerms = {
-  version: `${finishedDesignsTerms.version}.${designRequestTerms.version}`,
+  // The newer of the two dates; bumping either part to today's date moves it forward.
+  version: [finishedDesignsTerms.version, designRequestTerms.version].sort().at(-1)!,
   title: "G4 Builders Inc Terms and Conditions",
   introduction:
     "Please read these terms before creating your account or signing in. They cover viewing G4 Builders Inc designs and requesting a design, construction cost estimate, and blueprint.",

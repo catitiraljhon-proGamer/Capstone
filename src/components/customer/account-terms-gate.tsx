@@ -10,17 +10,24 @@ import { accountTerms, type AccountTermsAcceptance } from "@/lib/account-terms";
  * (accounts created before the terms moved to registration, or signed up with Google from the login page).
  * Accounts that already agreed never see it again.
  */
-export function AccountTermsGate() {
+export function AccountTermsGate({ userId }: { userId: string }) {
   const [required, setRequired] = useState(false);
+  // An agreement is permanent, so once this tab has seen it, other pages skip the check.
+  const storageKey = `g4-terms-accepted:${userId}:${accountTerms.version}`;
 
   useEffect(() => {
+    if (readAccepted(storageKey)) return;
     let active = true;
     fetch("/api/account/terms", { cache: "no-store" })
       .then((response) => (response.ok ? response.json() as Promise<{ accepted?: boolean }> : null))
-      .then((payload) => { if (active && payload && !payload.accepted) setRequired(true); })
+      .then((payload) => {
+        if (!active || !payload) return;
+        if (payload.accepted) saveAccepted(storageKey);
+        else setRequired(true);
+      })
       .catch(() => undefined);
     return () => { active = false; };
-  }, []);
+  }, [storageKey]);
 
   if (!required) return null;
   return (
@@ -31,10 +38,18 @@ export function AccountTermsGate() {
       declineLabel="Decline and Sign Out"
       helperText="You only need to agree once. Declining signs you out."
       // Reload so pages fetched before agreeing (such as full design galleries) load with access.
-      onAccept={() => window.location.reload()}
+      onAccept={() => { saveAccepted(storageKey); window.location.reload(); }}
       onDecline={() => {
         void fetch("/api/auth/logout", { method: "DELETE" }).finally(() => window.location.replace("/login"));
       }}
     />
   );
+}
+
+function readAccepted(key: string) {
+  try { return window.sessionStorage.getItem(key) === "1"; } catch { return false; }
+}
+
+function saveAccepted(key: string) {
+  try { window.sessionStorage.setItem(key, "1"); } catch { /* storage unavailable: the check simply runs again */ }
 }

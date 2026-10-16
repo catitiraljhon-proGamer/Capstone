@@ -87,8 +87,6 @@ export type CostEstimateDto = {
   customerNotes: string;
   lineItems: EstimateLineItem[];
   subtotal: number;
-  vatRate: number;
-  vat: number;
   total: number;
   scheduleTemplate: MilestoneTemplate[];
   adminNotes: string;
@@ -111,7 +109,6 @@ export type ConstructionProjectDto = {
   estimateReference: string | null;
   contractPrice: number;
   subtotal: number;
-  vat: number;
   downpaymentPercent: number | null;
   startDate: string | null;
   neededBy: string | null;

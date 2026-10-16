@@ -36,18 +36,3 @@ export const designRequestTerms = {
   ],
   acknowledgment: "I have read and agree to the Design Request Terms and Conditions. I understand that the design and floor plan are shared for review only, and that I can download the blueprint only after the Billing Clerk verifies full payment of the blueprint fee.",
 } as const;
-
-export const designRequestTermsText = [
-  designRequestTerms.title,
-  `Version ${designRequestTerms.version}`,
-  designRequestTerms.introduction,
-  designRequestTerms.paymentNotice,
-  ...designRequestTerms.sections.map((section, index) => `${index + 1}. ${section.title}\n${section.body}`),
-  designRequestTerms.acknowledgment,
-].join("\n\n");
-
-export type DesignTermsAcceptance = {
-  id: string;
-  version: string;
-  acceptedAt: string;
-};

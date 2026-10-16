@@ -22,8 +22,7 @@ export async function recordAccountTerms(
   const users = db.collection<UserDocument>(collections.users);
   const existing = await users.findOne({ _id: new ObjectId(user.id) }, { projection: { termsAcceptance: 1 } });
   if (existing?.termsAcceptance) return existing.termsAcceptance;
-  const auditLogId = new ObjectId();
-  const acceptance = { auditLogId, version, acceptedAt: now };
+  const { acceptance, auditLog } = accountTermsRecords(user, version, now);
   const saved = await users.updateOne(
     { _id: new ObjectId(user.id), termsAcceptance: { $exists: false } },
     { $set: { termsAcceptance: acceptance } },
@@ -33,13 +32,20 @@ export async function recordAccountTerms(
     if (current?.termsAcceptance) return current.termsAcceptance;
     throw new BillingError("Account not found.", 404);
   }
-  await db.collection<AuditLogDocument>(collections.auditLogs).insertOne({
+  await db.collection<AuditLogDocument>(collections.auditLogs).insertOne(auditLog);
+  return acceptance;
+}
+
+/** The account pointer and the audit record (with the exact terms text) for one agreement, saved together. */
+export function accountTermsRecords(user: Pick<SessionUser, "id" | "name" | "role">, version: typeof accountTerms.version, now: Date) {
+  const auditLogId = new ObjectId();
+  const auditLog: AuditLogDocument = {
     _id: auditLogId, actorId: new ObjectId(user.id), actorName: user.name, actorRole: user.role,
     action: acceptanceAction, entityType: "account_terms", entityId: new ObjectId(user.id),
     details: { accepted: true, termsVersion: version, acknowledgment: accountTerms.acknowledgment, termsSnapshot: accountTermsText },
     createdAt: now,
-  });
-  return acceptance;
+  };
+  return { acceptance: { auditLogId, version, acceptedAt: now }, auditLog };
 }
 
 const acceptanceSchema = z.object({ accepted: z.literal(true), version: termsVersionSchema }).strict();

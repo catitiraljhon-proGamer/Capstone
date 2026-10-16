@@ -1,12 +1,14 @@
 import {
   collections,
+  type AuditLogDocument,
   type NotificationDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
-import { recordAccountTerms, termsVersionSchema } from "@/lib/server/account-terms";
+import { accountTermsRecords, termsVersionSchema } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
+import { billingTransaction } from "@/lib/server/billing";
 import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
 import {
   checkEmailVerificationCode,
@@ -81,6 +83,8 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const userId = new ObjectId();
+    // The Terms and Conditions agreement is saved with the account, so an account never exists without it.
+    const terms = accountTermsRecords({ id: userId.toHexString(), name, role: "customer" }, termsVersion, now);
     const user: UserDocument = {
       _id: userId,
       name,
@@ -90,12 +94,16 @@ export async function POST(request: Request) {
       role: "customer",
       status: "active",
       authVersion: 0,
+      termsAcceptance: terms.acceptance,
       createdAt: now,
       updatedAt: now,
     };
 
     try {
-      await users.insertOne(user);
+      await billingTransaction(db, async (session) => {
+        await users.insertOne(user, { session });
+        await db.collection<AuditLogDocument>(collections.auditLogs).insertOne(terms.auditLog, { session });
+      });
     } catch (error) {
       if (error instanceof MongoServerError && error.code === 11000) {
         return NextResponse.json(
@@ -107,7 +115,6 @@ export async function POST(request: Request) {
     }
     // The used code is left to expire: the account now exists, so it cannot register
     // again, and a simultaneous duplicate submission still gets the 409 above.
-    await recordAccountTerms(db, { id: userId.toHexString(), name: user.name, role: user.role }, termsVersion, now);
 
     const admins = await users
       .find(

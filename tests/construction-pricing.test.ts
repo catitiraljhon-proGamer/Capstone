@@ -5,14 +5,10 @@ import { buildPaymentSchedule, defaultScheduleTemplate, estimateTotals, schedule
 const template = defaultScheduleTemplate("2027-01-04", "2027-12-20");
 const sum = (values: number[]) => Math.round(values.reduce((total, value) => total + value * 100, 0)) / 100;
 
-test("adds no VAT: G4 Builders is VAT-exempt, so the contract total is the scope-of-works subtotal", () => {
-  assert.deepEqual(estimateTotals([{ quantity: 1, unitPrice: 6_000_000 }]), { subtotal: 6_000_000, vat: 0, total: 6_000_000 });
-  assert.deepEqual(estimateTotals([{ quantity: 1, unitPrice: 0.1 }, { quantity: 1, unitPrice: 0.2 }]), { subtotal: 0.3, vat: 0, total: 0.3 });
-});
-
-test("an explicit VAT rate still rounds to the centavo, as saved on older estimates", () => {
-  assert.deepEqual(estimateTotals([{ quantity: 1, unitPrice: 6_000_000 }], 0.12), { subtotal: 6_000_000, vat: 720_000, total: 6_720_000 });
-  assert.deepEqual(estimateTotals([{ quantity: 3, unitPrice: 0.1 }], 0.12), { subtotal: 0.3, vat: 0.04, total: 0.34 });
+test("the contract total is the sum of the scope-of-work amounts, with no VAT, to the centavo", () => {
+  assert.deepEqual(estimateTotals([{ quantity: 1, unitPrice: 6_000_000 }]), { subtotal: 6_000_000, total: 6_000_000 });
+  assert.deepEqual(estimateTotals([{ quantity: 1, unitPrice: 0.1 }, { quantity: 1, unitPrice: 0.2 }]), { subtotal: 0.3, total: 0.3 });
+  assert.deepEqual(estimateTotals([{ quantity: 3, unitPrice: 0.1 }]), { subtotal: 0.3, total: 0.3 });
 });
 
 test("default template is 30/30/30/10 with dates from start to needed-by", () => {

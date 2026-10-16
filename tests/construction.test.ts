@@ -10,6 +10,7 @@ import { BillingError, changeInvoice, createInvoice, getBillingData, reviewPayme
 import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects } from "@/lib/server/construction";
 import { defaultScheduleTemplate } from "@/lib/construction";
 import { listPaymentDues } from "@/lib/server/payment-dues";
+import { removeVatFromEstimates } from "@/lib/server/vat-cleanup";
 import { archiveInactiveClients } from "@/lib/server/client-inactivity";
 import { setClientArchived } from "@/lib/server/clients";
 import { manilaDate } from "@/lib/billing";
@@ -132,24 +133,25 @@ test("estimates saved with VAT drop it, unless billing already started on the ac
     await db.collection<ProjectDocument>("projects").updateOne({ _id: project!._id }, { $set: { contractPrice: 6_720_000, subtotal: 6_000_000, vat: 720_000, paymentSchedule: schedule } });
     await db.collection<InvoiceDocument>("invoices").updateMany({ projectId: project!._id }, { $set: { amount: 2_016_000 } });
   }
-  // Read the invoice straight from the database: listing projects would already remove the VAT.
   const billedProject = await db.collection<ProjectDocument>("projects").findOne({ _id: new ObjectId(billed.projectId) });
   await changeInvoice(db, clerk, billedProject!.paymentSchedule![0].invoiceId!.toHexString(), { action: "issue" });
 
+  await removeVatFromEstimates(db);
   const estimates = await listEstimates(db, admin);
   const reopened = estimates.find((estimate) => estimate.id === open.id)!;
-  assert.deepEqual([reopened.subtotal, reopened.vat, reopened.total], [6_000_000, 0, 6_000_000]);
+  assert.deepEqual([reopened.subtotal, reopened.total], [6_000_000, 6_000_000]);
+  assert.equal((await db.collection("cost_estimates").findOne({ _id: new ObjectId(open.id) }))?.vat, undefined);
   const freed = estimates.find((estimate) => estimate.id === unbilled.estimate.id)!;
-  assert.deepEqual([freed.vat, freed.total], [0, 6_000_000]);
+  assert.equal(freed.total, 6_000_000);
   const unbilledProject = await projectDto(unbilled.projectId);
-  assert.deepEqual([unbilledProject.contractPrice, unbilledProject.vat], [6_000_000, 0]);
+  assert.equal(unbilledProject.contractPrice, 6_000_000);
   assert.deepEqual(unbilledProject.milestones.map((milestone) => milestone.amount), [1_800_000, 1_800_000, 1_800_000, 600_000]);
   assert.equal(unbilledProject.milestones[0].invoice?.amount, 1_800_000);
   const event = await db.collection("schedules").findOne({ projectId: new ObjectId(unbilled.projectId), milestoneId: unbilledProject.milestones[0].id });
   assert.equal(event?.expectedAmount, 1_800_000);
   // An issued invoice means the customer was already billed on the agreed total.
   const kept = estimates.find((estimate) => estimate.id === billed.estimate.id)!;
-  assert.deepEqual([kept.vat, kept.total], [720_000, 6_720_000]);
+  assert.equal(kept.total, 6_720_000);
   assert.equal((await projectDto(billed.projectId)).contractPrice, 6_720_000);
   // Accepting the open estimate uses the VAT-free total.
   const { projectId } = await changeEstimate(db, customer, open.id, { action: "accept", downpaymentPercent: 30 });
@@ -169,7 +171,7 @@ test("clients are warned, then archived and disabled 30 days after their last pr
   assert.deepEqual(await archiveInactiveClients(db, at(10)), { noticed: 0, archived: 0 });
   assert.deepEqual(await archiveInactiveClients(db, at(24)), { noticed: 1, archived: 0 });
   assert.deepEqual(await archiveInactiveClients(db, at(25)), { noticed: 0, archived: 0 });
-  assert.match((await db.collection("notifications").findOne({ kind: "client-inactivity-notice" }))!.title, /will be archived on January 31, 2026/);
+  assert.match((await db.collection("notifications").findOne({ kind: "client-inactivity-notice" }))!.title, /will be archived on February 1, 2026/); // 7 days after the day-24 notice
 
   // An unpaid invoice keeps the client active.
   const invoiceId = new ObjectId();
@@ -193,8 +195,26 @@ test("clients are warned, then archived and disabled 30 days after their last pr
   assert.equal(restored?.status, "active");
   assert.equal(restored?.clientArchivedAt, undefined);
   const reactivatedAt = restored!.reactivatedAt!;
-  assert.deepEqual(await archiveInactiveClients(db, new Date(reactivatedAt.getTime() + 5 * 86_400_000)), { noticed: 0, archived: 0 });
-  assert.equal((await archiveInactiveClients(db, new Date(reactivatedAt.getTime() + 31 * 86_400_000))).archived, 1);
+  const afterReactivation = (days: number) => new Date(reactivatedAt.getTime() + days * 86_400_000);
+  assert.deepEqual(await archiveInactiveClients(db, afterReactivation(5)), { noticed: 0, archived: 0 });
+  // A missed notice window still gets a full 7-day warning before archiving.
+  assert.deepEqual(await archiveInactiveClients(db, afterReactivation(31)), { noticed: 1, archived: 0 });
+  assert.deepEqual(await archiveInactiveClients(db, afterReactivation(37)), { noticed: 0, archived: 0 });
+  assert.deepEqual(await archiveInactiveClients(db, afterReactivation(38)), { noticed: 0, archived: 1 });
+});
+
+test("clients already past 30 days when the job first runs are warned, not archived on the spot", async () => {
+  const completedAt = new Date("2026-01-01T02:00:00.000Z");
+  await db.collection<ProjectDocument>("projects").insertOne({
+    _id: new ObjectId(), reference: "PRJ-OLD", name: "Long done", customerId: new ObjectId(customer.id),
+    status: "Completed", contractPrice: 1, completedAt, createdAt: completedAt, updatedAt: completedAt,
+  });
+  const firstRun = new Date("2026-06-01T00:30:00.000Z");
+  assert.deepEqual(await archiveInactiveClients(db, firstRun), { noticed: 1, archived: 0 });
+  assert.match((await db.collection("notifications").findOne({ kind: "client-inactivity-notice" }))!.title, /June 8, 2026/);
+  assert.equal((await db.collection<UserDocument>("users").findOne({ _id: new ObjectId(customer.id) }))?.status, "active");
+  assert.deepEqual(await archiveInactiveClients(db, new Date(firstRun.getTime() + 6 * 86_400_000)), { noticed: 0, archived: 0 });
+  assert.deepEqual(await archiveInactiveClients(db, new Date(firstRun.getTime() + 7 * 86_400_000)), { noticed: 0, archived: 1 });
 });
 
 test("clients with an unfinished project are never archived for inactivity", async () => {
@@ -323,8 +343,8 @@ test("admin saves and sends a validated estimate using the default schedule", as
   const saved = (await changeEstimate(db, admin, estimate.id, savePayload())).estimate;
   assert.equal(saved.status, "Draft");
   assert.equal(saved.subtotal, 6_000_000);
-  assert.equal(saved.vat, 0);
   assert.equal(saved.total, 6_000_000);
+  assert.equal((await db.collection("cost_estimates").findOne({ _id: new ObjectId(estimate.id) }))?.vat, undefined);
   const sent = (await changeEstimate(db, admin, estimate.id, { action: "send" })).estimate;
   assert.equal(sent.status, "Sent");
   assert.ok(sent.sentAt);
@@ -340,7 +360,6 @@ test("customers never see line items before the estimate is sent, and only their
     assert.deepEqual(dto.scheduleTemplate, []);
     assert.equal(dto.total, 0);
     assert.equal(dto.subtotal, 0);
-    assert.equal(dto.vat, 0);
   };
   hiddenView(await getEstimate(db, customer, estimate.id));
   await changeEstimate(db, admin, estimate.id, savePayload());
@@ -380,7 +399,6 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   assert.match(project.reference, /^PRJ-\d{4}-\d{6}$/);
   assert.equal(project.contractPrice, 6_000_000);
   assert.equal(project.subtotal, 6_000_000);
-  assert.equal(project.vat, 0);
   assert.equal(project.estimateId, estimate.id);
   assert.equal(project.downpaymentPercent, 30);
   assert.equal(project.startDate, startDate());

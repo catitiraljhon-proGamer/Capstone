@@ -192,7 +192,7 @@ async function proxyRequest(
   return proxy(request);
 }
 
-test("only Vercel Cron, or a caller with CRON_SECRET, can run the payment reminder job", async () => {
+test("only a caller with CRON_SECRET can run the payment reminder job", async () => {
   const run = (headers: Record<string, string>) =>
     runPaymentReminders(new Request("http://localhost:3000/api/cron/payment-reminders", { headers }));
   const previous = process.env.CRON_SECRET;
@@ -200,7 +200,7 @@ test("only Vercel Cron, or a caller with CRON_SECRET, can run the payment remind
     delete process.env.CRON_SECRET;
     assert.equal((await run({})).status, 401);
     assert.equal((await run({ "user-agent": "curl/8.0" })).status, 401);
-    assert.equal((await run({ "user-agent": "vercel-cron/1.0" })).status, 200);
+    assert.equal((await run({ "user-agent": "vercel-cron/1.0" })).status, 401);
     process.env.CRON_SECRET = "test-cron-secret";
     assert.equal((await run({ "user-agent": "vercel-cron/1.0" })).status, 401);
     assert.equal((await run({ authorization: "Bearer wrong" })).status, 401);

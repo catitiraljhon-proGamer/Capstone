@@ -173,7 +173,7 @@ export async function setClientArchived(db: Db, actor: SessionUser, id: string, 
       // disabled in Users & Roles) and restarts the inactivity count.
       : [
         { $set: { status: { $cond: [{ $ifNull: ["$autoArchivedAt", false] }, "active", "$status"] }, reactivatedAt: now, updatedAt: now } },
-        { $unset: ["clientArchivedAt", "autoArchivedAt", "inactivityNoticeFor"] },
+        { $unset: ["clientArchivedAt", "autoArchivedAt", "inactivityNoticeFor", "inactivityNoticeSentAt"] },
       ],
     { returnDocument: "after" },
   );

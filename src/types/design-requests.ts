@@ -54,6 +54,8 @@ export type DesignWorkflowDto = {
   blueprintPaid: boolean;
   /** When the admin submitted the blueprint to the Billing Clerk; files are locked from then on. */
   blueprintSubmittedAt: string | null;
+  /** True while no blueprint fee invoice is active, so the admin can reopen the files to fix them. */
+  blueprintCanReopen: boolean;
 };
 
 export type DesignRequestDto = {
