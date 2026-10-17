@@ -2,14 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
-import { sumMoney } from "@/lib/billing";
-import { exportXlsx, type XlsxColumn } from "@/lib/export-xlsx";
+import { manilaDate, sumMoney } from "@/lib/billing";
+import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
-import type { AdminCollectionsReport } from "@/types/admin-reports";
+import type { AdminCollectionsReport, CollectedEntry, InvoicedEntry } from "@/types/admin-reports";
 import { AlertTriangle, Banknote, Download, FileText, HandCoins, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type MonthRow = { id: string; month: string; invoiceCount: number; invoiced: number; paymentCount: number; collected: number };
+type SummaryRow = { item: string; value: string | number };
 
 const panel = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
 const field = "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm font-normal text-stone-950 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
@@ -28,6 +29,34 @@ const monthColumns: XlsxColumn<MonthRow>[] = [
   { header: "Verified Payments", width: 18, value: (row) => row.paymentCount },
   { header: "Collected", width: 17, format: "peso", value: (row) => row.collected },
 ];
+const summaryColumns: XlsxColumn<SummaryRow>[] = [
+  { header: "Collections Summary", width: 34, value: (row) => row.item },
+  { header: "Details", width: 44, format: "peso", value: (row) => row.value },
+];
+const invoiceColumns: XlsxColumn<InvoicedEntry>[] = [
+  { header: "Invoice", width: 18, value: (entry) => entry.invoiceNumber },
+  { header: "Issued", width: 14, format: "date", value: (entry) => entry.issuedOn },
+  { header: "Due Date", width: 14, format: "date", value: (entry) => entry.dueDate },
+  { header: "Client", width: 24, value: (entry) => entry.customerName },
+  { header: "Project", width: 34, value: (entry) => entry.projectName },
+  { header: "Billing Stage", width: 30, value: (entry) => entry.label },
+  { header: "Amount", width: 16, format: "peso", value: (entry) => entry.amount },
+  { header: "Verified Paid", width: 16, format: "peso", value: (entry) => entry.paid },
+  { header: "Balance", width: 16, format: "peso", value: (entry) => entry.balance },
+  { header: "Status", width: 15, value: (entry) => entry.status },
+];
+const paymentColumns: XlsxColumn<CollectedEntry>[] = [
+  { header: "Payment", width: 18, value: (entry) => entry.reference },
+  { header: "Payment Date", width: 14, format: "date", value: (entry) => entry.paidOn },
+  { header: "Client", width: 24, value: (entry) => entry.customerName },
+  { header: "Project", width: 34, value: (entry) => entry.projectName },
+  { header: "Invoice", width: 18, value: (entry) => entry.invoiceNumber },
+  { header: "Method", width: 15, value: (entry) => entry.method },
+  { header: "Amount", width: 16, format: "peso", value: (entry) => entry.amount },
+  { header: "Receipt", width: 18, value: (entry) => entry.receiptNumber },
+];
+const generatedAt = () =>
+  new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" });
 
 export function AdminReports() {
   const [report, setReport] = useState<AdminCollectionsReport | null>(null);
@@ -94,8 +123,55 @@ export function AdminReports() {
     overdue: sumMoney(visibleProjects.map((project) => project.overdue)),
   };
   const exportMonths = months.filter((row) => selectedMonths.has(row.id));
-  const exportReport = <Row,>(filename: string, sheetName: string, columns: XlsxColumn<Row>[], rows: Row[]) => {
-    exportXlsx({ filename, sheetName, columns, rows }).catch(() => setError("Unable to create the Excel file. Try again."));
+  const exportReport = () => {
+    const included = (entryProjectId: string, date: string) => inScope(entryProjectId) && inRange(date) && selectedMonths.has(date.slice(0, 7));
+    const invoices = (report?.invoiced ?? []).filter((entry) => included(entry.projectId, entry.issuedOn));
+    const payments = (report?.collected ?? []).filter((entry) => included(entry.projectId, entry.paidOn));
+    const project = projects.find((item) => item.id === projectId);
+    const invoicedTotal = sumMoney(exportMonths.map((row) => row.invoiced));
+    const collectedTotal = sumMoney(exportMonths.map((row) => row.collected));
+    const summary: SummaryRow[] = [
+      { item: "Company", value: "G4 Builders Inc" },
+      { item: "Generated", value: generatedAt() },
+      { item: "Project", value: project ? `${project.reference} · ${project.name}` : "All projects (including design and blueprint fees)" },
+      { item: "Project Status", value: status || "All statuses" },
+      { item: "Date Range", value: from || to ? `${from || "Start"} to ${to || "Today"}` : "All dates" },
+      { item: "Months Included", value: [...exportMonths].reverse().map((row) => monthLabel(row.month)).join(", ") },
+      { item: "", value: "" },
+      { item: "Current Position", value: "" },
+      { item: "Projects", value: `${visibleProjects.length}` },
+      { item: "Contract Value", value: totals.contract },
+      { item: "Billed (issued invoices)", value: totals.billed },
+      { item: "Collected (verified payments)", value: totals.collected },
+      { item: "Outstanding", value: totals.outstanding },
+      { item: "Overdue", value: totals.overdue },
+      { item: "", value: "" },
+      { item: "Selected Months", value: "" },
+      { item: "Invoiced", value: invoicedTotal },
+      { item: "Collected", value: collectedTotal },
+      { item: "Invoices Issued", value: `${invoices.length}` },
+      { item: "Verified Payments", value: `${payments.length}` },
+    ];
+    exportWorkbook(`g4-collections-report-${manilaDate()}.xlsx`, [
+      xlsxSheet({ name: "Summary", columns: summaryColumns, rows: summary, filters: false }),
+      xlsxSheet({
+        name: "By Month", columns: monthColumns, rows: exportMonths,
+        totalRow: { Month: "Total", "Invoices Issued": invoices.length, Invoiced: invoicedTotal, "Verified Payments": payments.length, Collected: collectedTotal },
+      }),
+      xlsxSheet({
+        name: "Invoices", columns: invoiceColumns, rows: invoices,
+        totalRow: {
+          Invoice: "Total",
+          Amount: sumMoney(invoices.map((entry) => entry.amount)),
+          "Verified Paid": sumMoney(invoices.map((entry) => entry.paid)),
+          Balance: sumMoney(invoices.map((entry) => entry.balance)),
+        },
+      }),
+      xlsxSheet({
+        name: "Payments", columns: paymentColumns, rows: payments,
+        totalRow: { Payment: "Total", Amount: sumMoney(payments.map((entry) => entry.amount)) },
+      }),
+    ]).catch(() => setError("Unable to create the Excel file. Try again."));
   };
 
   if (error && !report) return <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>;
@@ -154,9 +230,9 @@ export function AdminReports() {
       <section className={panel}>
         <ReportHeader
           title="By Month"
-          summary={isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}
+          summary={`${isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}. The export adds a summary and every invoice and payment in the checked months.`}
           exportCount={invalidRange ? 0 : exportMonths.length}
-          onExport={() => exportReport("g4-collections-by-month.xlsx", "By Month", monthColumns, exportMonths)}
+          onExport={exportReport}
         />
         {invalidRange ? (
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">The From date must be on or before the To date.</p>

@@ -68,4 +68,18 @@ test("project totals count issued invoices and verified payments only", async ()
   // Dates use Manila time: 8:00 PM UTC on September 30 is already October 1 in Manila.
   assert.ok(report.invoiced.some((entry) => entry.amount === 30000 && entry.issuedOn === "2026-10-01"));
   assert.ok(report.collected.some((entry) => entry.amount === 10000 && entry.paidOn === "2026-10-01"));
+
+  // Export rows carry the details the workbook lists.
+  const overdueEntry = report.invoiced.find((entry) => entry.invoiceNumber === "INV-2");
+  assert.deepEqual(
+    { customer: overdueEntry?.customerName, project: overdueEntry?.projectName, paid: overdueEntry?.paid, balance: overdueEntry?.balance, status: overdueEntry?.status },
+    { customer: "Test Customer", project: "PRJ-001 · Test residence", paid: 0, balance: 50000, status: "Overdue" },
+  );
+  assert.match(report.invoiced.find((entry) => entry.invoiceNumber === "INV-FEE")?.projectName ?? "", /^Design request /);
+  const firstPayment = report.collected.find((entry) => entry.reference === "PAY-1");
+  assert.deepEqual(
+    { invoice: firstPayment?.invoiceNumber, method: firstPayment?.method, project: firstPayment?.projectName },
+    { invoice: "INV-1", method: "Bank transfer", project: "PRJ-001 · Test residence" },
+  );
+  assert.equal(report.collected.find((entry) => entry.reference === "PAY-FEE")?.invoiceNumber, "Unallocated");
 });

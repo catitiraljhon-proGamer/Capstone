@@ -68,7 +68,7 @@ export const paymentActionSchema = z.discriminatedUnion("action", [
 function recordId(value: string) { return new ObjectId(idSchema.parse(value)); }
 
 /** Display name for design and blueprint fee invoices, which have no construction project. */
-function designInvoiceName(invoice: Pick<InvoiceDocument, "designRequestId" | "feeType">) {
+export function designInvoiceName(invoice: Pick<InvoiceDocument, "designRequestId" | "feeType">) {
   const label = `Design request ${invoice.designRequestId!.toHexString().slice(-8).toUpperCase()}`;
   return invoice.feeType === "blueprint" ? `Blueprint · ${label}` : label;
 }
