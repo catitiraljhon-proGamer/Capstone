@@ -46,6 +46,7 @@ export const collections = {
   schedules: "schedules",
   meetingRequests: "meeting_requests",
   auditLogs: "audit_logs",
+  systemSettings: "system_settings",
   rateLimits: "rate_limits",
   emailVerifications: "email_verifications",
 } as const;
@@ -500,6 +501,17 @@ export type MeetingRequestDocument = {
   reviewedByName?: string;
   reviewedAt?: Date;
   createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Maintenance mode: customers and the Billing Clerk are locked out until `endsAt`. */
+export type MaintenanceModeDocument = {
+  _id: "maintenance-mode";
+  endsAt: Date;
+  message?: string;
+  startedAt: Date;
+  startedById: ObjectId;
+  startedByName: string;
   updatedAt: Date;
 };
 

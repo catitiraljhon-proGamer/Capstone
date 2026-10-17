@@ -15,3 +15,12 @@ export type MaintenanceData = {
   finishes: FinishRecord[];
   houseTypes: HouseTypeRecord[];
 };
+
+/** Public maintenance-mode status; `endsAt` is an ISO time while maintenance is on. */
+export type MaintenanceModeStatus = {
+  active: boolean;
+  endsAt: string | null;
+  message: string | null;
+  startedAt: string | null;
+  startedByName: string | null;
+};

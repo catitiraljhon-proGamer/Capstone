@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
 import { Button } from "@/components/ui/button";
 import { manilaDate } from "@/lib/billing";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
@@ -7,17 +8,17 @@ import type { FinishRecord, HouseTypeRecord, MaintenanceData, MaintenanceKind } 
 import { ArrowDown, ArrowUp, DatabaseBackup, Download, Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
-type Tab = "Finishes" | "House Types" | "Backup";
+type Tab = "Maintenance Mode" | "Finishes" | "House Types" | "Backup";
 type Save = (body: Record<string, unknown>, message: string) => Promise<boolean>;
 
-const tabs: Tab[] = ["Finishes", "House Types", "Backup"];
+const tabs: Tab[] = ["Maintenance Mode", "Finishes", "House Types", "Backup"];
 const panel = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
 const field = "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm font-normal text-stone-950 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
 const label = "block text-sm font-medium text-stone-700";
 
 export function AdminMaintenance() {
   const [data, setData] = useState<MaintenanceData | null>(null);
-  const [tab, setTab] = useState<Tab>("Finishes");
+  const [tab, setTab] = useState<Tab>("Maintenance Mode");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -78,7 +79,7 @@ export function AdminMaintenance() {
       {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {success ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p> : null}
 
-      {tab === "Backup" ? <BackupPanel onError={setError} /> : !data ? (
+      {tab === "Maintenance Mode" ? <AdminMaintenanceMode onError={setError} onSuccess={setSuccess} /> : tab === "Backup" ? <BackupPanel onError={setError} /> : !data ? (
         <div className={`${panel} text-sm text-stone-500`}>{error ? "Maintenance records are unavailable." : "Loading maintenance records…"}</div>
       ) : tab === "Finishes" ? (
         <FinishesPanel records={data.finishes} save={save} move={move} isSaving={isSaving} />

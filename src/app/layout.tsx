@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ContactUs } from "@/components/landing/contact-us";
+import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
+        <MaintenanceBanner />
         {children}
         <ContactUs />
       </body>
