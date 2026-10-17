@@ -10,7 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { AccountTermsDialog } from "@/components/auth/account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { useHouseDesigns } from "@/lib/house-design-store";
@@ -134,6 +134,16 @@ function SwappingHouseShowcase() {
   );
 }
 
+const navLinkClass =
+  "rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700";
+
+/** Home is this page, so the link scrolls back to the top instead of reloading. */
+function backToTop(event: MouseEvent<HTMLAnchorElement>) {
+  event.preventDefault();
+  window.history.replaceState(null, "", "/");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 /** Footer with the brand and a working link to the Terms and Conditions; the site has no other public pages. */
 function LandingFooter() {
   const [readingTerms, setReadingTerms] = useState(false);
@@ -188,6 +198,12 @@ export default function LandingPage() {
           <Link href="/" aria-label="G4 Builders home" className="min-w-0">
             <BrandLogo />
           </Link>
+          <div className="flex items-center gap-1 sm:ml-auto">
+            <Link href="/" onClick={backToTop} className={navLinkClass}>Home</Link>
+            {/* About Us and FAQ are placeholders until their content is ready. */}
+            <button type="button" className={navLinkClass}>About Us</button>
+            <button type="button" className={navLinkClass}>FAQ</button>
+          </div>
           <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto">
             <Link
               href="/login"
