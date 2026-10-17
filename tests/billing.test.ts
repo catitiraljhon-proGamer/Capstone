@@ -40,8 +40,8 @@ async function agree(actor: SessionUser = customer) {
 async function publishedHouseDesign() {
   const now = new Date();
   const design: HouseDesignDocument = {
-    _id: new ObjectId(), name: "Selected courtyard house", houseType: "Bungalow",
-    area: 95, rooms: "2 bedrooms, 1 bathroom", finish: "Standard", rate: 25000,
+    _id: new ObjectId(), name: "Selected courtyard house",
+    area: 95, rooms: "2 bedrooms, 1 bathroom", rate: 25000,
     images: [privateImage], notes: "Published design", status: "Published",
     defaultSelections: [], customItems: [], createdAt: now, updatedAt: now,
     createdBy: new ObjectId(admin.id), createdByName: admin.name,
@@ -58,7 +58,6 @@ test("requesting a published design keeps its identity and specifications withou
   assert.equal(result.selectedDesign.name, design.name);
   assert.equal(result.floorArea, design.area);
   assert.equal(result.rooms, design.rooms);
-  assert.equal(result.finish, design.finish);
   assert.equal(result.notes, "I would like to request this design as shown.");
   assert.deepEqual(result.inspirationImages, []);
   assert.equal(result.status, "Pending");
@@ -84,7 +83,7 @@ test("selected designs reject unavailable records, forged specifications, unauth
   await assert.rejects(createDesignRequest(db, other, input), isError(409));
   await assert.rejects(createDesignRequest(db, customer, { houseDesignId: input.houseDesignId }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, houseDesignId: "invalid" }), ZodError);
-  await assert.rejects(createDesignRequest(db, customer, { ...input, floorArea: 1, finish: "Luxury" }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, floorArea: 1 }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, selectedDesign: { name: "Forged design" } }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, houseDesignId: new ObjectId().toHexString() }), isError(404));
   for (const status of ["Draft", "Archived"]) {
@@ -103,7 +102,7 @@ test("customers can have at most three design requests waiting for review", asyn
   const customerId = new ObjectId(customer.id);
   const now = new Date();
   const existing = (status: DesignRequestDocument["status"]): DesignRequestDocument => ({
-    _id: new ObjectId(), customerId, floorArea: 80, rooms: "2 bedrooms", finish: "Standard", notes: "Earlier request",
+    _id: new ObjectId(), customerId, floorArea: 80, rooms: "2 bedrooms", notes: "Earlier request",
     inspirationImages: [], status, createdAt: now, updatedAt: now,
   });
   // Decided requests do not count toward the limit.
@@ -127,7 +126,9 @@ test("customers can have at most three design requests waiting for review", asyn
 
 test("custom design requests still require requirements and inspiration images", async () => {
   await agree();
-  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
+  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
+  // Finish levels were removed; an old form that still sends one is rejected.
+  await assert.rejects(createDesignRequest(db, customer, { ...input, finish: "Standard" }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, bedrooms: 101 }), /Bedrooms cannot be more than 100/);
@@ -143,7 +144,7 @@ test("design requests require a Preferred Date and Needed By in the future, in o
   const design = await publishedHouseDesign();
   await agree();
   const input = { houseDesignId: design._id.toHexString(), ...dates };
-  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, finish: "Standard", notes: "Custom layout", inspirationImages: [privateImage], ...dates };
+  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom layout", inspirationImages: [privateImage], ...dates };
   const withoutPreferred = { ...input, preferredDate: undefined };
   const withoutNeeded = { ...custom, neededBy: undefined };
   await assert.rejects(createDesignRequest(db, customer, withoutPreferred), ZodError);
@@ -299,7 +300,7 @@ async function designFixture(status: DesignRequestDocument["status"] = "Approved
   const id = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
     _id: id, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
-    finish: "Standard", notes: "Requested courtyard home", status, createdAt: now, updatedAt: now,
+    notes: "Requested courtyard home", status, createdAt: now, updatedAt: now,
   });
   await db.collection<ApprovalDocument>("approvals").insertOne({
     _id: new ObjectId(), reference: "APR-" + id, customerId: new ObjectId(customer.id), recordId: id,
@@ -484,9 +485,8 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_billing_tests");
-  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates", "reference_values"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
-  await db.collection("reference_values").insertMany(["Standard", "Semi-luxury", "Luxury"].map((value, order) => ({ category: "house-design-finish", value, order, active: true })));
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,
   })));

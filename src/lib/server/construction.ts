@@ -120,14 +120,14 @@ async function notify(db: Db, session: ClientSession, userIds: ObjectId[], note:
 // ───────────────────────── DTOs ─────────────────────────
 
 const designLabelOf = (design?: DesignRequestDocument | null) =>
-  design ? design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.finish}` : "Construction estimate";
+  design ? design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.rooms}` : "Construction estimate";
 
 async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: UserRole): Promise<CostEstimateDto[]> {
   const customerIds = [...new Set(estimates.map((estimate) => estimate.customerId.toHexString()))].map((id) => new ObjectId(id));
   const designIds = estimates.flatMap((estimate) => (estimate.designRequestId ? [estimate.designRequestId] : []));
   const [customers, designs] = await Promise.all([
     customerIds.length ? db.collection<UserDocument>(collections.users).find({ _id: { $in: customerIds } }, { projection: { name: 1, email: 1 } }).toArray() : [],
-    designIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: designIds } }, { projection: { selectedDesign: 1, floorArea: 1, finish: 1 } }).toArray() : [],
+    designIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: designIds } }, { projection: { selectedDesign: 1, floorArea: 1, rooms: 1 } }).toArray() : [],
   ]);
   const customerById = new Map(customers.map((customer) => [customer._id.toHexString(), customer]));
   const designById = new Map(designs.map((design) => [design._id.toHexString(), design]));
@@ -140,7 +140,7 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
       customer: { id: estimate.customerId.toHexString(), name: customer?.name ?? "Unknown customer", email: customer?.email ?? "" },
       designRequestId: estimate.designRequestId?.toHexString() ?? null,
       designLabel: designLabelOf(design as DesignRequestDocument | undefined),
-      floorArea: design?.floorArea ?? null, finish: design?.finish ?? null,
+      floorArea: design?.floorArea ?? null,
       preferredStartDate: isoDate(estimate.preferredStartDate), neededBy: isoDate(estimate.neededBy),
       siteAddress: estimate.siteAddress ?? "", siteAddressDetails: estimate.siteAddressDetails ?? null,
       customerNotes: estimate.customerNotes ?? "",

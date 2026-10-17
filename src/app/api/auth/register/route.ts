@@ -14,6 +14,7 @@ import {
   EmailVerificationError,
   registrationDetailsSchema,
 } from "@/lib/server/email-verification";
+import { requirePasswordPolicy } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
 import {
   clientIp,
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
     const { name, email, password, verificationCode, termsVersion, ...input } = registrationSchema.parse(await request.json());
     const clientDetails = toClientDetails(input);
     const db = await getDatabase();
+    await requirePasswordPolicy(db, password);
     // Every attempt from a network address counts, which limits both
     // automated sign-ups and probing which emails already have accounts.
     const ipKey = rateLimitKeys.register(clientIp(request));

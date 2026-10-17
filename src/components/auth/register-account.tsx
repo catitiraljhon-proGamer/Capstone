@@ -11,6 +11,8 @@ import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-add
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { phContactNumberExample } from "@/lib/ph-contact-number";
+import { passwordPolicyHint } from "@/lib/system-settings";
+import { usePublicSettings } from "@/lib/use-public-settings";
 import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, HardHat, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
@@ -114,7 +116,8 @@ export function RegisterAccountPage({
   const [errorMessage, setErrorMessage] = useState("");
   const [googleError, setGoogleError] = useState(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const validation = useClientFormValidation("register");
+  const passwordPolicy = usePublicSettings();
+  const validation = useClientFormValidation("register", passwordPolicy);
   const { describe, error: fieldError, errorId } = validation;
   /** Step 1 fills in the form; step 2 confirms the emailed code. The account is created only in step 2. */
   const [step, setStep] = useState<RegistrationStep>("details");
@@ -445,11 +448,12 @@ export function RegisterAccountPage({
                     name="password"
                     type={showPasswords ? "text" : "password"}
                     autoComplete="new-password"
-                    minLength={8}
+                    minLength={passwordPolicy.passwordMinLength}
                     maxLength={72}
                     required
                     placeholder="Enter password"
                     {...describe("password")}
+                    aria-describedby={[describe("password")["aria-describedby"], "password-hint"].filter(Boolean).join(" ")}
                     className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 pr-11 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                   />
                   <button
@@ -467,6 +471,7 @@ export function RegisterAccountPage({
                     )}
                   </button>
                 </div>
+                <p id="password-hint" className="text-xs text-stone-500">{passwordPolicyHint(passwordPolicy)}</p>
                 <FieldError id={errorId("password")} message={fieldError("password")} />
               </div>
 
@@ -482,7 +487,7 @@ export function RegisterAccountPage({
                   name="confirmPassword"
                   type={showPasswords ? "text" : "password"}
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={passwordPolicy.passwordMinLength}
                   maxLength={72}
                   required
                   placeholder="Re-enter password"

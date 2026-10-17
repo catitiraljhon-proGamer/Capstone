@@ -76,10 +76,9 @@ export type CostEstimateDto = {
   status: EstimateStatus;
   customer: { id: string; name: string; email: string };
   designRequestId: string | null;
-  /** Selected design name, or "120 sqm · Standard" for custom requests. */
+  /** Selected design name, or "120 sqm · 3 bedrooms, 2 bathrooms" for custom requests. */
   designLabel: string;
   floorArea: number | null;
-  finish: string | null;
   preferredStartDate: string | null;
   neededBy: string | null;
   siteAddress: string;

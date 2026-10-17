@@ -48,8 +48,8 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p>
-              <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.finish}`}</h2>
-              {design.selectedDesign && <p className="mt-1 text-sm text-stone-600">{design.floorArea} sqm · {design.finish}</p>}
+              <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.rooms}`}</h2>
+              {design.selectedDesign && <p className="mt-1 text-sm text-stone-600">{design.floorArea} sqm · {design.rooms}</p>}
               <p className="mt-1 break-words text-sm text-stone-600">{design.rooms}</p>
             </div>
           </div>

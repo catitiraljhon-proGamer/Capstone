@@ -1,21 +1,43 @@
 import assert from "node:assert/strict";
-import { after, before, beforeEach, test } from "node:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { after, afterEach, before, beforeEach, test } from "node:test";
+import { hash } from "bcryptjs";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
 import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
-import type { HouseDesignDocument } from "@/lib/database/collections";
-import { applyMaintenance, getMaintenanceData, isActiveFinish, MaintenanceError } from "@/lib/server/maintenance";
-import { backupCollections, backupPage, startBackup } from "@/lib/server/backup";
+import type { HouseDesignDocument, UserDocument } from "@/lib/database/collections";
+import {
+  getSystemSettings,
+  getSystemSettingsView,
+  MaintenanceError,
+  requirePasswordPolicy,
+  updateSystemSettings,
+} from "@/lib/server/maintenance";
+import {
+  backupCollections,
+  createBackup,
+  listBackups,
+  pruneAutomaticBackups,
+  readBackupChunk,
+  receiveBackupUpload,
+  restoreBackup,
+  runDailyBackup,
+} from "@/lib/server/backup";
+import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
+import { defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
 import type { SessionUser } from "@/types/domain";
 
 let mongo: MongoMemoryReplSet;
 let db: Db;
+let backupFolder: string;
+const adminPassword = "Admin-password-2026";
 const admin: SessionUser = { id: new ObjectId().toHexString(), name: "Admin", email: "admin@example.test", role: "admin" };
 const clerk: SessionUser = { id: new ObjectId().toHexString(), name: "Billing Clerk", email: "clerk@example.test", role: "billing-clerk" };
 const designId = new ObjectId();
 const isStatus = (status: number) => (error: unknown) => error instanceof MaintenanceError && error.status === status;
-const design = () => db.collection<HouseDesignDocument>("house_designs").findOne({ _id: designId });
 
 before(async () => {
   mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: "wiredTiger" } });
@@ -25,56 +47,116 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_maintenance_tests");
-  await Promise.all(["reference_values", "house_types", "house_designs", "audit_logs", "rate_limits"].map((name) => db.collection(name).deleteMany({})));
-  await db.collection("reference_values").insertMany(["Standard", "Luxury"].map((value, order) => ({ category: "house-design-finish", value, order, active: true })));
-  await db.collection("house_types").insertOne({ heading: "Modern", description: "Clean lines and open planning.", imgSrc: "https://example.test/modern.jpg", order: 0, active: true });
+  backupFolder = await mkdtemp(path.join(tmpdir(), "g4-backups-"));
+  process.env.BACKUP_LOCAL_DIR = backupFolder;
+  await Promise.all(["house_designs", "audit_logs", "rate_limits", "system_settings", "users", "backup_uploads"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
+  await db.collection<UserDocument>("users").insertMany([admin, clerk].map((actor) => ({
+    _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active" as const,
+    authVersion: 0, createdAt: now, updatedAt: now,
+  })));
+  await db.collection<UserDocument>("users").updateOne({ _id: new ObjectId(admin.id) }, { $set: { passwordHash: await hash(adminPassword, 4) } });
   await db.collection<HouseDesignDocument>("house_designs").insertOne({
-    _id: designId, name: "Test design", houseType: "Modern", finish: "Standard", area: 90, rooms: "2 bedrooms", rate: 25000,
+    _id: designId, name: "Test design", area: 90, rooms: "2 bedrooms", rate: 25000,
     images: ["https://example.test/design.jpg"], notes: "", status: "Published",
-    defaultSelections: [],
-    customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
-  } as HouseDesignDocument);
+    defaultSelections: [], customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
+  });
 });
-after(async () => { await db?.client.close(); await mongo?.stop(); });
-
-test("only the Admin can change maintenance records", async () => {
-  await assert.rejects(applyMaintenance(db, clerk, { action: "save-finish", value: "Premium", active: true }), isStatus(403));
+afterEach(() => rm(backupFolder, { recursive: true, force: true }));
+after(async () => {
+  await db?.client.close();
+  await mongo?.stop();
 });
 
-test("renaming a finish or house type carries over to house designs, and retired finishes are no longer offered", async () => {
-  await assert.rejects(applyMaintenance(db, admin, { action: "save-exterior-item", item: "Gate", detail: "", quantity: 1, options: [], active: true }), ZodError);
-  const data = await getMaintenanceData(db);
-  const standard = data.finishes.find((finish) => finish.value === "Standard")!;
-  assert.equal(standard.designCount, 1);
+test("settings start at the system's previous fixed values and only the Admin can change them, within limits", async () => {
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+  await assert.rejects(updateSystemSettings(db, clerk, { passwordMinLength: 12 }), isStatus(403));
+  await assert.rejects(updateSystemSettings(db, admin, { passwordMinLength: 7 }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { passwordMinLength: 12.5 }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { unknownSetting: 1 }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { autoBackup: "yes" }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { inactiveNoticeDays: 30 }), isStatus(400));
+});
 
-  await applyMaintenance(db, admin, { action: "save-finish", id: standard.id, value: "Basic", active: false });
-  assert.equal((await design())?.finish, "Basic");
-  assert.equal(await isActiveFinish(db, "Basic"), false);
-  assert.equal(await isActiveFinish(db, "Luxury"), true);
+test("saving records who changed each setting and audits old and new values", async () => {
+  const view = await updateSystemSettings(db, admin, { passwordMinLength: 12, emailCopiesCustomer: false, loginMaxAttempts: 5 });
+  assert.equal(view.settings.passwordMinLength, 12);
+  assert.equal(view.settings.emailCopiesCustomer, false);
+  assert.equal(view.changes.passwordMinLength?.by, "Admin");
+  // Unchanged values are not stamped.
+  assert.equal(view.changes.loginMaxAttempts, undefined);
+  const log = await db.collection("audit_logs").findOne({ action: "Updated settings" });
+  assert.deepEqual(log?.details, { "Minimum length": "8 characters → 12 characters", Customer: "On → Off" });
+  assert.equal((await getSystemSettingsView(db)).settings.passwordMinLength, 12);
+});
 
-  await applyMaintenance(db, admin, { action: "save-finish", value: "Premium", active: true });
-  assert.deepEqual((await getMaintenanceData(db)).finishes.map((finish) => finish.value), ["Basic", "Luxury", "Premium"]);
-  await assert.rejects(applyMaintenance(db, admin, { action: "save-finish", value: "Luxury", active: true }), isStatus(409));
+test("new passwords follow the Admin's password rules", async () => {
+  await requirePasswordPolicy(db, "eightchr");
+  await updateSystemSettings(db, admin, { passwordMinLength: 10, passwordLettersAndNumbers: true, passwordUpperAndSymbol: true });
+  await assert.rejects(requirePasswordPolicy(db, "Short-1"), PasswordPolicyError);
+  await assert.rejects(requirePasswordPolicy(db, "OnlyLetters-x"), /letters and numbers/);
+  await assert.rejects(requirePasswordPolicy(db, "lowercase-2026"), /uppercase letter and a symbol/);
+  await requirePasswordPolicy(db, "Strong-pass-2026");
+});
 
-  const modern = (await getMaintenanceData(db)).houseTypes[0];
-  await applyMaintenance(db, admin, { action: "save-house-type", id: modern.id, heading: "Contemporary", description: modern.description, imgSrc: modern.imgSrc, active: true });
-  assert.equal((await design())?.houseType, "Contemporary");
+test("a backup can be listed, downloaded in pieces, and restored with the Admin's password", async () => {
+  assert.ok(!backupCollections.includes("rate_limits" as never));
+  const saved = await createBackup(db, admin, "manual");
+  assert.equal(saved.type, "manual");
+  assert.equal(saved.createdBy, "Admin");
+  assert.deepEqual((await listBackups()).map((record) => record.id), [saved.id]);
+  const chunk = await readBackupChunk(saved.id, 0);
+  assert.equal(chunk.chunks, 1);
+  assert.equal(Buffer.from(chunk.data, "base64").length, saved.size);
+
+  // Changes made after the backup are undone by the restore.
+  await db.collection<HouseDesignDocument>("house_designs").updateOne({ _id: designId }, { $set: { name: "Renamed later" } });
+  await db.collection("house_designs").insertOne({ name: "Added later" });
+
+  await assert.rejects(restoreBackup(db, clerk, saved.id, { password: adminPassword }), isStatus(403));
+  await assert.rejects(restoreBackup(db, admin, saved.id, { password: "wrong-password" }), isStatus(403));
+  await assert.rejects(restoreBackup(db, admin, "../../etc/passwd", { password: adminPassword }), ZodError);
+
+  const result = await restoreBackup(db, admin, saved.id, { password: adminPassword });
+  const designs = await db.collection<HouseDesignDocument>("house_designs").find().toArray();
+  assert.deepEqual(designs.map((design) => design.name), ["Test design"]);
+  assert.ok(designs[0]._id instanceof ObjectId);
+  assert.ok(designs[0].createdAt instanceof Date);
+  // Everyone signs in again, maintenance is back off, and the restore stays in the audit log.
+  assert.ok((await db.collection<UserDocument>("users").find().toArray()).every((user) => user.authVersion === 1));
+  assert.equal((await readMaintenanceMode(db, new Date(), { fresh: true })).active, false);
+  assert.ok(await db.collection("audit_logs").findOne({ action: "Restored database backup" }));
+  const safety = (await listBackups()).find((record) => record.id === result.safetyBackup);
+  assert.equal(safety?.type, "before-restore");
+});
+
+test("an uploaded backup file is checked, then added to the list ready to restore", async () => {
+  const saved = await createBackup(db, admin, "manual");
+  const data = Buffer.from((await readBackupChunk(saved.id, 0)).data, "base64");
+  const half = Math.ceil(data.length / 2);
+  const uploadId = "upload-test-1";
+  const first = await receiveBackupUpload(db, admin, { uploadId, index: 0, total: 2, data: data.subarray(0, half).toString("base64") });
+  assert.equal(first.complete, false);
+  const second = await receiveBackupUpload(db, admin, { uploadId, index: 1, total: 2, data: data.subarray(half).toString("base64") });
+  assert.equal(second.complete && second.backup.type, "uploaded");
+  assert.equal(await db.collection("backup_uploads").countDocuments(), 0);
+
   await assert.rejects(
-    applyMaintenance(db, admin, { action: "save-house-type", heading: "Bad image", description: "A house type with a bad image.", imgSrc: "http://example.test/a.jpg", active: true }),
-    ZodError,
+    receiveBackupUpload(db, admin, { uploadId: "upload-test-2", index: 0, total: 1, data: Buffer.from("{\"hello\":1}").toString("base64") }),
+    /not a G4 Builders backup/,
   );
 });
 
-test("backups page through every lasting collection in Extended JSON and are audited", async () => {
-  assert.ok(!backupCollections.includes("rate_limits" as never));
-  const { collections } = await startBackup(db, admin);
-  assert.ok(collections.some((entry) => entry.name === "reference_values" && entry.count === 2));
-  const log = await db.collection("audit_logs").findOne({ action: "Downloaded database backup" });
-  assert.equal(log?.actorName, "Admin");
-
-  const page = await backupPage(db, "house_designs");
-  assert.equal(page.next, null);
-  assert.equal(page.documents.length, 1);
-  assert.deepEqual((page.documents[0] as { _id: unknown })._id, { $oid: designId.toHexString() });
+test("daily backups follow the Admin's setting and keep only the newest automatic ones", async () => {
+  await updateSystemSettings(db, admin, { autoBackup: false });
+  assert.deepEqual(await runDailyBackup(db), { created: null });
+  await updateSystemSettings(db, admin, { autoBackup: true, keepAutomaticBackups: 2 });
+  const manual = await createBackup(db, admin, "manual", new Date("2026-10-01T00:00:00Z"));
+  for (const day of [1, 2, 3]) await createBackup(db, admin, "automatic", new Date(`2026-10-0${day}T17:00:00Z`));
+  await pruneAutomaticBackups(2);
+  const remaining = await listBackups();
+  assert.deepEqual(remaining.filter((record) => record.type === "automatic").map((record) => record.createdAt), [
+    "2026-10-03T17:00:00.000Z", "2026-10-02T17:00:00.000Z",
+  ]);
+  assert.ok(remaining.some((record) => record.id === manual.id));
 });

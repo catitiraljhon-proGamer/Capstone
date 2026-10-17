@@ -3,13 +3,11 @@ import { gmailAddressMessage, isGmailAddress } from "@/lib/gmail";
 import { termsVersionSchema } from "@/lib/server/account-terms";
 import { getAuthSecret } from "@/lib/server/auth-secret";
 import { createClientSchema } from "@/lib/server/clients";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { type Db, MongoServerError } from "mongodb";
 import { z } from "zod";
 
-export const verificationCodeMinutes = 10;
-export const verificationResendSeconds = 60;
-const maxCodeAttempts = 5;
 
 /** Self-registration email: a valid, normalized Gmail address. */
 export const registrationEmailSchema = createClientSchema.shape.email.refine(isGmailAddress, gmailAddressMessage);
@@ -51,12 +49,13 @@ function verifications(db: Db) {
 
 /**
  * Creates a new 6-digit code for the email, replacing any earlier one.
- * Refuses a new code until the resend cooldown has passed.
+ * Refuses a new code until the resend cooldown has passed. Timings come from the Admin's settings.
  */
 export async function issueEmailVerificationCode(db: Db, email: string) {
+  const { signupCodeMinutes, signupResendSeconds } = await getSystemSettings(db);
   const now = new Date();
   const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-  const cooldownStart = new Date(now.getTime() - verificationResendSeconds * 1000);
+  const cooldownStart = new Date(now.getTime() - signupResendSeconds * 1000);
   try {
     // Matches only a code old enough to replace; a recent one makes the upsert collide on _id.
     await verifications(db).updateOne(
@@ -66,7 +65,7 @@ export async function issueEmailVerificationCode(db: Db, email: string) {
           codeHash: hashCode(email, code),
           attempts: 0,
           sentAt: now,
-          expiresAt: new Date(now.getTime() + verificationCodeMinutes * 60 * 1000),
+          expiresAt: new Date(now.getTime() + signupCodeMinutes * 60 * 1000),
         },
       },
       { upsert: true },
@@ -76,7 +75,7 @@ export async function issueEmailVerificationCode(db: Db, email: string) {
     const recent = await verifications(db).findOne({ _id: email });
     const retryAfterSeconds = recent
       ? Math.max(1, Math.ceil((recent.sentAt.getTime() - cooldownStart.getTime()) / 1000))
-      : verificationResendSeconds;
+      : signupResendSeconds;
     throw new EmailVerificationError(
       `A code was just sent. You can request another one in ${retryAfterSeconds} seconds.`,
       429,
@@ -88,6 +87,7 @@ export async function issueEmailVerificationCode(db: Db, email: string) {
 
 /** Throws unless the code matches the latest unexpired code for this email. */
 export async function checkEmailVerificationCode(db: Db, email: string, code: string) {
+  const { signupMaxAttempts: maxCodeAttempts } = await getSystemSettings(db);
   const record = await verifications(db).findOneAndUpdate(
     { _id: email, expiresAt: { $gt: new Date() }, attempts: { $lt: maxCodeAttempts } },
     { $inc: { attempts: 1 } },

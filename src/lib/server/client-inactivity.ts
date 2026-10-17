@@ -5,12 +5,9 @@ import {
 } from "@/lib/database/collections";
 import { invoiceState, sumMoney } from "@/lib/billing";
 import { recordAuditLog } from "@/lib/server/audit";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
 
-/** Days after the last project is completed before an inactive client is archived and disabled. */
-export const inactiveArchiveDays = 30;
-/** Days before archiving that the customer is warned. */
-export const inactiveNoticeDays = 7;
 
 const day = 86_400_000;
 const systemActor = { id: "000000000000000000000000", name: "System (automatic)", role: "admin" as const };
@@ -41,9 +38,11 @@ async function hasOpenWork(db: Db, customerId: ObjectId, since: Date) {
 
 /**
  * Daily job. When every project of a client is Completed and nothing else is open, the client is warned, then archived
- * and disabled 30 days after the last completion and at least 7 days after the warning. Unarchiving restores access.
+ * and disabled a set number of days after the last completion (30 by default) and at least the warning period (7 by
+ * default) after the warning. Both are Admin settings. Unarchiving restores access.
  */
 export async function archiveInactiveClients(db: Db, now = new Date()) {
+  const { inactiveArchiveDays, inactiveNoticeDays } = await getSystemSettings(db);
   const users = db.collection<UserDocument>(collections.users);
   const projects = db.collection<ProjectDocument>(collections.projects);
   const candidateIds = (await projects.find({ status: "Completed" }, { projection: { customerId: 1 } }).toArray())
@@ -61,8 +60,8 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
     if (await hasOpenWork(db, customer._id, inactiveSince)) continue;
 
     const archiveOn = new Date(inactiveSince.getTime() + inactiveArchiveDays * day);
-    // The customer is always warned first, and archived no sooner than 7 days after that warning. Clients already
-    // past 30 days when this started (or when a run was missed) still get their full 7 days.
+    // The customer is always warned first, and archived no sooner than the warning period after that warning. Clients
+    // already past the archive period when this started (or when a run was missed) still get the full warning period.
     const noticeSentAt = customer.inactivityNoticeFor?.getTime() === inactiveSince.getTime() ? customer.inactivityNoticeSentAt : undefined;
     if (noticeSentAt) {
       if (now.getTime() < Math.max(archiveOn.getTime(), noticeSentAt.getTime() + inactiveNoticeDays * day)) continue;

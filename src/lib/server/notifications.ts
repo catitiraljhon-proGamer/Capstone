@@ -4,11 +4,14 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { isEmailConfigured, notificationEmail, sendEmail } from "@/lib/server/email";
+import { getSystemSettings } from "@/lib/server/maintenance";
+import type { SystemSettings } from "@/lib/system-settings";
+import type { UserRole } from "@/types/domain";
 import type { ClientSession, Db, ObjectId } from "mongodb";
 import { after } from "next/server";
 
 /**
- * Saves in-app notifications and emails each recipient a copy, whatever their role.
+ * Saves in-app notifications and emails each recipient a copy, for the roles the Admin keeps email copies on for.
  * Pass the transaction session when called inside one; the emails go out
  * only after the response, so a rolled-back notification is never sent.
  */
@@ -39,7 +42,15 @@ function queueNotificationEmails(db: Db, ids: ObjectId[]) {
   }
 }
 
+/** Maintenance > Notifications and reminders turns email copies on or off per role. */
+const emailCopySetting: Record<UserRole, keyof SystemSettings> = {
+  admin: "emailCopiesAdmin",
+  "billing-clerk": "emailCopiesBillingClerk",
+  customer: "emailCopiesCustomer",
+};
+
 export async function deliverNotificationEmails(db: Db, ids: ObjectId[]) {
+  const settings = await getSystemSettings(db);
   const notifications = db.collection<NotificationDocument>(collections.notifications);
   const users = db.collection<UserDocument>(collections.users);
   for (const id of ids) {
@@ -51,9 +62,9 @@ export async function deliverNotificationEmails(db: Db, ids: ObjectId[]) {
     if (!notification) continue;
     const recipient = await users.findOne(
       { _id: notification.userId, status: "active" },
-      { projection: { email: 1, name: 1 } },
+      { projection: { email: 1, name: 1, role: 1 } },
     );
-    if (!recipient) continue;
+    if (!recipient || !settings[emailCopySetting[recipient.role]]) continue;
     const claimed = await notifications.findOneAndUpdate(
       { _id: id, emailedAt: { $exists: false } },
       { $set: { emailedAt: new Date() } },

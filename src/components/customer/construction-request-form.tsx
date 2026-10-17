@@ -156,7 +156,7 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
       {showDesignFacts && <dl className="mt-5 grid gap-3 rounded-lg bg-stone-50 p-4 text-sm sm:grid-cols-3">
         <div><dt className="text-xs text-stone-500">Design</dt><dd className="mt-1 font-semibold">{designTitle(design)}</dd></div>
         <div><dt className="text-xs text-stone-500">Floor Area</dt><dd className="mt-1 font-semibold">{design.floorArea} sqm</dd></div>
-        <div><dt className="text-xs text-stone-500">Finish</dt><dd className="mt-1 font-semibold">{design.finish}</dd></div>
+        <div><dt className="text-xs text-stone-500">Rooms</dt><dd className="mt-1 font-semibold">{design.rooms}</dd></div>
       </dl>}
 
       <form ref={formRef} noValidate onSubmit={submit} className="mt-6 space-y-5">

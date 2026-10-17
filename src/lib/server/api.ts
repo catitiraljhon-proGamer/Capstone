@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { MongoServerError } from "mongodb";
 import { ZodError } from "zod";
+import { PasswordPolicyError } from "@/lib/system-settings";
 
 /** zod's built-in messages ("Too small: expected number to be >=20") need the field name to make sense. */
 const builtInZodMessage = /^(Invalid|Too (small|big)|Expected|Unrecognized|Required)/;
@@ -18,6 +19,13 @@ export function apiError(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json(
       { error: validationMessage(error), issues: error.issues },
+      { status: 400 },
+    );
+  }
+
+  if (error instanceof PasswordPolicyError) {
+    return NextResponse.json(
+      { error: error.message, issues: [{ path: ["password"], message: error.message }] },
       { status: 400 },
     );
   }

@@ -39,7 +39,7 @@ async function designFixture(owner: SessionUser, paid: boolean) {
   const now = new Date();
   const id = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
-    _id: id, customerId: new ObjectId(owner.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms", finish: "Standard",
+    _id: id, customerId: new ObjectId(owner.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
     notes: "Courtyard home", status: "Completed", completedDesignImages: ["data:image/png;base64,AAAA"], completedAt: now, createdAt: now, updatedAt: now,
   });
   const invoiceId = new ObjectId();
@@ -259,7 +259,7 @@ test("blueprint-flow designs open the free estimate once the customer approves t
   const now = new Date();
   const id = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
-    _id: id, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms", finish: "Standard",
+    _id: id, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
     notes: "Courtyard home", status: "Changes requested", currentVersion: 1, createdAt: now, updatedAt: now,
   });
   await assert.rejects(createConstructionRequest(db, customer, requestInput(id.toHexString())), isError(409));
@@ -295,7 +295,7 @@ test("only the owner of an unlocked design can request construction, and each de
   assert.equal(estimate.status, "Requested");
   assert.match(estimate.reference, /^EST-\d{4}-\d{6}$/);
   assert.equal(estimate.preferredStartDate, startDate());
-  assert.equal(estimate.designLabel, "120 sqm · Standard");
+  assert.equal(estimate.designLabel, "120 sqm · 3 bedrooms, 2 bathrooms");
   assert.ok(estimate.siteAddress.includes("Balayan"));
   const duplicates = await Promise.allSettled([createConstructionRequest(db, customer, requestInput(unlocked)), createConstructionRequest(db, customer, requestInput(unlocked))]);
   assert.ok(duplicates.every((result) => result.status === "rejected" && isError(409)(result.reason)));
@@ -395,7 +395,7 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   const { estimate, projectId } = await acceptedProject(30);
   const project = await projectDto(projectId);
   assert.equal(project.status, "Awaiting downpayment");
-  assert.equal(project.name, "120 sqm · Standard – Construction");
+  assert.equal(project.name, "120 sqm · 3 bedrooms, 2 bathrooms – Construction");
   assert.match(project.reference, /^PRJ-\d{4}-\d{6}$/);
   assert.equal(project.contractPrice, 6_000_000);
   assert.equal(project.subtotal, 6_000_000);

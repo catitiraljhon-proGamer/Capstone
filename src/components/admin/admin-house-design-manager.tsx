@@ -2,7 +2,6 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
-import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import { HouseDesignForm } from "@/components/house-designs/house-design-form";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import {
@@ -26,7 +25,7 @@ import {
 import Image from "next/image";
 import { useState } from "react";
 
-type Step = "types" | "designs" | "create" | "details" | "edit";
+type Step = "designs" | "create" | "details" | "edit";
 
 const statusBadgeClass: Record<HouseDesignStatus, string> = {
   Draft: "bg-stone-100 text-stone-700",
@@ -131,8 +130,7 @@ export function AdminHouseDesignManager() {
     updateDesign,
     setDesignStatus,
   } = useHouseDesigns({ includeAll: true });
-  const [activeStep, setActiveStep] = useState<Step>("types");
-  const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
+  const [activeStep, setActiveStep] = useState<Step>("designs");
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isConfirmingArchive, setIsConfirmingArchive] = useState(false);
@@ -141,13 +139,10 @@ export function AdminHouseDesignManager() {
   const selectedDesign =
     designs.find((design) => design.id === selectedDesignId) ?? null;
   const filteredDesigns = designs.filter(
-    (design) =>
-      design.houseType === selectedHouseType &&
-      (showArchived ? true : design.status !== "Archived"),
+    (design) => showArchived || design.status !== "Archived",
   );
   const archivedCount = designs.filter(
-    (design) =>
-      design.houseType === selectedHouseType && design.status === "Archived",
+    (design) => design.status === "Archived",
   ).length;
 
   const goToStep = (step: Step) => {
@@ -156,10 +151,9 @@ export function AdminHouseDesignManager() {
     setIsConfirmingArchive(false);
   };
 
-  const goToTypes = () => {
-    setSelectedHouseType(null);
+  const goToDesigns = () => {
     setSelectedDesignId(null);
-    goToStep("types");
+    goToStep("designs");
   };
 
   const openDesign = (design: HouseDesign) => {
@@ -197,10 +191,7 @@ export function AdminHouseDesignManager() {
   };
 
   const breadcrumbItems = [
-    { label: "House Designs", onClick: goToTypes },
-    ...(selectedHouseType
-      ? [{ label: selectedHouseType, onClick: () => goToStep("designs") }]
-      : []),
+    { label: "House Designs", onClick: goToDesigns },
     ...(activeStep === "create" ? [{ label: "New Design" }] : []),
     ...((activeStep === "details" || activeStep === "edit") && selectedDesign
       ? [{ label: selectedDesign.name }]
@@ -240,40 +231,16 @@ export function AdminHouseDesignManager() {
         </p>
       ) : null}
 
-      {activeStep !== "types" ? <Breadcrumb items={breadcrumbItems} /> : null}
+      {activeStep !== "designs" ? <Breadcrumb items={breadcrumbItems} /> : null}
 
-      {activeStep === "types" ? (
-        <div>
-          <div className="mb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-              Select House Type
-            </h1>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              Admin can choose a house type first, then manage the designs and
-              exterior materials under that category.
-            </p>
-          </div>
-          <HouseTypeCards
-            houseTypes={catalog.houseTypes}
-            onSelect={(houseType) => {
-              setSelectedHouseType(houseType);
-              setSelectedDesignId(null);
-              goToStep("designs");
-            }}
-          />
-        </div>
-      ) : activeStep === "create" ? (
+      {activeStep === "create" ? (
         <HouseDesignForm
-          defaultHouseType={selectedHouseType}
           existingNames={designs.map((design) => design.name)}
-          houseTypes={catalog.houseTypes}
-          finishes={catalog.finishes}
           exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("designs")}
           onSubmit={async (draft) => {
             try {
               const created = await addDesign(draft);
-              setSelectedHouseType(created.houseType);
               setSelectedDesignId(created.id);
               setActiveStep("details");
               setStatusMessage(
@@ -292,14 +259,11 @@ export function AdminHouseDesignManager() {
           existingNames={designs
             .filter((design) => design.id !== selectedDesign.id)
             .map((design) => design.name)}
-          houseTypes={catalog.houseTypes}
-          finishes={catalog.finishes}
           exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("details")}
           onSubmit={async (changes) => {
             try {
               await updateDesign(selectedDesign.id, changes);
-              setSelectedHouseType(changes.houseType);
               setActiveStep("details");
               setStatusMessage(`${changes.name} was updated.`);
             } catch {
@@ -312,7 +276,7 @@ export function AdminHouseDesignManager() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-                {selectedHouseType} House Designs
+                House Designs
               </h1>
               <p className="mt-1 text-sm leading-6 text-stone-600">
                 Select a design to review its details and exterior materials.
@@ -366,7 +330,7 @@ export function AdminHouseDesignManager() {
                         <StatusBadge status={design.status} />
                       </div>
                       <p className="mt-1 text-xs text-stone-600">
-                        {design.style ?? design.houseType} -{" "}
+                        {design.style ? `${design.style} - ` : ""}
                         <span className="tabular-nums">{design.area}</span> sqm
                       </p>
                     </div>
@@ -401,12 +365,12 @@ export function AdminHouseDesignManager() {
           ) : (
             <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-8 text-center">
               <p className="text-sm font-semibold text-stone-950">
-                No designs under {selectedHouseType} yet.
+                No house designs yet.
               </p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
                 {archivedCount > 0
-                  ? "All designs for this house type are archived. Turn on Show archived to restore one."
-                  : "Create the first design record for this house type. It is saved as a draft until you publish it."}
+                  ? "All designs are archived. Turn on Show archived to restore one."
+                  : "Create the first design record. It is saved as a draft until you publish it."}
               </p>
               <Button
                 type="button"
@@ -554,14 +518,8 @@ export function AdminHouseDesignManager() {
   return (
     <AdminSectionPage
       activeLabel="House Design"
-      title={
-        selectedHouseType ? `${selectedHouseType} House Designs` : "House Designs"
-      }
-      description={
-        selectedHouseType
-          ? "Select a design to review and edit its details, materials, and custom items."
-          : "Review house design submissions and design-related project records."
-      }
+      title="House Designs"
+      description="Select a design to review and edit its details, materials, and custom items."
       mainContent={mainContent}
     />
   );

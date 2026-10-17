@@ -23,7 +23,7 @@ const roofPrice: MaterialPriceOverride = {
   item: "Roof", material: "Rib-type roofing", unit: "sqm", unitPrice: 1675.25,
 };
 const designInput = {
-  name: "Test House", houseType: "Bungalow", finish: "Standard", area: 100,
+  name: "Test House", area: 100,
   rooms: "3 bedrooms", rate: 20000, images: ["/test-house.jpg"], notes: "",
   status: "Published", defaultSelections: [0, 0], customItems: [],
 };

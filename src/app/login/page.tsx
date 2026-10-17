@@ -24,6 +24,8 @@ export default async function LoginPage({
       ? await readGoogleLink(cookieStore.get(googleLinkCookieName)?.value)
       : null;
   const error =
+    (params.signed_out === "idle" ? "You were signed out after a period of no activity. Sign in again to continue." : "") ||
+    (params.signed_out === "restore" ? "A backup was restored and everyone was signed out. Sign in again to continue." : "") ||
     googleAuthErrorMessage(params.google_error) ||
     (params.google_link === "1" && !link
       ? googleAuthErrorMessage("expired")

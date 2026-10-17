@@ -14,8 +14,6 @@ export type NewHouseDesignInput = Omit<
 >;
 
 const emptyCatalog: HouseDesignCatalog = {
-  finishes: [],
-  houseTypes: [],
   exteriorItems: [],
 };
 

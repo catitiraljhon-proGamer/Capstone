@@ -129,7 +129,7 @@ function DetailsCard({ estimate }: { estimate: CostEstimateDto }) {
           {estimate.designLabel}
           {estimate.floorArea ? (
             <span className="block text-xs text-stone-500">
-              {estimate.floorArea} sq m{estimate.finish ? ` · ${estimate.finish}` : ""}
+              {estimate.floorArea} sq m
             </span>
           ) : null}
         </Detail>

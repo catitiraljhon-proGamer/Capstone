@@ -44,14 +44,14 @@ export async function GET() {
           ...visibleNotificationsFor(customerId),
           readAt: { $exists: false },
         }),
-        db.collection<DesignRequestDocument>(collections.designRequests).findOne({ customerId }, { sort: { createdAt: -1 }, projection: { floorArea: 1, finish: 1 } }),
+        db.collection<DesignRequestDocument>(collections.designRequests).findOne({ customerId }, { sort: { createdAt: -1 }, projection: { floorArea: 1, rooms: 1 } }),
       ]);
 
     const totalPaid = sumMoney(billing.payments.filter((payment) => payment.status === "Verified").map((payment) => payment.amount));
     const totalContractPrice = sumMoney(billing.projects.map((item) => item.contractPrice));
 
     return NextResponse.json({
-      currentDesign: latestRequest ? `${latestRequest.floorArea} sqm · ${latestRequest.finish}` : null,
+      currentDesign: latestRequest ? `${latestRequest.floorArea} sqm · ${latestRequest.rooms}` : null,
       estimatedBudget: project?.contractPrice ?? 0,
       pendingRequests,
       totalContractPrice,

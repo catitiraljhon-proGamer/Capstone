@@ -484,7 +484,7 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
 async function billableDesignRequests(db: Db) {
   // Blueprint requests appear once the admin submits the blueprint, which requires an accepted estimate.
   return db.collection<DesignRequestDocument>(collections.designRequests)
-    .find({ $or: [{ status: "Completed" }, { status: "Design approved", blueprintSubmittedAt: { $exists: true } }] }, { projection: { customerId: 1, floorArea: 1, finish: 1, status: 1 } })
+    .find({ $or: [{ status: "Completed" }, { status: "Design approved", blueprintSubmittedAt: { $exists: true } }] }, { projection: { customerId: 1, floorArea: 1, rooms: 1, status: 1 } })
     .sort({ updatedAt: -1 }).toArray();
 }
 
@@ -525,7 +525,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
   return {
     designRequests: designs.map((design) => ({
       id: design._id.toHexString(), customerName: customerNames.get(design.customerId.toHexString()) ?? "Unknown customer",
-      label: design.floorArea + " sqm · " + design.finish + " · " + design._id.toHexString().slice(-8).toUpperCase(),
+      label: design.floorArea + " sqm · " + design.rooms + " · " + design._id.toHexString().slice(-8).toUpperCase(),
       feeType: design.status === "Completed" ? "design" as const : "blueprint" as const,
       invoiceId: invoices.find((invoice) => invoice.designRequestId?.equals(design._id) && invoice.status !== "Void")?._id.toHexString(),
     })),

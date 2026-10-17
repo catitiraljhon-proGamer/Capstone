@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { IdleSignOut } from "@/components/auth/idle-sign-out";
 import { ContactUs } from "@/components/landing/contact-us";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 import "./globals.css";
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <MaintenanceBanner />
+        <IdleSignOut />
         {children}
         <ContactUs />
       </body>

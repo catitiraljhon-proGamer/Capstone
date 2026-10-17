@@ -26,8 +26,6 @@ const materialPricesSchema = z.array(z.object({
 export const houseDesignInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   style: z.string().trim().max(80).optional(),
-  houseType: z.string().trim().min(1).max(80),
-  finish: z.string().trim().min(1, "Choose a finish level.").max(40),
   area: z.number().finite().positive().max(100_000),
   rooms: z.string().trim().min(1).max(200),
   rate: z.number().finite().nonnegative().max(100_000_000),
@@ -50,8 +48,6 @@ export function toHouseDesignDto(document: HouseDesignDocument): HouseDesign {
     id: document._id.toHexString(),
     name: document.name,
     style: document.style,
-    houseType: document.houseType,
-    finish: document.finish,
     area: document.area,
     rooms: document.rooms,
     rate: document.rate,

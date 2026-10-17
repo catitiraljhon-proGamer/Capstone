@@ -222,9 +222,9 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
           <div className="min-w-0">
             <Eyebrow>{`Estimate ${estimate.reference}`}</Eyebrow>
             <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{estimate.designLabel}</h2>
-            {(estimate.floorArea || estimate.finish) && (
-              <p className="mt-1 text-sm text-stone-600">{[estimate.floorArea ? `${estimate.floorArea} sqm` : null, estimate.finish].filter(Boolean).join(" · ")}</p>
-            )}
+            {estimate.floorArea ? (
+              <p className="mt-1 text-sm text-stone-600">{estimate.floorArea} sqm</p>
+            ) : null}
           </div>
           <span className="inline-flex whitespace-nowrap rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800">
             {preparing ? "Preparing estimate" : estimate.status === "Sent" ? "Ready for your review" : estimate.status}

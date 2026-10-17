@@ -32,7 +32,7 @@ before(async () => {
 });
 beforeEach(async () => {
   sent.length = 0;
-  await Promise.all(["users", "notifications"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["users", "notifications", "system_settings"].map((name) => db.collection(name).deleteMany({})));
 });
 after(async () => {
   delete emailGlobals.gmailTransporter;
@@ -79,6 +79,19 @@ test("every role's notifications are emailed exactly once; disabled and rolled-b
   assert.equal(emailed, 3);
   const skipped = await db.collection<NotificationDocument>("notifications").findOne({ _id: notes[3]._id });
   assert.equal(skipped?.emailedAt, undefined);
+});
+
+test("the Admin can turn email copies off for a role", async () => {
+  const customer = person({});
+  const clerk = person({ email: "clerk@example.test", role: "billing-clerk" });
+  await db.collection<UserDocument>("users").insertMany([customer, clerk]);
+  await db.collection("system_settings").updateOne({ _id: "system" as never }, { $set: { values: { emailCopiesBillingClerk: false } } }, { upsert: true });
+  const notes = [note(customer._id, "New invoice"), note(clerk._id, "Payment needs review")];
+  await db.collection<NotificationDocument>("notifications").insertMany(notes);
+  await deliverNotificationEmails(db, notes.map((item) => item._id));
+  assert.deepEqual(sent.map((message) => message.to), [customer.email]);
+  // The in-app notification is still there for the clerk.
+  assert.equal(await db.collection("notifications").countDocuments({ userId: clerk._id }), 1);
 });
 
 test("email content escapes notification text and shows the verification code", () => {

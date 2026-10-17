@@ -14,6 +14,8 @@ import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { textError } from "@/lib/form-validation";
 import { gmailAddressMessage, isGmailAddress } from "@/lib/gmail";
 import { phContactNumberError, phContactNumberExample } from "@/lib/ph-contact-number";
+import { defaultPasswordPolicy, passwordPolicyError, passwordPolicyHint, type PasswordPolicy } from "@/lib/system-settings";
+import { usePublicSettings } from "@/lib/use-public-settings";
 import type { ClientDto } from "@/types/clients";
 
 export type ClientFormInput = {
@@ -48,15 +50,12 @@ export function registrationEmailError(raw: string) {
   return emailError(raw) ?? (isGmailAddress(raw) ? null : gmailAddressMessage);
 }
 
-function passwordError(raw: string) {
-  if (!raw) return "Enter a password.";
-  if (raw.length < 8) return "Password must be at least 8 characters.";
-  if (raw.length > 72) return "Password must be 72 characters or fewer.";
-  return null;
-}
-
 /** Client-side mirror of the server rules in lib/server/clients.ts and the register route. */
-export function clientFieldErrors(values: Record<string, string>, mode: ClientFormMode): FieldErrors {
+export function clientFieldErrors(
+  values: Record<string, string>,
+  mode: ClientFormMode,
+  passwordPolicy: PasswordPolicy = defaultPasswordPolicy,
+): FieldErrors {
   const errors: FieldErrors = {
     name: textError(values.name ?? "", { label: "Full name", min: 2, max: 100 }),
     contactNumber: phContactNumberError(values.contactNumber ?? ""),
@@ -65,7 +64,7 @@ export function clientFieldErrors(values: Record<string, string>, mode: ClientFo
   };
   if (mode !== "edit") {
     errors.email = emailError(values.email ?? "");
-    errors.password = passwordError(values.password ?? "");
+    errors.password = passwordPolicyError(values.password ?? "", passwordPolicy);
   }
   if (mode === "register") {
     errors.email = registrationEmailError(values.email ?? "");
@@ -90,12 +89,12 @@ export function readFormValues(form: HTMLFormElement) {
  * under a field after it loses focus or after a submit attempt, and a failed
  * submit focuses the first invalid field. Spread `formProps` onto the form.
  */
-export function useClientFormValidation(mode: ClientFormMode) {
+export function useClientFormValidation(mode: ClientFormMode, passwordPolicy: PasswordPolicy = defaultPasswordPolicy) {
   const prefix = useId();
   const [values, setValues] = useState<Record<string, string> | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
-  const errors = useMemo<FieldErrors>(() => (values ? clientFieldErrors(values, mode) : {}), [values, mode]);
+  const errors = useMemo<FieldErrors>(() => (values ? clientFieldErrors(values, mode, passwordPolicy) : {}), [values, mode, passwordPolicy]);
 
   const error = (name: string) => (submitted || touched[name] ? errors[name] ?? null : null);
   const errorId = (name: string) => `${prefix}-${name}-error`;
@@ -130,7 +129,7 @@ export function useClientFormValidation(mode: ClientFormMode) {
     const next = readFormValues(form);
     setValues(next);
     setSubmitted(true);
-    const found = clientFieldErrors(next, mode);
+    const found = clientFieldErrors(next, mode, passwordPolicy);
     const firstInvalid = Array.from(form.elements).find((element) => {
       const name = (element as HTMLInputElement).name;
       return Boolean(name && found[name]);
@@ -156,7 +155,8 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const validation = useClientFormValidation(creating ? "create" : "edit");
+  const passwordPolicy = usePublicSettings();
+  const validation = useClientFormValidation(creating ? "create" : "edit", passwordPolicy);
   const { describe, error: fieldError, errorId } = validation;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -227,8 +227,8 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         {creating && <div className="min-w-0 sm:col-span-2">
           <label className="block text-sm font-medium text-stone-700">
             Initial Account Password <RequiredIndicator />
-            <input name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={72} placeholder="Enter initial account password" className={fieldClass} {...describe("password")} />
-            <span className="mt-1 block text-xs font-normal text-stone-500">At least 8 characters. The new account will have client access.</span>
+            <input name="password" type="password" autoComplete="new-password" required minLength={passwordPolicy.passwordMinLength} maxLength={72} placeholder="Enter initial account password" className={fieldClass} {...describe("password")} />
+            <span className="mt-1 block text-xs font-normal text-stone-500">{passwordPolicyHint(passwordPolicy)} The new account will have client access.</span>
           </label>
           <FieldError id={errorId("password")} message={fieldError("password")} />
         </div>}

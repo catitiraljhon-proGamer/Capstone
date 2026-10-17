@@ -14,9 +14,7 @@ import {
   type CustomExteriorItem,
   type ExteriorItemChoice,
   type HouseDesign,
-  type HouseDesignFinish,
   type HouseDesignStatus,
-  type HouseType,
   type MaterialPriceOverride,
 } from "@/lib/house-design-data";
 import {
@@ -38,7 +36,6 @@ const maxImages = 6;
 
 type FieldName =
   | "name"
-  | "houseType"
   | "area"
   | "rate"
   | "rooms"
@@ -50,7 +47,6 @@ type FieldErrors = Partial<Record<FieldName, string>>;
 
 type FormValues = {
   name: string;
-  houseType: string;
   area: string;
   rate: string;
   rooms: string;
@@ -58,7 +54,6 @@ type FormValues = {
 
 const fieldOrder: FieldName[] = [
   "name",
-  "houseType",
   "area",
   "rate",
   "rooms",
@@ -69,7 +64,6 @@ const fieldOrder: FieldName[] = [
 
 const fieldLabels: Record<FieldName, string> = {
   name: "Design Name",
-  houseType: "House Type",
   area: "Floor Area",
   rate: "Cost Rate",
   rooms: "Room Setup",
@@ -80,7 +74,6 @@ const fieldLabels: Record<FieldName, string> = {
 
 const fieldIds: Record<FieldName, string> = {
   name: "design-name",
-  houseType: "design-house-type",
   area: "design-area",
   rate: "design-rate",
   rooms: "design-rooms",
@@ -161,10 +154,6 @@ function validate(
     )
   ) {
     errors.name = "A design with this name already exists. Use a unique name.";
-  }
-
-  if (!values.houseType) {
-    errors.houseType = "Select a house type so customers can find this design.";
   }
 
   const areaMessage =
@@ -250,20 +239,14 @@ function describedBy(id: string, hasHint: boolean, hasError: boolean) {
 
 export function HouseDesignForm({
   design,
-  defaultHouseType,
   existingNames,
-  houseTypes,
-  finishes,
   exteriorItems,
   onCancel,
   onSubmit,
 }: {
   /** Provide to edit an existing design; omit to create a new one. */
   design?: HouseDesign | null;
-  defaultHouseType?: string | null;
   existingNames: string[];
-  houseTypes: HouseType[];
-  finishes: HouseDesignFinish[];
   exteriorItems: ExteriorItemChoice[];
   onCancel: () => void;
   onSubmit: (design: NewHouseDesignInput) => void;
@@ -273,15 +256,11 @@ export function HouseDesignForm({
 
   const [values, setValues] = useState<FormValues>({
     name: design?.name ?? "",
-    houseType: design?.houseType ?? defaultHouseType ?? "",
     area: design ? String(design.area) : "",
     rate: design ? String(design.rate) : "",
     rooms: design?.rooms ?? "",
   });
   const [style, setStyle] = useState(design?.style ?? "");
-  const [finish, setFinish] = useState<HouseDesignFinish>(
-    design?.finish ?? "Standard",
-  );
   const [status, setStatus] = useState<HouseDesignStatus>(
     design?.status ?? "Draft",
   );
@@ -498,8 +477,6 @@ export function HouseDesignForm({
     onSubmit({
       name: values.name.trim(),
       style: style.trim() || undefined,
-      houseType: values.houseType,
-      finish,
       area: areaValue,
       rooms: values.rooms.trim(),
       rate: rateValue,
@@ -588,39 +565,9 @@ export function HouseDesignForm({
               </Field>
 
               <Field
-                htmlFor={fieldIds.houseType}
-                label={fieldLabels.houseType}
-                hint="Controls which category card shows this design."
-                required
-                error={errors.houseType}
-              >
-                <select
-                  id={fieldIds.houseType}
-                  name="houseType"
-                  className={`${inputClass} ${errors.houseType ? invalidInputClass : ""}`}
-                  value={values.houseType}
-                  onChange={(event) => setValue("houseType", event.target.value)}
-                  onBlur={() => handleBlur("houseType")}
-                  aria-invalid={Boolean(errors.houseType)}
-                  aria-describedby={describedBy(
-                    fieldIds.houseType,
-                    true,
-                    Boolean(errors.houseType),
-                  )}
-                >
-                  <option value="">Select a house type</option>
-                  {houseTypes.map((type) => (
-                    <option key={type.heading} value={type.heading}>
-                      {type.heading}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field
                 htmlFor="design-style"
                 label="Style Label"
-                hint="Optional. Defaults to the house type."
+                hint="Optional. Shown under the design name."
               >
                 <input
                   id="design-style"
@@ -631,24 +578,6 @@ export function HouseDesignForm({
                   aria-describedby="design-style-hint"
                   placeholder="Two-storey, corner lot"
                 />
-              </Field>
-
-              <Field htmlFor="design-finish" label="Finish Level">
-                <select
-                  id="design-finish"
-                  name="finish"
-                  className={inputClass}
-                  value={finish}
-                  onChange={(event) =>
-                    setFinish(event.target.value as HouseDesignFinish)
-                  }
-                >
-                  {finishes.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
               </Field>
 
               <Field

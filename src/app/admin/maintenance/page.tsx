@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Admin Maintenance | G4 Builders Inc",
-  description: "Turn on maintenance mode, maintain finishes and house types, and download database backups.",
+  description: "Maintenance mode, account security, email codes, notification and reminder settings, and database backups.",
 };
 
 export default function AdminMaintenancePage() {
@@ -12,7 +12,7 @@ export default function AdminMaintenancePage() {
     <AdminSectionPage
       activeLabel="Maintenance"
       title="Maintenance"
-      description="Turn on maintenance mode, maintain finishes and house types, and download database backups."
+      description="Maintenance mode, account security, email codes, notification and reminder settings, and database backups."
       mainContent={<AdminMaintenance />}
     />
   );

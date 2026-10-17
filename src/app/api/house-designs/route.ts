@@ -1,4 +1,3 @@
-import { inactiveFinishMessage, isActiveFinish } from "@/lib/server/maintenance";
 import {
   collections,
   type AuditLogDocument,
@@ -55,7 +54,6 @@ export async function POST(request: Request) {
 
     const input = houseDesignInputSchema.parse(await request.json());
     const db = await getDatabase();
-    if (!(await isActiveFinish(db, input.finish))) return NextResponse.json({ error: inactiveFinishMessage }, { status: 400 });
     const now = new Date();
     const document: HouseDesignDocument = {
       _id: new ObjectId(),

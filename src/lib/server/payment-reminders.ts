@@ -2,10 +2,9 @@ import { ObjectId, type Db } from "mongodb";
 import { collections, type InvoiceDocument, type PaymentDocument } from "@/lib/database/collections";
 import { invoiceState, manilaDate, sumMoney } from "@/lib/billing";
 import { formatPeso } from "@/lib/house-design-data";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
 
-/** Customers are reminded once when an unpaid invoice is this many days (or fewer) from its due date. */
-export const dueReminderDays = 3;
 
 const day = 86_400_000;
 
@@ -23,6 +22,8 @@ function dueLabel(daysLeft: number) {
  */
 export async function sendDuePaymentReminders(db: Db, now = new Date()) {
   const today = manilaDate(now);
+  // Customers are reminded once when an unpaid invoice is this many days (or fewer) from its due date.
+  const { dueReminderDays } = await getSystemSettings(db);
   const lastDay = addDays(today, dueReminderDays);
   const invoices = db.collection<InvoiceDocument>(collections.invoices);
   const candidates = await invoices.find({

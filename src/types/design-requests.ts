@@ -1,12 +1,9 @@
-import type { HouseDesignFinish } from "@/lib/house-design-data";
 
 export type RequestedHouseDesign = {
   id: string;
   name: string;
-  houseType: string;
   floorArea: number;
   rooms: string;
-  finish: HouseDesignFinish;
 };
 
 /**
@@ -66,7 +63,6 @@ export type DesignRequestDto = {
   bedrooms?: number;
   bathrooms?: number;
   rooms: string;
-  finish: HouseDesignFinish;
   notes: string;
   /** YYYY-MM-DD; missing on requests made before the timespan was required. */
   preferredDate?: string;

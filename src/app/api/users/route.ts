@@ -1,3 +1,4 @@
+import { requirePasswordPolicy } from "@/lib/server/maintenance";
 import {
   collections,
   type AuditLogDocument,
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
 
     const input = createManagedUserSchema.parse(await request.json());
     const db = await getDatabase();
+    await requirePasswordPolicy(db, input.password);
     const now = new Date();
     const user: UserDocument = {
       _id: new ObjectId(),

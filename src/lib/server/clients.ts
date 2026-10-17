@@ -1,5 +1,6 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
+import { requirePasswordPolicy } from "@/lib/server/maintenance";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import { formatPhContactNumber, phContactNumberError } from "@/lib/ph-contact-number";
 import type { ClientDetails, ClientDto, ClientListPayload } from "@/types/clients";
@@ -147,6 +148,7 @@ export async function updateClient(db: Db, actor: SessionUser, id: string, rawIn
 export async function createClient(db: Db, actor: SessionUser, rawInput: unknown) {
   requireClientAccess(actor);
   const { name, email, password, ...input } = createClientSchema.parse(rawInput);
+  await requirePasswordPolicy(db, password);
   const clientDetails = toClientDetails(input);
   const now = new Date();
   const user: UserDocument = {

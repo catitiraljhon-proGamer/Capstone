@@ -1,12 +1,4 @@
-/** Finish levels are maintained by the Admin (Maintenance > Finishes). */
-export type HouseDesignFinish = string;
 export type HouseDesignStatus = "Draft" | "Published" | "Archived";
-
-export type HouseType = {
-  heading: string;
-  description: string;
-  imgSrc: string;
-};
 
 export type ExteriorMaterialOption = {
   name: string;
@@ -32,8 +24,6 @@ export type MaterialPriceOverride = {
 };
 
 export type HouseDesignCatalog = {
-  finishes: HouseDesignFinish[];
-  houseTypes: HouseType[];
   exteriorItems: ExteriorItemChoice[];
 };
 
@@ -50,10 +40,8 @@ export type CustomExteriorItem = {
 export type HouseDesign = {
   id: string;
   name: string;
-  /** Optional sub-label shown under the card title. Falls back to houseType. */
+  /** Optional sub-label shown under the card title. */
   style?: string;
-  houseType: string;
-  finish: HouseDesignFinish;
   area: number;
   rooms: string;
   rate: number;

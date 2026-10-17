@@ -80,7 +80,7 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
   return {
     id: design._id.toHexString(), workflow, floorArea: design.floorArea, bedrooms: design.bedrooms, bathrooms: design.bathrooms,
     selectedDesign: design.selectedDesign,
-    rooms: design.rooms, finish: design.finish, notes: design.notes,
+    rooms: design.rooms, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
     ...(design.preferredDate ? { preferredDate: design.preferredDate.toISOString().slice(0, 10) } : {}),
     ...(design.neededBy ? { neededBy: design.neededBy.toISOString().slice(0, 10) } : {}),

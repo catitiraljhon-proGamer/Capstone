@@ -49,7 +49,7 @@ async function unpaidDesignFee() {
   const now = new Date();
   const designId = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
-    _id: designId, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms", finish: "Standard",
+    _id: designId, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
     notes: "Courtyard home", status: "Completed", completedDesignImages: ["data:image/png;base64,AAAA"], completedAt: now, createdAt: now, updatedAt: now,
   });
   const invoiceId = new ObjectId();
@@ -68,7 +68,7 @@ async function acceptedProject() {
   const now = new Date();
   const designId = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
-    _id: designId, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms", finish: "Standard",
+    _id: designId, customerId: new ObjectId(customer.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
     notes: "Courtyard home", status: "Completed", completedDesignImages: ["data:image/png;base64,AAAA"], completedAt: now, createdAt: now, updatedAt: now,
   });
   const invoiceId = new ObjectId();

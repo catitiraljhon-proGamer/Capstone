@@ -1,3 +1,4 @@
+import { requirePasswordPolicy } from "@/lib/server/maintenance";
 import {
   collections,
   type AuditLogDocument,
@@ -81,6 +82,7 @@ export async function PATCH(
     if (input.role !== undefined) set.role = input.role;
     if (input.status !== undefined) set.status = input.status;
     if (input.password !== undefined) {
+      await requirePasswordPolicy(db, input.password);
       set.passwordHash = await hash(input.password, 12);
     }
 

@@ -6,7 +6,6 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { ClientInformationReminder, ClientProfileForm } from "@/components/clients/client-profile";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
-import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import {
   formatPeso,
   getExteriorEstimate,
@@ -319,16 +318,12 @@ export function CustomerFinishedDesignsPage() {
 
 function FinishedDesignsBrowser() {
   const { designs, catalog, isLoading, error } = useHouseDesigns();
-  const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
-  const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
+  const [activeStep, setActiveStep] = useState<"designs" | "details">("designs");
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
   const [materialSelections, setMaterialSelections] = useState<number[]>([]);
   const publishedDesigns = designs.filter(
     (design) => design.status === "Published",
   );
-  const filteredDesigns = selectedHouseType
-    ? publishedDesigns.filter((design) => design.houseType === selectedHouseType)
-    : [];
   const selectedDesign =
     publishedDesigns.find((design) => design.id === selectedDesignId) ?? null;
 
@@ -353,40 +348,22 @@ function FinishedDesignsBrowser() {
               Loading house-design records from MongoDB…
             </p>
           ) : null}
-          {activeStep === "types" ? (
-            <div>
-              <div className="mb-5">
-                <h1 className="text-xl font-semibold tracking-tight">Select House Type</h1>
-                <p className="mt-1 text-sm text-stone-600">
-                  Start by choosing a house type. Design images appear after a type is selected.
-                </p>
-              </div>
-              <HouseTypeCards
-                houseTypes={catalog.houseTypes}
-                onSelect={(houseType) => {
-                  setSelectedHouseType(houseType);
-                  setSelectedDesignId(null);
-                  setActiveStep("designs");
-                }}
-              />
-            </div>
-          ) : activeStep === "designs" ? (
+          {activeStep === "designs" ? (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h1 className="text-xl font-semibold tracking-tight">
-                    {selectedHouseType} House Designs
+                    House Designs
                   </h1>
                   <p className="mt-1 text-sm text-stone-600">
                     Select one house design to view project details and estimated construction cost.
                   </p>
                 </div>
-                <BackButton type="button" onClick={() => setActiveStep("types")} />
               </div>
 
-              {filteredDesigns.length > 0 ? (
+              {publishedDesigns.length > 0 ? (
                 <div className="mt-5 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                  {filteredDesigns.map((design, designIndex) => (
+                  {publishedDesigns.map((design, designIndex) => (
                     <button
                       key={design.id}
                       type="button"
@@ -425,7 +402,7 @@ function FinishedDesignsBrowser() {
                           {design.name}
                         </h2>
                         <p className="mt-1 text-xs text-stone-600">
-                          {design.style ?? design.houseType} - {design.area} sqm
+                          {design.style ? `${design.style} - ` : ""}{design.area} sqm
                         </p>
                       </div>
                     </button>
@@ -434,7 +411,7 @@ function FinishedDesignsBrowser() {
               ) : (
                 <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-6 text-center">
                   <p className="text-sm font-semibold text-stone-950">
-                    No designs available for this house type yet.
+                    No house designs are available yet.
                   </p>
                 </div>
               )}
@@ -458,15 +435,7 @@ function FinishedDesignsBrowser() {
                 <p className="mt-1 text-sm text-stone-600">
                   {selectedDesign.notes}
                 </p>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                  <div className="rounded-lg border border-stone-200 p-4">
-                    <dt className="text-xs font-semibold uppercase text-stone-500">
-                      House Type
-                    </dt>
-                    <dd className="mt-1 font-semibold text-stone-950">
-                      {selectedDesign.houseType}
-                    </dd>
-                  </div>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                   <div className="rounded-lg border border-stone-200 p-4">
                     <dt className="text-xs font-semibold uppercase text-stone-500">
                       Floor Area

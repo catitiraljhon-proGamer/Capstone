@@ -7,8 +7,6 @@ import {
   EmailVerificationError,
   issueEmailVerificationCode,
   registrationDetailsSchema,
-  verificationCodeMinutes,
-  verificationResendSeconds,
 } from "@/lib/server/email-verification";
 import {
   clientIp,
@@ -18,6 +16,7 @@ import {
   rateLimitPolicies,
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
+import { getSystemSettings, requirePasswordPolicy } from "@/lib/server/maintenance";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -25,7 +24,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     // The whole sign-up form is checked first, so a code is sent only for details that can register.
-    const { email } = registrationDetailsSchema.parse(await request.json());
+    const { email, password } = registrationDetailsSchema.parse(await request.json());
     if (!isEmailConfigured() && process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { error: "Email verification is not available right now. Please register with Google or try again later." },
@@ -33,6 +32,8 @@ export async function POST(request: Request) {
       );
     }
     const db = await getDatabase();
+    await requirePasswordPolicy(db, password);
+    const settings = await getSystemSettings(db);
     const limits = [
       [rateLimitKeys.verificationEmailIp(clientIp(request)), rateLimitPolicies.verificationEmailIp],
       [rateLimitKeys.verificationEmailAddress(email), rateLimitPolicies.verificationEmailAddress],
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
 
     if (isEmailConfigured()) {
       try {
-        await sendEmail(verificationCodeEmail(email, code, verificationCodeMinutes));
+        await sendEmail(verificationCodeEmail(email, code, settings.signupCodeMinutes));
       } catch (error) {
         await clearEmailVerification(db, email);
         // Log only a fixed label; SMTP errors can echo addresses and credentials.
@@ -81,8 +82,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       sent: true,
-      expiresInMinutes: verificationCodeMinutes,
-      resendAfterSeconds: verificationResendSeconds,
+      expiresInMinutes: settings.signupCodeMinutes,
+      resendAfterSeconds: settings.signupResendSeconds,
     });
   } catch (error) {
     if (error instanceof EmailVerificationError) {

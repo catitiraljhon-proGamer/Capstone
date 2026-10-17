@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import { signInDestination } from "@/lib/server/clients";
 import { recordAuditLog } from "@/lib/server/audit";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { linkGoogleAccount } from "@/lib/server/google-accounts";
 import {
   getGoogleConfig,
@@ -64,13 +65,20 @@ export async function POST(request: NextRequest) {
       );
     }
     const db = await getDatabase();
+    const settings = await getSystemSettings(db);
+    // The Admin sets how many wrong passwords lock an account, and for how long.
+    const accountPolicy = {
+      ...rateLimitPolicies.loginAccount,
+      maxAttempts: settings.loginMaxAttempts,
+      lockMs: settings.loginLockMinutes * 60_000,
+    };
     const accountKey = rateLimitKeys.loginAccount(input.email);
     const ipKey = rateLimitKeys.loginIp(clientIp(request));
 
     // Locked keys are rejected before the password is checked, so guesses
     // made during a lockout reveal nothing.
     const [accountStatus, ipStatus] = await Promise.all([
-      getRateLimitStatus(db, accountKey, rateLimitPolicies.loginAccount),
+      getRateLimitStatus(db, accountKey, accountPolicy),
       getRateLimitStatus(db, ipKey, rateLimitPolicies.loginIp),
     ]);
     if (accountStatus.locked) return lockedResponse(accountStatus);
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     if (!user?.passwordHash || !passwordMatches) {
       const [account, network] = await Promise.all([
-        recordRateLimitFailure(db, accountKey, rateLimitPolicies.loginAccount),
+        recordRateLimitFailure(db, accountKey, accountPolicy),
         recordRateLimitFailure(db, ipKey, rateLimitPolicies.loginIp),
       ]);
       if (network.locked && !account.locked) return lockedResponse(network);

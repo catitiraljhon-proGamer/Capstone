@@ -126,8 +126,8 @@ export async function GET() {
       sourcesByKey.set(sourceKey("Design request", source._id), {
         subject: source.selectedDesign
           ? `${source.selectedDesign.name} — design request`
-          : `${source.floorArea.toLocaleString("en-PH")} sqm ${source.finish.toLowerCase()} design request`,
-        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.finish} · ${source.rooms} — ${source.notes}`,
+          : `${source.floorArea.toLocaleString("en-PH")} sqm design request`,
+        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.rooms} — ${source.notes}`,
         sourceStatus: source.status,
         sourceAvailable: true,
         selectedDesign: source.selectedDesign,

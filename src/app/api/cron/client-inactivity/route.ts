@@ -7,7 +7,7 @@ import { isAuthorizedCronRequest } from "@/lib/server/cron";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Daily: warns, then archives and disables clients with no open work 30 days after their last completed project. */
+/** Daily: warns, then archives and disables clients with no open work for the Admin's set days after their last completed project. */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {

@@ -1,9 +1,7 @@
 import type {
   CustomExteriorItem,
   ExteriorItemChoice,
-  HouseDesignFinish,
   HouseDesignStatus,
-  HouseType,
   MaterialPriceOverride,
 } from "@/lib/house-design-data";
 import type {
@@ -22,15 +20,14 @@ import type { DesignRequestStatus, RequestedHouseDesign } from "@/types/design-r
 import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
+import type { SettingKey, SystemSettings } from "@/lib/system-settings";
 
 export type { ProjectStatus } from "@/types/construction";
 
 export const collections = {
   users: "users",
   houseDesigns: "house_designs",
-  houseTypes: "house_types",
   exteriorItems: "exterior_items",
-  referenceValues: "reference_values",
   messages: "messages",
   projects: "projects",
   designRequests: "design_requests",
@@ -49,6 +46,7 @@ export const collections = {
   systemSettings: "system_settings",
   rateLimits: "rate_limits",
   emailVerifications: "email_verifications",
+  backupUploads: "backup_uploads",
 } as const;
 
 export type UserDocument = {
@@ -99,8 +97,6 @@ export type HouseDesignDocument = {
   _id: ObjectId;
   name: string;
   style?: string;
-  houseType: string;
-  finish: HouseDesignFinish;
   area: number;
   rooms: string;
   rate: number;
@@ -116,22 +112,8 @@ export type HouseDesignDocument = {
   updatedAt: Date;
 };
 
-export type HouseTypeDocument = HouseType & {
-  _id: ObjectId;
-  order: number;
-  active: boolean;
-};
-
 export type ExteriorItemDocument = ExteriorItemChoice & {
   _id: ObjectId;
-  order: number;
-  active: boolean;
-};
-
-export type ReferenceValueDocument = {
-  _id: ObjectId;
-  category: string;
-  value: string;
   order: number;
   active: boolean;
 };
@@ -201,7 +183,6 @@ export type DesignRequestDocument = {
   bedrooms?: number;
   bathrooms?: number;
   rooms: string;
-  finish: HouseDesignFinish;
   notes: string;
   /** Timespan for the design; missing on requests made before it was required. */
   preferredDate?: Date;
@@ -505,6 +486,14 @@ export type MeetingRequestDocument = {
 };
 
 /** Maintenance mode: customers and the Billing Clerk are locked out until `endsAt`. */
+/** The Admin's system settings (Maintenance); missing values use the defaults in lib/system-settings. */
+export type SystemSettingsDocument = {
+  _id: "system";
+  values: Partial<SystemSettings>;
+  changes: Partial<Record<SettingKey, { by: string; at: Date }>>;
+  updatedAt: Date;
+};
+
 export type MaintenanceModeDocument = {
   _id: "maintenance-mode";
   endsAt: Date;

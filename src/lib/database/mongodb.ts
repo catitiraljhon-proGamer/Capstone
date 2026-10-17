@@ -55,13 +55,9 @@ async function ensureIndexes(db: Db) {
         { googleSub: 1 },
         { unique: true, partialFilterExpression: { googleSub: { $type: "string" } } },
       ),
-      db.collection("house_designs").createIndex({ houseType: 1, status: 1 }),
+      db.collection("house_designs").createIndex({ status: 1 }),
       db.collection("house_designs").createIndex({ name: 1 }, { unique: true }),
-      db.collection("house_types").createIndex({ heading: 1 }, { unique: true }),
       db.collection("exterior_items").createIndex({ item: 1 }, { unique: true }),
-      db
-        .collection("reference_values")
-        .createIndex({ category: 1, value: 1 }, { unique: true }),
       db.collection("messages").createIndex({ conversationKey: 1, createdAt: 1 }),
       db.collection("messages").createIndex({ customerId: 1, createdAt: -1 }),
       db

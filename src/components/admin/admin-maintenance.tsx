@@ -1,324 +1,256 @@
 "use client";
 
+import { AdminMaintenanceBackups } from "@/components/admin/admin-maintenance-backups";
 import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
 import { Button } from "@/components/ui/button";
-import { manilaDate } from "@/lib/billing";
-import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
-import type { FinishRecord, HouseTypeRecord, MaintenanceData, MaintenanceKind } from "@/types/maintenance";
-import { ArrowDown, ArrowUp, DatabaseBackup, Download, Pencil, Plus, X } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  settingFields,
+  settingKeys,
+  type SettingKey,
+  type SystemSettings,
+  type SystemSettingsView,
+} from "@/lib/system-settings";
+import { Bell, DatabaseBackup, Lock, Mail, Wrench, type LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 
-type Tab = "Maintenance Mode" | "Finishes" | "House Types" | "Backup";
-type Save = (body: Record<string, unknown>, message: string) => Promise<boolean>;
+type Section = "mode" | "security" | "email" | "notifications" | "backup";
+type SettingGroup = { title: string; description?: string; keys: SettingKey[] };
 
-const tabs: Tab[] = ["Maintenance Mode", "Finishes", "House Types", "Backup"];
+const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
+  { id: "mode", label: "Maintenance mode", icon: Wrench, groups: [] },
+  {
+    id: "security", label: "Account security", icon: Lock, groups: [
+      { title: "Passwords", description: "Rules for new passwords. Current passwords keep working.", keys: ["passwordMinLength", "passwordLettersAndNumbers", "passwordUpperAndSymbol"] },
+      { title: "Sign-in and inactivity", keys: ["loginMaxAttempts", "loginLockMinutes", "idleSignOutMinutes"] },
+    ],
+  },
+  {
+    id: "email", label: "Email links and codes", icon: Mail, groups: [
+      { title: "Sign-up verification code", description: "The code a new client enters to confirm their Gmail address.", keys: ["signupCodeMinutes", "signupResendSeconds", "signupMaxAttempts"] },
+    ],
+  },
+  {
+    id: "notifications", label: "Notifications and reminders", icon: Bell, groups: [
+      { title: "Email copies of notifications", description: "Every notification also shows inside the system.", keys: ["emailCopiesAdmin", "emailCopiesBillingClerk", "emailCopiesCustomer"] },
+      { title: "Reminders", keys: ["dueReminderDays", "inactiveNoticeDays", "inactiveArchiveDays"] },
+    ],
+  },
+  {
+    id: "backup", label: "Backup", icon: DatabaseBackup, groups: [
+      { title: "Automatic backups", description: "Runs every night at 1:00 AM.", keys: ["autoBackup", "keepAutomaticBackups"] },
+    ],
+  },
+];
+
 const panel = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
-const field = "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm font-normal text-stone-950 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
-const label = "block text-sm font-medium text-stone-700";
+
+function changedLine(view: SystemSettingsView, key: SettingKey) {
+  const change = view.changes[key];
+  if (!change) return null;
+  const date = new Date(change.at).toLocaleDateString("en-PH", { timeZone: "Asia/Manila", month: "short", day: "numeric", year: "numeric" });
+  return `${change.by} · ${date}`;
+}
 
 export function AdminMaintenance() {
-  const [data, setData] = useState<MaintenanceData | null>(null);
-  const [tab, setTab] = useState<Tab>("Maintenance Mode");
+  const [section, setSection] = useState<Section>("mode");
+  const [view, setView] = useState<SystemSettingsView | null>(null);
+  /** Typed values; numbers stay as text until saved so a field can be cleared while editing. */
+  const [draft, setDraft] = useState<Record<SettingKey, string | boolean> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const toDraft = (settings: SystemSettings) =>
+    Object.fromEntries(settingKeys.map((key) => [key, typeof settings[key] === "boolean" ? settings[key] : String(settings[key])])) as Record<SettingKey, string | boolean>;
 
   useEffect(() => {
     let active = true;
     fetch("/api/maintenance", { cache: "no-store" })
       .then(async (response) => {
-        const payload = (await response.json().catch(() => ({}))) as MaintenanceData & { error?: string };
-        if (!response.ok || !payload.finishes) throw new Error(payload.error ?? "Unable to load maintenance records.");
-        if (active) setData(payload);
+        const payload = (await response.json().catch(() => ({}))) as SystemSettingsView & { error?: string };
+        if (!response.ok || !payload.settings) throw new Error(payload.error ?? "Unable to load the settings.");
+        if (!active) return;
+        setView(payload);
+        setDraft(toDraft(payload.settings));
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : "Unable to load maintenance records.");
+        if (active) setError(loadError instanceof Error ? loadError.message : "Unable to load the settings.");
       });
     return () => {
       active = false;
     };
   }, []);
 
-  const save: Save = async (body, message) => {
-    setIsSaving(true);
+  const changedKeys = view && draft
+    ? settingKeys.filter((key) => String(draft[key]) !== String(view.settings[key]))
+    : [];
+
+  const save = async () => {
+    if (!view || !draft || !changedKeys.length) return;
     setError(null);
     setSuccess(null);
+    const body: Partial<Record<SettingKey, number | boolean>> = {};
+    for (const key of changedKeys) {
+      const field = settingFields[key];
+      const value = draft[key];
+      if (field.kind === "toggle") {
+        body[key] = Boolean(value);
+        continue;
+      }
+      const number = Number(value);
+      if (String(value).trim() === "" || !Number.isInteger(number) || number < field.min || number > field.max) {
+        setError(`${field.label} must be a whole number from ${field.min} to ${field.max} ${field.unit}.`);
+        return;
+      }
+      body[key] = number;
+    }
+    setIsSaving(true);
     try {
-      const response = await fetch("/api/maintenance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const payload = (await response.json().catch(() => ({}))) as MaintenanceData & { error?: string };
-      if (!response.ok || !payload.finishes) throw new Error(payload.error ?? "Unable to save the change.");
-      setData(payload);
-      if (message) setSuccess(message);
-      return true;
+      const response = await fetch("/api/maintenance", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const payload = (await response.json().catch(() => ({}))) as SystemSettingsView & { error?: string; issues?: { message?: string }[] };
+      if (!response.ok || !payload.settings) throw new Error(payload.issues?.[0]?.message ?? payload.error ?? "Unable to save the settings.");
+      setView(payload);
+      setDraft(toDraft(payload.settings));
+      setSuccess(changedKeys.length === 1 ? "Setting saved." : `${changedKeys.length} settings saved.`);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Unable to save the change.");
-      return false;
+      setError(saveError instanceof Error ? saveError.message : "Unable to save the settings.");
     } finally {
       setIsSaving(false);
     }
   };
-  const move = (kind: MaintenanceKind, id: string, direction: "up" | "down") => void save({ action: "move", kind, id, direction }, "");
+
+  const current = sections.find((item) => item.id === section)!;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Maintenance sections">
-        {tabs.map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            onClick={() => { setTab(name); setError(null); setSuccess(null); }}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${tab === name ? "bg-red-700 text-white" : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-100"}`}
-          >
-            {name}
-          </button>
-        ))}
+    <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <nav aria-label="Maintenance sections" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:px-0">
+        {sections.map((item) => {
+          const Icon = item.icon;
+          const active = item.id === section;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              onClick={(event) => {
+                setSection(item.id);
+                setError(null);
+                setSuccess(null);
+                // On phones the sections scroll sideways; keep the chosen one in view.
+                event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" });
+              }}
+              className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                active ? "bg-rose-50 text-red-800 ring-1 ring-rose-200" : "text-stone-600 hover:bg-stone-100 hover:text-stone-950"
+              }`}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="min-w-0 space-y-5">
+        {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+        {success ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p> : null}
+
+        {section === "mode" ? <AdminMaintenanceMode onError={setError} onSuccess={setSuccess} /> : null}
+
+        {current.groups.length ? (
+          !view || !draft ? (
+            <div className={`${panel} text-sm text-stone-500`}>{error ? "The settings are unavailable." : "Loading settings…"}</div>
+          ) : (
+            current.groups.map((group) => (
+              <section key={group.title} className={panel}>
+                <h2 className="text-base font-semibold tracking-tight">{group.title}</h2>
+                {group.description ? <p className="mt-1 text-sm text-stone-600">{group.description}</p> : null}
+                <div className="mt-3 divide-y divide-stone-200 border-t border-stone-200">
+                  {group.keys.map((key) => (
+                    <SettingRow
+                      key={key}
+                      settingKey={key}
+                      value={draft[key]}
+                      changed={changedLine(view, key)}
+                      onChange={(value) => { setDraft({ ...draft, [key]: value }); setSuccess(null); }}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))
+          )
+        ) : null}
+
+        {section === "backup" ? <AdminMaintenanceBackups onError={setError} onSuccess={setSuccess} /> : null}
+
+        {changedKeys.length ? (
+          // Sits above the floating Contact Us button.
+          <div className="sticky bottom-20 z-10 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
+            <p className="mr-auto text-sm text-stone-600" role="status">
+              {changedKeys.length === 1 ? "1 unsaved change" : `${changedKeys.length} unsaved changes`}
+            </p>
+            <Button type="button" variant="outline" disabled={isSaving} onClick={() => { if (view) setDraft(toDraft(view.settings)); setError(null); }}>
+              Discard
+            </Button>
+            <Button type="button" disabled={isSaving} onClick={() => void save()}>
+              {isSaving ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        ) : null}
       </div>
+    </div>
+  );
+}
 
-      {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
-      {success ? <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</p> : null}
-
-      {tab === "Maintenance Mode" ? <AdminMaintenanceMode onError={setError} onSuccess={setSuccess} /> : tab === "Backup" ? <BackupPanel onError={setError} /> : !data ? (
-        <div className={`${panel} text-sm text-stone-500`}>{error ? "Maintenance records are unavailable." : "Loading maintenance records…"}</div>
-      ) : tab === "Finishes" ? (
-        <FinishesPanel records={data.finishes} save={save} move={move} isSaving={isSaving} />
+function SettingRow({ settingKey, value, changed, onChange }: {
+  settingKey: SettingKey;
+  value: string | boolean;
+  changed: string | null;
+  onChange: (value: string | boolean) => void;
+}) {
+  const field = settingFields[settingKey];
+  const id = `setting-${settingKey}`;
+  const hintId = field.hint ? `${id}-hint` : undefined;
+  return (
+    <div className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+      <div className="min-w-0">
+        <label htmlFor={id} className="text-sm font-medium text-stone-950">{field.label}</label>
+        {field.hint ? <p id={hintId} className="mt-0.5 text-sm text-stone-600">{field.hint}</p> : null}
+        {changed ? <p className="mt-0.5 text-xs text-stone-500">{changed}</p> : null}
+      </div>
+      {field.kind === "toggle" ? (
+        <label className="flex cursor-pointer items-center gap-3 justify-self-start sm:justify-self-end">
+          <span className="w-7 text-sm text-stone-600">{value ? "On" : "Off"}</span>
+          <input
+            id={id}
+            type="checkbox"
+            role="switch"
+            checked={Boolean(value)}
+            aria-describedby={hintId}
+            onChange={(event) => onChange(event.target.checked)}
+            className="peer sr-only"
+          />
+          <span
+            aria-hidden="true"
+            className="relative h-6 w-11 rounded-full bg-stone-300 transition peer-checked:bg-red-700 peer-focus-visible:ring-2 peer-focus-visible:ring-red-600 peer-focus-visible:ring-offset-2 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"
+          />
+        </label>
       ) : (
-        <HouseTypesPanel records={data.houseTypes} save={save} move={move} isSaving={isSaving} onError={setError} />
+        <div className="flex items-center gap-2 justify-self-start sm:justify-self-end">
+          <input
+            id={id}
+            type="number"
+            inputMode="numeric"
+            min={field.min}
+            max={field.max}
+            step={1}
+            value={String(value)}
+            aria-describedby={hintId}
+            onChange={(event) => onChange(event.target.value)}
+            className="h-10 w-24 rounded-lg border border-stone-200 bg-white px-3 text-right text-sm tabular-nums text-stone-950 outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
+          />
+          <span className="min-w-0 text-sm text-stone-600">{field.unit}</span>
+        </div>
       )}
     </div>
-  );
-}
-
-type PanelProps<T> = { records: T[]; save: Save; move: (kind: MaintenanceKind, id: string, direction: "up" | "down") => void; isSaving: boolean };
-
-function SectionHeader({ title, description, onAdd, addLabel }: { title: string; description: string; onAdd: () => void; addLabel: string }) {
-  return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 max-w-2xl text-sm text-stone-600">{description}</p>
-      </div>
-      <Button type="button" onClick={onAdd}><Plus className="mr-2 h-4 w-4" />{addLabel}</Button>
-    </div>
-  );
-}
-
-function StatusPill({ active }: { active: boolean }) {
-  return active
-    ? <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Active</span>
-    : <span className="rounded bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-600">Inactive</span>;
-}
-
-function RowActions({ index, count, onMove, onEdit, name, disabled }: {
-  index: number; count: number; onMove: (direction: "up" | "down") => void; onEdit: () => void; name: string; disabled: boolean;
-}) {
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      <Button type="button" size="sm" variant="ghost" disabled={disabled || index === 0} onClick={() => onMove("up")} aria-label={`Move ${name} up`}><ArrowUp className="h-4 w-4" /></Button>
-      <Button type="button" size="sm" variant="ghost" disabled={disabled || index === count - 1} onClick={() => onMove("down")} aria-label={`Move ${name} down`}><ArrowDown className="h-4 w-4" /></Button>
-      <Button type="button" size="sm" variant="outline" onClick={onEdit}><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
-    </div>
-  );
-}
-
-function EditorPanel({ title, onClose, onSubmit, isSaving, children }: { title: string; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; isSaving: boolean; children: ReactNode }) {
-  return (
-    <form onSubmit={onSubmit} className="mb-5 rounded-xl border border-rose-200 bg-rose-50/40 p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <h3 className="font-semibold">{title}</h3>
-        <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="Close form"><X className="h-4 w-4" /></button>
-      </div>
-      <div className="space-y-4">{children}</div>
-      <div className="mt-5 flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-        <Button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : "Save"}</Button>
-      </div>
-    </form>
-  );
-}
-
-function ActiveToggle({ checked, onChange, hint }: { checked: boolean; onChange: (value: boolean) => void; hint: string }) {
-  return (
-    <label className="flex items-start gap-2 text-sm text-stone-700">
-      <input type="checkbox" className="mt-0.5 h-4 w-4 accent-red-700" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      <span><span className="font-medium">Active</span><span className="block text-xs text-stone-500">{hint}</span></span>
-    </label>
-  );
-}
-
-const designCountLabel = (count: number) => (count === 1 ? "Used by 1 house design" : `Used by ${count} house designs`);
-
-function FinishesPanel({ records, save, move, isSaving }: PanelProps<FinishRecord>) {
-  const [editing, setEditing] = useState<FinishRecord | "new" | null>(null);
-  const [value, setValue] = useState("");
-  const [active, setActive] = useState(true);
-  const open = (record: FinishRecord | "new") => {
-    setEditing(record);
-    setValue(record === "new" ? "" : record.value);
-    setActive(record === "new" ? true : record.active);
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const id = editing && editing !== "new" ? editing.id : undefined;
-    if (await save({ action: "save-finish", ...(id ? { id } : {}), value, active }, `${value} was saved.`)) setEditing(null);
-  };
-
-  return (
-    <section className={panel}>
-      <SectionHeader title="Finishes" description="Finish levels customers and the Admin choose for house designs and design requests." onAdd={() => open("new")} addLabel="Add Finish" />
-      {editing ? (
-        <EditorPanel title={editing === "new" ? "New Finish" : `Edit ${editing.value}`} onClose={() => setEditing(null)} onSubmit={submit} isSaving={isSaving}>
-          <label className={label}>Finish Name<input required minLength={2} maxLength={40} className={field} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Example: Premium" /></label>
-          {editing !== "new" && editing.designCount > 0 ? <p className="text-xs text-stone-500">Renaming also updates the {editing.designCount} house designs that use it.</p> : null}
-          <ActiveToggle checked={active} onChange={setActive} hint="Inactive finishes are hidden from new designs and requests. Existing records keep them." />
-        </EditorPanel>
-      ) : null}
-      <ul className="divide-y divide-stone-100">
-        {records.map((record, index) => (
-          <li key={record.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div>
-              <p className="font-semibold">{record.value}</p>
-              <p className="mt-0.5 text-xs text-stone-500">{designCountLabel(record.designCount)}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusPill active={record.active} />
-              <RowActions index={index} count={records.length} name={record.value} disabled={isSaving} onMove={(direction) => move("finish", record.id, direction)} onEdit={() => open(record)} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function HouseTypesPanel({ records, save, move, isSaving, onError }: PanelProps<HouseTypeRecord> & { onError: (message: string) => void }) {
-  const [editing, setEditing] = useState<HouseTypeRecord | "new" | null>(null);
-  const [form, setForm] = useState({ heading: "", description: "", imgSrc: "", active: true });
-  const open = (record: HouseTypeRecord | "new") => {
-    setEditing(record);
-    setForm(record === "new" ? { heading: "", description: "", imgSrc: "", active: true } : { heading: record.heading, description: record.description, imgSrc: record.imgSrc, active: record.active });
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!form.imgSrc) return onError("Add an image link or upload an image.");
-    const id = editing && editing !== "new" ? editing.id : undefined;
-    if (await save({ action: "save-house-type", ...(id ? { id } : {}), ...form }, `${form.heading} was saved.`)) setEditing(null);
-  };
-  const upload = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const imgSrc = await readEmbeddedImage(file);
-      setForm((current) => ({ ...current, imgSrc }));
-    } catch (uploadError) {
-      onError(uploadError instanceof Error ? uploadError.message : "The image could not be read.");
-    }
-  };
-
-  return (
-    <section className={panel}>
-      <SectionHeader title="House Types" description="Styles shown to customers when they browse house designs." onAdd={() => open("new")} addLabel="Add House Type" />
-      {editing ? (
-        <EditorPanel title={editing === "new" ? "New House Type" : `Edit ${editing.heading}`} onClose={() => setEditing(null)} onSubmit={submit} isSaving={isSaving}>
-          <label className={label}>Name<input required minLength={2} maxLength={80} className={field} value={form.heading} onChange={(event) => setForm({ ...form, heading: event.target.value })} placeholder="Example: Bungalow" /></label>
-          {editing !== "new" && editing.designCount > 0 ? <p className="text-xs text-stone-500">Renaming also updates the {editing.designCount} house designs that use it.</p> : null}
-          <label className={label}>Description<textarea required minLength={10} maxLength={400} className={`${field} h-24 py-2`} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-          <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
-            <label className={label}>Image Link<input type="url" className={field} value={form.imgSrc.startsWith("data:") ? "" : form.imgSrc} onChange={(event) => setForm({ ...form, imgSrc: event.target.value })} placeholder={form.imgSrc.startsWith("data:") ? "Uploaded image" : "https://"} /></label>
-            <label className="inline-flex h-10 cursor-pointer items-center justify-center rounded-lg border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 hover:bg-stone-100">
-              Upload Image
-              <input type="file" accept={embeddedImageAccept} className="sr-only" onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = ""; }} />
-            </label>
-          </div>
-          {form.imgSrc ? (
-            // eslint-disable-next-line @next/next/no-img-element -- previews may be data URLs or any https host
-            <img src={form.imgSrc} alt="" className="h-32 w-56 rounded-lg object-cover ring-1 ring-stone-200" />
-          ) : null}
-          <ActiveToggle checked={form.active} onChange={(value) => setForm({ ...form, active: value })} hint="Inactive house types are hidden from customers." />
-        </EditorPanel>
-      ) : null}
-      <ul className="divide-y divide-stone-100">
-        {records.map((record, index) => (
-          <li key={record.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- images may be data URLs or any https host */}
-              <img src={record.imgSrc} alt="" className="h-14 w-20 shrink-0 rounded-lg object-cover ring-1 ring-stone-200" />
-              <div className="min-w-0">
-                <p className="font-semibold">{record.heading}</p>
-                <p className="mt-0.5 line-clamp-1 max-w-xl text-sm text-stone-600">{record.description}</p>
-                <p className="mt-0.5 text-xs text-stone-500">{designCountLabel(record.designCount)}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusPill active={record.active} />
-              <RowActions index={index} count={records.length} name={record.heading} disabled={isSaving} onMove={(direction) => move("house-type", record.id, direction)} onEdit={() => open(record)} />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function BackupPanel({ onError }: { onError: (message: string) => void }) {
-  const [progress, setProgress] = useState<string | null>(null);
-
-  const download = async () => {
-    setProgress("Preparing backup…");
-    try {
-      const read = async <T,>(url: string) => {
-        const response = await fetch(url, { cache: "no-store" });
-        const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "The backup could not be downloaded.");
-        return payload;
-      };
-      const { collections } = await read<{ collections: { name: string; count: number }[] }>("/api/maintenance/backup");
-      const backup: Record<string, unknown[]> = {};
-      for (const [index, { name }] of collections.entries()) {
-        setProgress(`Downloading ${name.replaceAll("_", " ")} (${index + 1} of ${collections.length})…`);
-        backup[name] = [];
-        let after: string | null = null;
-        do {
-          const query: string = `/api/maintenance/backup?collection=${encodeURIComponent(name)}${after ? `&after=${after}` : ""}`;
-          const page: { documents: unknown[]; next: string | null } = await read(query);
-          backup[name].push(...page.documents);
-          after = page.next;
-        } while (after);
-      }
-      const file = JSON.stringify({ system: "G4 Builders Inc", createdAt: new Date().toISOString(), format: "MongoDB Extended JSON (canonical)", collections: backup });
-      const url = URL.createObjectURL(new Blob([file], { type: "application/json" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `g4-backup-${manilaDate()}.json`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setProgress(null);
-    } catch (downloadError) {
-      setProgress(null);
-      onError(downloadError instanceof Error ? downloadError.message : "The backup could not be downloaded.");
-    }
-  };
-
-  return (
-    <section className={panel}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-rose-50 text-red-700"><DatabaseBackup className="h-5 w-5" /></span>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Database Backup</h2>
-            <p className="mt-1 max-w-2xl text-sm text-stone-600">
-              Download a copy of every system record (users, projects, estimates, invoices, payments, files, and logs) as one JSON file. Login throttles and sign-up codes are left out.
-            </p>
-          </div>
-        </div>
-        <Button type="button" disabled={Boolean(progress)} onClick={() => void download()}><Download className="mr-2 h-4 w-4" />{progress ? "Downloading…" : "Download Backup"}</Button>
-      </div>
-      {progress ? <p role="status" className="mt-4 text-sm text-stone-600">{progress}</p> : null}
-      <ul className="mt-5 list-disc space-y-1 pl-5 text-sm text-stone-600">
-        <li>The file contains customer details and password hashes. Store it somewhere private and do not share it.</li>
-        <li>Each download is recorded in the Audit Logs.</li>
-        <li>Restoring is done by a developer with MongoDB tools, so a mistaken upload can never overwrite live data from this page.</li>
-      </ul>
-    </section>
   );
 }

@@ -7,7 +7,7 @@ import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Daily: reminds customers about unpaid invoices due within 3 days. Each invoice is reminded once per due date. */
+/** Daily: reminds customers about unpaid invoices due within the Admin's set days. Each invoice is reminded once per due date. */
 export async function GET(request: Request) {
   if (!isAuthorizedCronRequest(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {

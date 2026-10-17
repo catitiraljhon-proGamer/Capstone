@@ -1,4 +1,3 @@
-import { inactiveFinishMessage, isActiveFinish } from "@/lib/server/maintenance";
 import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
 import {
@@ -40,7 +39,6 @@ const inputSchema = z.union([
     floorArea: z.number().finite().positive().max(100_000),
     bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
     bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
-    finish: z.string().trim().min(1, "Choose a finish level.").max(40),
     notes: z.string().trim().min(1).max(4_000),
     inspirationImages: embeddedImagesSchema,
     preferredDate,
@@ -64,11 +62,10 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   if (input.neededBy < input.preferredDate) {
     throw new BillingError("The Needed By date must be on or after the Preferred Date.", 400);
   }
-  if ("finish" in input && !(await isActiveFinish(db, input.finish))) throw new BillingError(inactiveFinishMessage, 400);
   // The account-level agreement from registration (or first sign-in) covers every request.
   const termsAcceptance = await requireAccountTerms(db, actor);
   let details: Pick<DesignRequestDocument,
-    "floorArea" | "rooms" | "finish" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign"
+    "floorArea" | "rooms" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign"
   >;
 
   if ("houseDesignId" in input) {
@@ -81,10 +78,9 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     details = {
       houseDesignId: design._id,
       selectedDesign: {
-        id: design._id.toHexString(), name: design.name, houseType: design.houseType,
-        floorArea: design.area, rooms: design.rooms, finish: design.finish,
+        id: design._id.toHexString(), name: design.name, floorArea: design.area, rooms: design.rooms,
       },
-      floorArea: design.area, rooms: design.rooms, finish: design.finish,
+      floorArea: design.area, rooms: design.rooms,
       notes: input.notes || "I would like to request this design as shown.",
     };
   } else {
@@ -96,7 +92,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
       projectId: project?._id, houseDesignId: project?.houseDesignId,
       floorArea: input.floorArea, bedrooms: input.bedrooms, bathrooms: input.bathrooms,
       rooms: `${input.bedrooms} bedroom${input.bedrooms === 1 ? "" : "s"}, ${input.bathrooms} bathroom${input.bathrooms === 1 ? "" : "s"}`,
-      finish: input.finish, notes: input.notes,
+      notes: input.notes,
     };
   }
 
@@ -117,7 +113,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     .find({ role: "admin", status: "active" }, { projection: { _id: 1 } }).toArray();
   const subject = document.selectedDesign
     ? `requested ${document.selectedDesign.name}`
-    : `submitted a ${document.finish.toLowerCase()} design request for ${document.floorArea.toLocaleString("en-PH")} sq m`;
+    : `submitted a design request for ${document.floorArea.toLocaleString("en-PH")} sq m`;
   await insertNotifications(db, admins.map((admin) => ({
     _id: new ObjectId(), userId: admin._id, title: "New design request",
     body: `${actor.name} ${subject}: ${document.notes.length > 120 ? `${document.notes.slice(0, 117)}…` : document.notes} (Needed by ${input.neededBy})`,
@@ -126,7 +122,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   await recordAuditLog({
     db, actor, action: "design-request.created", entityType: "design_request", entityId: document._id,
     details: {
-      floorArea: document.floorArea, finish: document.finish, status: document.status,
+      floorArea: document.floorArea, status: document.status,
       inspirationImageCount: input.inspirationImages.length,
       preferredDate: input.preferredDate, neededBy: input.neededBy,
       ...(document.selectedDesign ? { selectedHouseDesignId: document.selectedDesign.id } : {}),

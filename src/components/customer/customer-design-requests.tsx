@@ -1,6 +1,5 @@
 "use client";
 
-import type { HouseDesignFinish } from "@/lib/house-design-data";
 import { AccountTermsDialog } from "@/components/auth/account-terms";
 import {
   countOpenDesignRequests,
@@ -90,7 +89,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
   houseDesignId?: string;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { catalog, designs, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
+  const { designs, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
   const hasDesignSelection = houseDesignId !== undefined;
   const selectedDesign = designs.find((design) => design.id === houseDesignId);
   const selectionUnavailable = hasDesignSelection && !isCatalogLoading && !selectedDesign;
@@ -98,7 +97,6 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
-  const [finish, setFinish] = useState<HouseDesignFinish>("Standard");
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [neededBy, setNeededBy] = useState("");
@@ -209,7 +207,6 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
       (Number(floorArea) <= 0 ? "Floor area must be more than 0 sq m." : null),
     bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount }),
     bathrooms: hasDesignSelection ? null : numberError(bathrooms, { label: "Number of bathrooms", integer: true, min: 0, max: maxRoomCount }),
-    finish: hasDesignSelection || catalog.finishes.includes(finish) ? null : "Choose a finish level.",
     notes: textError(notes, {
       label: "Description",
       required: !hasDesignSelection,
@@ -222,10 +219,10 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
       : null,
   };
   const fieldIds: Record<string, string> = {
-    floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms", finish: "dr-finish",
+    floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms",
     notes: "dr-notes", preferredDate: "dr-preferred-date", neededBy: "dr-needed-by", images: "dr-images",
   };
-  const fieldOrder = ["floorArea", "bedrooms", "bathrooms", "finish", "notes", "preferredDate", "neededBy", "images"];
+  const fieldOrder = ["floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
   const touch = (name: string) => setTouched((current) => (current[name] ? current : { ...current, [name]: true }));
   /** The message for a field, shown after it was left or a submit was attempted. */
   const showError = (name: string) => {
@@ -273,7 +270,6 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
             floorArea: Number(floorArea),
             bedrooms: Number(bedrooms),
             bathrooms: Number(bathrooms),
-            finish,
           }),
           notes,
           preferredDate,
@@ -382,7 +378,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Design</p>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
-                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType} · {selectedDesign.area} sqm · {selectedDesign.finish}</p>
+                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.area} sqm</p>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
                     <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The design review is free; only the blueprint is billed.</p>
                   </div>
@@ -390,7 +386,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
               ) : null}
             </div>
           ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label className="block">
                 <span className="block text-sm font-semibold">
@@ -456,28 +452,6 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                 />
               </label>
               <FieldError id={`${fieldIds.bathrooms}-error`} message={showError("bathrooms")} />
-            </div>
-            <div>
-              <label className="block">
-                <span className="block text-sm font-semibold">
-                  Finish Level
-                </span>
-                <select
-                  id={fieldIds.finish}
-                  value={finish}
-                  onChange={(event) =>
-                    setFinish(event.target.value as HouseDesignFinish)
-                  }
-                  onBlur={() => touch("finish")}
-                  {...describe("finish")}
-                  className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
-                >
-                  {catalog.finishes.map((option) => (
-                    <option key={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
-              <FieldError id={`${fieldIds.finish}-error`} message={showError("finish")} />
             </div>
           </div>
           )}
@@ -675,7 +649,7 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
                   <div>
                     {request.selectedDesign ? <p className="mb-1 text-sm font-semibold text-red-800">{request.selectedDesign.name}</p> : null}
                     <p className="text-sm font-semibold">
-                      {request.floorArea} sqm · {request.finish}
+                      {request.floorArea} sqm · {request.rooms}
                     </p>
                     <p className="mt-1 text-xs text-stone-500">
                       Submitted {formatDate(request.createdAt)}
