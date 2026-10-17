@@ -6,23 +6,31 @@ export class EmailNotConfiguredError extends Error {
   }
 }
 
-type GmailConfig = { user: string; appPassword: string; fromName: string };
+type EmailConfig = { host: string; port: number; user: string; pass: string; fromAddress: string; fromName: string };
 
-/** Gmail SMTP with an App Password (Google Account > Security > App passwords). */
-export function getGmailConfig(): GmailConfig | null {
+/**
+ * Any SMTP relay (e.g. Brevo) when SMTP_* and EMAIL_FROM are set; otherwise Gmail SMTP with an
+ * App Password (Google Account > Security > App passwords).
+ */
+export function getEmailConfig(): EmailConfig | null {
+  const fromName = process.env.EMAIL_FROM_NAME?.trim() || "G4 Builders Inc";
+  const host = process.env.SMTP_HOST?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  const fromAddress = process.env.EMAIL_FROM?.trim();
+  if (host && smtpUser && smtpPass && fromAddress) {
+    return { host, port: Number(process.env.SMTP_PORT) || 587, user: smtpUser, pass: smtpPass, fromAddress, fromName };
+  }
+
   const user = process.env.GMAIL_USER?.trim();
   // Google shows App Passwords in groups of four; the spaces are not part of it.
   const appPassword = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, "");
   if (!user || !appPassword) return null;
-  return {
-    user,
-    appPassword,
-    fromName: process.env.EMAIL_FROM_NAME?.trim() || "G4 Builders Inc",
-  };
+  return { host: "smtp.gmail.com", port: 465, user, pass: appPassword, fromAddress: user, fromName };
 }
 
 export function isEmailConfigured() {
-  return getGmailConfig() !== null;
+  return getEmailConfig() !== null;
 }
 
 /** Absolute site address for links inside emails. */
@@ -36,35 +44,36 @@ export function appUrl(path = "/") {
 }
 
 const globalForEmail = globalThis as typeof globalThis & {
-  gmailTransporter?: { key: string; transporter: Transporter };
+  emailTransporter?: { key: string; transporter: Transporter };
 };
 
-function transporterFor(config: GmailConfig) {
-  const key = `${config.user}:${config.appPassword}`;
-  if (globalForEmail.gmailTransporter?.key !== key) {
-    globalForEmail.gmailTransporter = {
+function transporterFor(config: EmailConfig) {
+  const key = `${config.host}:${config.port}:${config.user}:${config.pass}`;
+  if (globalForEmail.emailTransporter?.key !== key) {
+    globalForEmail.emailTransporter = {
       key,
       transporter: nodemailer.createTransport({
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true,
-        auth: { user: config.user, pass: config.appPassword },
+        host: config.host,
+        port: config.port,
+        // Port 465 is implicit TLS; other ports upgrade with STARTTLS.
+        secure: config.port === 465,
+        auth: { user: config.user, pass: config.pass },
         connectionTimeout: 10000,
         greetingTimeout: 10000,
         socketTimeout: 15000,
       }),
     };
   }
-  return globalForEmail.gmailTransporter.transporter;
+  return globalForEmail.emailTransporter.transporter;
 }
 
 export type EmailMessage = { to: string; subject: string; text: string; html: string };
 
 export async function sendEmail(message: EmailMessage) {
-  const config = getGmailConfig();
+  const config = getEmailConfig();
   if (!config) throw new EmailNotConfiguredError();
   await transporterFor(config).sendMail({
-    from: { name: config.fromName, address: config.user },
+    from: { name: config.fromName, address: config.fromAddress },
     ...message,
   });
 }
