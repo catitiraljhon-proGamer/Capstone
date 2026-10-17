@@ -6,7 +6,7 @@ import {
 } from "@/lib/customer-notifications";
 import { Bell, CheckCheck, LoaderCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 function formatNotificationTime(value: string) {
   return new Intl.DateTimeFormat("en-PH", {
@@ -31,6 +31,8 @@ export function NotificationBell() {
   const knownNotificationIdsRef = useRef<Set<string> | null>(null);
   const popupTimerRef = useRef<number | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  /** On phones the panel spans the screen just below the bell, so it never runs off the left edge. */
+  const [panelTop, setPanelTop] = useState(72);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [popupNotification, setPopupNotification] =
     useState<SystemNotification | null>(null);
@@ -113,7 +115,8 @@ export function NotificationBell() {
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        onClick={() => {
+        onClick={(event) => {
+          setPanelTop(Math.round(event.currentTarget.getBoundingClientRect().bottom + 8));
           setIsOpen((current) => !current);
           if (
             "Notification" in window &&
@@ -143,7 +146,8 @@ export function NotificationBell() {
         <section
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-12 z-50 max-h-[calc(100dvh-8rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white text-stone-950 shadow-xl sm:w-96"
+          style={{ "--panel-top": `${panelTop}px` } as CSSProperties}
+          className="fixed inset-x-4 top-(--panel-top) z-50 max-h-[calc(100dvh-var(--panel-top)-1rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white text-stone-950 shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:max-h-[calc(100dvh-8rem)] sm:w-96"
         >
           <div className="flex items-start justify-between gap-3 border-b border-stone-200 px-4 py-3">
             <div>
