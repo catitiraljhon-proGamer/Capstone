@@ -484,8 +484,9 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_billing_tests");
-  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates", "reference_values"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
+  await db.collection("reference_values").insertMany(["Standard", "Semi-luxury", "Luxury"].map((value, order) => ({ category: "house-design-finish", value, order, active: true })));
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,
   })));

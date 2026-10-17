@@ -1,3 +1,4 @@
+import { inactiveFinishMessage, isActiveFinish } from "@/lib/server/maintenance";
 import {
   collections,
   type AuditLogDocument,
@@ -26,6 +27,13 @@ export async function PATCH(
 
     const changes = houseDesignPatchSchema.parse(await request.json());
     const db = await getDatabase();
+    if (changes.finish) {
+      // A design may keep a finish that was later retired, but cannot switch to one.
+      const current = await db.collection<HouseDesignDocument>(collections.houseDesigns).findOne({ _id: new ObjectId(id) }, { projection: { finish: 1 } });
+      if (current?.finish !== changes.finish && !(await isActiveFinish(db, changes.finish))) {
+        return NextResponse.json({ error: inactiveFinishMessage }, { status: 400 });
+      }
+    }
     const now = new Date();
     const document = await db
       .collection<HouseDesignDocument>(collections.houseDesigns)

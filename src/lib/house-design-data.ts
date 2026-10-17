@@ -1,4 +1,5 @@
-export type HouseDesignFinish = "Standard" | "Semi-luxury" | "Luxury";
+/** Finish levels are maintained by the Admin (Maintenance > Finishes). */
+export type HouseDesignFinish = string;
 export type HouseDesignStatus = "Draft" | "Published" | "Archived";
 
 export type HouseType = {

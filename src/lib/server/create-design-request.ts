@@ -1,3 +1,4 @@
+import { inactiveFinishMessage, isActiveFinish } from "@/lib/server/maintenance";
 import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
 import {
@@ -39,7 +40,7 @@ const inputSchema = z.union([
     floorArea: z.number().finite().positive().max(100_000),
     bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
     bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
-    finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
+    finish: z.string().trim().min(1, "Choose a finish level.").max(40),
     notes: z.string().trim().min(1).max(4_000),
     inspirationImages: embeddedImagesSchema,
     preferredDate,
@@ -63,6 +64,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   if (input.neededBy < input.preferredDate) {
     throw new BillingError("The Needed By date must be on or after the Preferred Date.", 400);
   }
+  if ("finish" in input && !(await isActiveFinish(db, input.finish))) throw new BillingError(inactiveFinishMessage, 400);
   // The account-level agreement from registration (or first sign-in) covers every request.
   const termsAcceptance = await requireAccountTerms(db, actor);
   let details: Pick<DesignRequestDocument,

@@ -27,7 +27,7 @@ export const houseDesignInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   style: z.string().trim().max(80).optional(),
   houseType: z.string().trim().min(1).max(80),
-  finish: z.enum(["Standard", "Semi-luxury", "Luxury"]),
+  finish: z.string().trim().min(1, "Choose a finish level.").max(40),
   area: z.number().finite().positive().max(100_000),
   rooms: z.string().trim().min(1).max(200),
   rate: z.number().finite().nonnegative().max(100_000_000),

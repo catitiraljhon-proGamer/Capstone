@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   Users,
   WalletCards,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -69,6 +70,7 @@ const adminNav = [
   { label: "Scheduling", icon: CalendarDays, href: "/admin/scheduling" },
   { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
+  { label: "Maintenance", icon: Wrench, href: "/admin/maintenance" },
   { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },
 ];
 
