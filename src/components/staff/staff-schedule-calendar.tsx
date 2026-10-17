@@ -63,7 +63,7 @@ const roleCopy: Record<StaffRole, {
     titlePlaceholder: "Example: Contract review meeting",
     notesPlaceholder: "Agenda, reminders, or preparation notes (staff only)",
     subtitle: "Client meetings and customer payment dates in one calendar.",
-    emptyHint: "Add a client meeting to this date.",
+    emptyHint: "Use New Meeting above to add one to this date.",
   },
   "billing-clerk": {
     managed: "Payment follow-up",
@@ -72,7 +72,7 @@ const roleCopy: Record<StaffRole, {
     titlePlaceholder: "Example: Call about the downpayment",
     notesPlaceholder: "What to discuss or check (staff only)",
     subtitle: "Customer payment dates, your follow-ups, and client meetings.",
-    emptyHint: "Add a payment follow-up to this date.",
+    emptyHint: "Use New Follow-Up above to add one to this date.",
   },
 };
 
@@ -348,13 +348,8 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
         />
 
         <aside className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Day</p>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight">{formatSelectedDay(selectedDate)}</h2>
-            </div>
-            <Button type="button" size="icon" onClick={() => openForm()} aria-label={copy.newLabel}><Plus className="h-4 w-4" /></Button>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Day</p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight">{formatSelectedDay(selectedDate)}</h2>
 
           {selectedDues.length > 0 ? (
             <div className="mt-5 space-y-3">
@@ -391,7 +386,6 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
               <p className="mt-3 text-sm font-medium text-stone-700">Nothing Scheduled for This Day</p>
               <p className="mt-1 text-xs leading-5 text-stone-500">{copy.emptyHint}</p>
-              <Button type="button" size="sm" className="mt-4" onClick={() => openForm()}>{copy.newLabel}</Button>
             </div>
           )}
 
