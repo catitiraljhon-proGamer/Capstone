@@ -9,6 +9,7 @@ import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, Billing
 import { InvoiceActionDialog, InvoiceForm, PayOnlineDialog, PaymentForm, PaymentReview, type BillingMutation } from "@/components/billing/billing-forms";
 import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { manilaDate, sumMoney } from "@/lib/billing";
+import { exportXlsx, type XlsxColumn } from "@/lib/export-xlsx";
 import type { PaymongoCheckoutDto } from "@/types/paymongo";
 import { designFeeLabels, paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 
@@ -22,16 +23,27 @@ type Dialog =
   | { type: "payment"; payment: BillingPayment }
   | { type: "account"; customerId: string; customerName: string };
 
-function exportCsv(filename: string, rows: (string | number)[][]) {
-  const content = rows.map((row) => row.map((value) => {
-    const text = String(value);
-    const safe = /^[=+\-@\t\r\n]/.test(text) ? "'" + text : text;
-    return '"' + safe.replaceAll('"', '""') + '"';
-  }).join(",")).join("\r\n");
-  const url = URL.createObjectURL(new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a"); link.href = url; link.download = filename; link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+const collectionColumns: XlsxColumn<BillingPayment>[] = [
+  { header: "Payment", width: 18, value: (payment) => payment.reference },
+  { header: "Customer", width: 24, value: (payment) => payment.customerName },
+  { header: "Project", width: 36, value: (payment) => payment.projectName },
+  { header: "Invoice", width: 18, value: (payment) => payment.invoiceNumber },
+  { header: "Payment Date", width: 15, format: "date", value: (payment) => manilaDate(new Date(payment.paidAt)) },
+  { header: "Method", width: 15, value: (payment) => payment.method },
+  { header: "Amount", width: 16, format: "peso", value: (payment) => payment.amount },
+  { header: "Receipt", width: 18, value: (payment) => payment.receiptNumber ?? "Legacy record" },
+];
+const outstandingColumns: XlsxColumn<BillingInvoice>[] = [
+  { header: "Invoice", width: 18, value: (invoice) => invoice.invoiceNumber },
+  { header: "Customer", width: 24, value: (invoice) => invoice.customerName },
+  { header: "Project", width: 36, value: (invoice) => invoice.projectName },
+  { header: "Due Date", width: 15, format: "date", value: (invoice) => invoice.dueDate },
+  { header: "Amount", width: 16, format: "peso", value: (invoice) => invoice.amount },
+  { header: "Verified Paid", width: 16, format: "peso", value: (invoice) => invoice.paid },
+  { header: "Balance", width: 16, format: "peso", value: (invoice) => invoice.balance },
+  { header: "Status", width: 14, value: (invoice) => invoice.status },
+  { header: "Overdue", width: 10, value: (invoice) => (invoice.overdue ? "Yes" : "No") },
+];
 
 const checkoutPollMs = 2000;
 const checkoutPollMaxMs = 30_000;
@@ -166,6 +178,9 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
       const invoices = issued.filter((invoice) => invoice.customerId === account.id);
       return { ...account, projects, billed: sumMoney(invoices.map((invoice) => invoice.amount)), paid: sumMoney(verified.filter((payment) => payment.customerId === account.id).map((payment) => payment.amount)), outstanding: sumMoney(invoices.map((invoice) => invoice.balance)) };
     }).filter((account) => matches([account.name, ...account.projects.map((project) => project.name)]) && (!projectId || account.projects.some((project) => project.id === projectId)));
+  const exportReport = <Row,>(filename: string, sheetName: string, columns: XlsxColumn<Row>[], rows: Row[]) => {
+    exportXlsx({ filename, sheetName, columns, rows }).catch(() => setError("Unable to create the Excel file. Try again."));
+  };
   const close = () => setDialog(null);
   const viewInvoice = (invoice: BillingInvoice) => setDialog({ type: "invoice", invoice });
   const viewPayment = (payment: BillingPayment) => setDialog({ type: "payment", payment });
@@ -234,11 +249,11 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
         {section === "Customer Accounts" && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Customer Balances</h2>{!accounts.length ? <BillingEmpty /> : <div className="divide-y divide-stone-200">{accounts.map((account) => <div key={account.id} className="flex flex-wrap items-center justify-between gap-4 py-5"><div><p className="font-semibold">{account.name}</p><p className="mt-1 text-xs text-stone-500">{account.projects.length} projects · {formatPeso(account.billed)} invoiced · {formatPeso(account.paid)} paid</p></div><div className="flex items-center gap-4"><div className="text-right"><p className="font-semibold text-red-700">{formatPeso(account.outstanding)}</p><p className="text-xs text-stone-500">Outstanding</p></div><Button variant="outline" onClick={() => setDialog({ type: "account", customerId: account.id, customerName: account.name })}>View Account</Button></div></div>)}</div>}</BillingPanel>}
         {section === "Reports" && <>
           <p className="text-sm text-stone-600">Collections use the payment date and currently verified payments. Outstanding invoices use their due date and current balance. Pending, rejected, and reversed payments are excluded from collections. Check the rows you want, then use Export Selected.</p>
-          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><Button variant="outline" disabled={!exportPayments.length || Boolean(from && to && from > to)} onClick={() => exportCsv("g4-collections.csv", [["Payment", "Customer", "Project", "Invoice", "Payment Date", "Method", "Amount PHP", "Receipt"], ...exportPayments.map((payment) => [payment.reference, payment.customerName, payment.projectName, payment.invoiceNumber, manilaDate(new Date(payment.paidAt)), payment.method, payment.amount, payment.receiptNumber ?? "Legacy record"])])}><Download className="mr-2 h-4 w-4" />{exportPayments.length ? `Export Selected (${exportPayments.length})` : "Select Rows to Export"}</Button></div>
+          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><Button variant="outline" disabled={!exportPayments.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-collections.xlsx", "Verified Collections", collectionColumns, exportPayments)}><Download className="mr-2 h-4 w-4" />{exportPayments.length ? `Export Selected (${exportPayments.length})` : "Select Rows to Export"}</Button></div>
             <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{paymentMethods.map((method) => <div className="rounded-lg bg-stone-50 p-3" key={method}><p className="text-xs text-stone-500">{method}</p><p className="mt-2 font-semibold">{formatPeso(sumMoney(reportPayments.filter((payment) => payment.method === method).map((payment) => payment.amount)))}</p></div>)}</div>
             <PaymentTable key={from + to + projectId} payments={reportPayments} customer={false} onView={viewPayment} selection={{ selected: selectedPaymentIds, onChange: setSelectedPaymentIds }} />
           </BillingPanel>
-          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><Button variant="outline" disabled={!exportInvoices.length || Boolean(from && to && from > to)} onClick={() => exportCsv("g4-outstanding-invoices.csv", [["Invoice", "Customer", "Project", "Due Date", "Amount PHP", "Verified paid PHP", "Balance PHP", "Status", "Overdue"], ...exportInvoices.map((invoice) => [invoice.invoiceNumber, invoice.customerName, invoice.projectName, invoice.dueDate, invoice.amount, invoice.paid, invoice.balance, invoice.status, invoice.overdue ? "Yes" : "No"])])}><Download className="mr-2 h-4 w-4" />{exportInvoices.length ? `Export Selected (${exportInvoices.length})` : "Select Rows to Export"}</Button></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>
+          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><Button variant="outline" disabled={!exportInvoices.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-outstanding-invoices.xlsx", "Outstanding Invoices", outstandingColumns, exportInvoices)}><Download className="mr-2 h-4 w-4" />{exportInvoices.length ? `Export Selected (${exportInvoices.length})` : "Select Rows to Export"}</Button></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>
         </>}
       </>}
     </>}
