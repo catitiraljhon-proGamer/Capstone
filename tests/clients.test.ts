@@ -36,11 +36,12 @@ function registrationRequest(input: unknown) {
   });
 }
 
-function sendCodeRequest(email: string, ip = "203.0.113.10") {
+// The sign-up form sends every detail before the code; registration repeats them with the code.
+function sendCodeRequest(email: string, ip = "203.0.113.10", input: object = registrationInput) {
   return new Request("http://localhost:3000/api/auth/register/send-code", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-real-ip": ip },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ termsVersion: accountTerms.version, ...input, email }),
   });
 }
 
@@ -279,6 +280,25 @@ test("verification codes go only to addresses without an account, at most once a
 
     const registered = await registerCustomer(registrationRequest({ ...registrationInput, email: "fresh@gmail.com", verificationCode: code }));
     assert.equal(registered.status, 201);
+  } finally {
+    mock.restoreAll();
+  }
+});
+
+test("a verification code is sent only after every sign-up detail is valid", async () => {
+  const logged: string[] = [];
+  mock.method(console, "info", (message: string) => logged.push(message));
+  try {
+    const invalidChanges = [
+      { name: " " }, { password: "short" }, { contactNumber: "abcdefg" }, { addressDetails: undefined },
+      { termsVersion: "old-terms" }, { role: "admin" }, { verificationCode: "123456" },
+    ];
+    for (const change of invalidChanges) {
+      const sent = await sendVerificationCode(sendCodeRequest("details@gmail.com", "203.0.113.20", { ...registrationInput, ...change }));
+      assert.equal(sent.status, 400, JSON.stringify(change));
+    }
+    assert.equal(logged.length, 0);
+    assert.equal(await db.collection<{ _id: string }>("email_verifications").countDocuments({ _id: "details@gmail.com" }), 0);
   } finally {
     mock.restoreAll();
   }

@@ -5,13 +5,13 @@ import { BackButton } from "@/components/ui/back-button";
 import { accountTerms } from "@/lib/account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { registrationEmailError, useClientFormValidation } from "@/components/clients/client-information-form";
+import { useClientFormValidation } from "@/components/clients/client-information-form";
 import { ContactNumberInput } from "@/components/clients/contact-number-input";
 import { PhAddressFields, readAddressDetails } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { phContactNumberExample } from "@/lib/ph-contact-number";
-import { CheckCircle2, Eye, EyeOff, HardHat, MailCheck } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, HardHat, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
@@ -21,6 +21,87 @@ const benefits = [
   "Review project billing and payments",
   "Download your blueprint, invoices, and receipts",
 ];
+
+const registrationSteps = [
+  { id: "details", label: "Your details" },
+  { id: "verify", label: "Verify email" },
+] as const;
+
+type RegistrationStep = (typeof registrationSteps)[number]["id"];
+
+/** What the sign-up form sends: first to get a code, then again with the code to create the account. */
+type RegistrationDetails = {
+  name: string;
+  email: string;
+  password: string;
+  contactNumber: string;
+  addressDetails: ReturnType<typeof readAddressDetails>;
+  occupation: string;
+  termsVersion: string;
+};
+
+type ApiPayload = {
+  error?: string;
+  issues?: { message?: string; path?: (string | number)[] }[];
+  expiresInMinutes?: number;
+  resendAfterSeconds?: number;
+  retryAfterSeconds?: number;
+  redirectTo?: string;
+};
+
+function readRegistrationDetails(form: HTMLFormElement): RegistrationDetails {
+  const formData = new FormData(form);
+  const value = (key: string) => String(formData.get(key) ?? "").trim();
+  return {
+    name: value("name"),
+    email: value("email").toLowerCase(),
+    password: String(formData.get("password") ?? ""),
+    contactNumber: value("contactNumber"),
+    addressDetails: readAddressDetails(formData),
+    occupation: value("occupation"),
+    termsVersion: accountTerms.version,
+  };
+}
+
+async function postJson(url: string, body: unknown) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return { response, payload: (await response.json()) as ApiPayload };
+}
+
+function payloadMessage(payload: ApiPayload, fallback: string) {
+  return payload.issues?.[0]?.message ?? payload.error ?? fallback;
+}
+
+function RegistrationStepIndicator({ step }: { step: RegistrationStep }) {
+  return (
+    <ol aria-label="Registration steps" className="flex items-center gap-3">
+      {registrationSteps.map((item, index) => {
+        const current = item.id === step;
+        const done = step === "verify" && item.id === "details";
+        return (
+          <li key={item.id} aria-current={current ? "step" : undefined} className="flex items-center gap-3">
+            {index > 0 ? <span aria-hidden="true" className="h-px w-8 bg-stone-300 sm:w-12" /> : null}
+            <span className={`flex items-center gap-2 text-sm font-medium ${current ? "text-stone-950" : "text-stone-500"}`}>
+              <span
+                aria-hidden="true"
+                className={`grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${
+                  current ? "bg-red-700 text-white" : done ? "bg-rose-100 text-red-800" : "bg-stone-100 text-stone-500"
+                }`}
+              >
+                {done ? <Check className="h-4 w-4" /> : index + 1}
+              </span>
+              {item.label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export function RegisterAccountPage({
   initialError = "",
@@ -35,11 +116,14 @@ export function RegisterAccountPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const validation = useClientFormValidation("register");
   const { describe, error: fieldError, errorId } = validation;
-  const [email, setEmail] = useState("");
+  /** Step 1 fills in the form; step 2 confirms the emailed code. The account is created only in step 2. */
+  const [step, setStep] = useState<RegistrationStep>("details");
+  const [details, setDetails] = useState<RegistrationDetails | null>(null);
   const [codeSentTo, setCodeSentTo] = useState("");
   const [codeMinutes, setCodeMinutes] = useState(10);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [sendCodeError, setSendCodeError] = useState("");
+  const [codeNotice, setCodeNotice] = useState("");
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
@@ -47,8 +131,6 @@ export function RegisterAccountPage({
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
-  const normalizedEmail = email.trim().toLowerCase();
-  const codeMatchesEmail = Boolean(codeSentTo) && codeSentTo === normalizedEmail;
   const emailField = describe("email");
   // The field's own validation may already show the same message.
   const sendCodeMessage = sendCodeError !== fieldError("email") ? sendCodeError : "";
@@ -59,98 +141,115 @@ export function RegisterAccountPage({
     return () => clearTimeout(timer);
   }, [resendIn]);
 
-  const sendCode = async () => {
-    if (isSendingCode || (codeMatchesEmail && resendIn > 0)) return;
+  const codeSent = (email: string, payload: ApiPayload) => {
+    setCodeSentTo(email);
+    setCodeMinutes(payload.expiresInMinutes ?? 10);
+    setResendIn(payload.resendAfterSeconds ?? 60);
+    setVerificationCode("");
+    setCodeError("");
+  };
+
+  const focusCode = () => setTimeout(() => codeRef.current?.focus(), 0);
+
+  /** Step 1: the server checks every detail, then emails the code. Nothing is saved to an account yet. */
+  const handleContinue = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSendingCode) return;
+    setErrorMessage("");
+    setGoogleError("");
     setSendCodeError("");
-    const problem = registrationEmailError(email);
-    if (problem) {
-      setSendCodeError(problem);
-      emailRef.current?.focus();
-      return;
-    }
+    setCodeNotice("");
+
+    // Show every message under its field and focus the first invalid one.
+    if (!validation.validate(event.currentTarget)) return;
+
+    const next = readRegistrationDetails(event.currentTarget);
     setIsSendingCode(true);
     try {
-      const response = await fetch("/api/auth/register/send-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail }),
-      });
-      const payload = (await response.json()) as {
-        error?: string;
-        issues?: { message?: string }[];
-        expiresInMinutes?: number;
-        resendAfterSeconds?: number;
-        retryAfterSeconds?: number;
-      };
-      if (!response.ok) {
-        setSendCodeError(payload.issues?.[0]?.message ?? payload.error ?? "Unable to send the verification code.");
-        if (payload.retryAfterSeconds && codeSentTo === normalizedEmail) setResendIn(payload.retryAfterSeconds);
+      const { response, payload } = await postJson("/api/auth/register/send-code", next);
+      if (response.ok) {
+        codeSent(next.email, payload);
+      } else if (response.status === 429 && payload.retryAfterSeconds && codeSentTo === next.email) {
+        // A code for this email was sent less than a minute ago and still works.
+        setResendIn(payload.retryAfterSeconds);
+        setVerificationCode("");
+        setCodeError("");
+      } else {
+        const message = payloadMessage(payload, "Unable to send the verification code.");
+        if (response.status === 409 || payload.issues?.[0]?.path?.[0] === "email") {
+          setSendCodeError(message);
+          emailRef.current?.focus();
+        } else {
+          setErrorMessage(message);
+        }
         return;
       }
-      setCodeSentTo(normalizedEmail);
-      setCodeMinutes(payload.expiresInMinutes ?? 10);
-      setResendIn(payload.resendAfterSeconds ?? 60);
-      setVerificationCode("");
-      setCodeError("");
-      setTimeout(() => codeRef.current?.focus(), 0);
+      setDetails(next);
+      setStep("verify");
+      focusCode();
     } catch {
-      setSendCodeError("Unable to reach the server. Try again.");
+      setErrorMessage("Unable to reach the server. Try again.");
     } finally {
       setIsSendingCode(false);
     }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSubmitting) return;
+  const resendCode = async () => {
+    if (!details || isSendingCode || resendIn > 0) return;
     setErrorMessage("");
-    setGoogleError("");
     setCodeError("");
-
-    // Show every message under its field and focus the first invalid one.
-    if (!validation.validate(event.currentTarget)) return;
-
-    if (!codeMatchesEmail) {
-      setSendCodeError("Send a verification code to this email address first.");
-      emailRef.current?.focus();
-      return;
+    setCodeNotice("");
+    setIsSendingCode(true);
+    try {
+      const { response, payload } = await postJson("/api/auth/register/send-code", details);
+      if (!response.ok) {
+        setErrorMessage(payloadMessage(payload, "Unable to send the verification code."));
+        if (payload.retryAfterSeconds) setResendIn(payload.retryAfterSeconds);
+        return;
+      }
+      codeSent(details.email, payload);
+      setCodeNotice("A new code was sent. Use the latest code only.");
+      focusCode();
+    } catch {
+      setErrorMessage("Unable to reach the server. Try again.");
+    } finally {
+      setIsSendingCode(false);
     }
+  };
+
+  const editDetails = () => {
+    setStep("details");
+    setErrorMessage("");
+    setCodeError("");
+    setCodeNotice("");
+  };
+
+  /** Step 2: the account is created only when the code matches. A wrong code saves nothing. */
+  const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting || !details) return;
+    setErrorMessage("");
+    setCodeError("");
+    setCodeNotice("");
+
     if (!/^\d{6}$/.test(verificationCode)) {
       setCodeError("Enter the 6-digit code sent to your email.");
       codeRef.current?.focus();
       return;
     }
 
-    const formData = new FormData(event.currentTarget);
-    const name = String(formData.get("name") ?? "").trim();
-    const email = String(formData.get("email") ?? "")
-      .trim()
-      .toLowerCase();
-    const password = String(formData.get("password") ?? "");
-    const contactNumber = String(formData.get("contactNumber") ?? "").trim();
-    const addressDetails = readAddressDetails(formData);
-    const occupation = String(formData.get("occupation") ?? "").trim();
-
-    const details = { name, email, password, contactNumber, addressDetails, occupation, verificationCode };
     setIsSubmitting(true);
-
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...details, termsVersion: accountTerms.version }),
-      });
-      const payload = (await response.json()) as {
-        error?: string;
-        issues?: { message?: string }[];
-        redirectTo?: string;
-      };
-
+      const { response, payload } = await postJson("/api/auth/register", { ...details, verificationCode });
       if (!response.ok || !payload.redirectTo) {
-        const message = payload.issues?.[0]?.message ?? payload.error ?? "Unable to create your account.";
+        const message = payloadMessage(payload, "Unable to create your account.");
         if (/verification code|6-digit code/i.test(message)) {
           setCodeError(message);
           codeRef.current?.focus();
+        } else if (response.status === 400 && payload.issues) {
+          // A detail no longer passes the server's checks: fix it in step 1.
+          setStep("details");
+          setErrorMessage(message);
         } else {
           setErrorMessage(message);
         }
@@ -164,6 +263,16 @@ export function RegisterAccountPage({
       setIsSubmitting(false);
     }
   };
+
+  const errorAlert = errorMessage ? (
+    <p
+      role="alert"
+      aria-live="polite"
+      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+    >
+      {errorMessage}
+    </p>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-950">
@@ -194,6 +303,7 @@ export function RegisterAccountPage({
 
           {agreedToTerms ? (
           <>
+          {step === "details" ? (
           <div className="mt-8 max-w-xl space-y-6">
             {googleError ? (
               <p
@@ -205,7 +315,7 @@ export function RegisterAccountPage({
             ) : null}
             <GoogleAuthButton
               mode="register"
-              disabled={isSubmitting}
+              disabled={isSendingCode}
               onClick={() => {
                 const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: accountTerms.version });
                 window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
@@ -221,8 +331,14 @@ export function RegisterAccountPage({
               <span className="flex-1 border-t border-stone-200" />
             </div>
           </div>
+          ) : null}
 
-          <form className="mt-6 max-w-xl space-y-5" onSubmit={handleSubmit} {...validation.formProps}>
+          <div className={`max-w-xl ${step === "details" ? "mt-6" : "mt-8"}`}>
+            <RegistrationStepIndicator step={step} />
+          </div>
+
+          {/* Stays mounted while the code is checked, so Edit details keeps everything typed in. */}
+          <form className="mt-6 max-w-xl space-y-5" onSubmit={handleContinue} hidden={step !== "details"} {...validation.formProps}>
             <p className="text-sm leading-6 text-stone-600">
               Fields marked with a red asterisk (<RequiredIndicator />) are required. Occupation is optional.
             </p>
@@ -255,83 +371,28 @@ export function RegisterAccountPage({
               >
                 Email Address <RequiredIndicator />
               </label>
-              <div className="flex gap-2">
-                <input
-                  ref={emailRef}
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  maxLength={254}
-                  required
-                  placeholder="Enter Gmail address"
-                  value={email}
-                  onChange={(event) => {
-                    setEmail(event.target.value);
-                    setSendCodeError("");
-                  }}
-                  aria-invalid={emailField["aria-invalid"] ?? (sendCodeMessage ? true : undefined)}
-                  aria-describedby={[emailField["aria-describedby"], sendCodeMessage ? "send-code-error" : undefined, "email-hint"]
-                    .filter(Boolean)
-                    .join(" ")}
-                  className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
-                />
-                <button
-                  type="button"
-                  onClick={sendCode}
-                  disabled={isSendingCode || (codeMatchesEmail && resendIn > 0)}
-                  className="shrink-0 rounded-xl border border-red-700 bg-white px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-stone-300 disabled:text-stone-500 disabled:hover:bg-white"
-                >
-                  {isSendingCode
-                    ? "Sending…"
-                    : codeMatchesEmail
-                      ? resendIn > 0
-                        ? `Resend in ${resendIn}s`
-                        : "Resend Code"
-                      : "Send Code"}
-                </button>
-              </div>
+              <input
+                ref={emailRef}
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                maxLength={254}
+                required
+                placeholder="Enter Gmail address"
+                onChange={() => setSendCodeError("")}
+                aria-invalid={emailField["aria-invalid"] ?? (sendCodeMessage ? true : undefined)}
+                aria-describedby={[emailField["aria-describedby"], sendCodeMessage ? "send-code-error" : undefined, "email-hint"]
+                  .filter(Boolean)
+                  .join(" ")}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
+              />
               <p id="email-hint" className="text-xs text-stone-500">
-                Use your Gmail address (@gmail.com). We will email you a 6-digit code to confirm it belongs to you.
+                Use your Gmail address (@gmail.com). After you continue, we will email you a 6-digit code to confirm it belongs to you.
               </p>
               <FieldError id={errorId("email")} message={fieldError("email")} />
               <FieldError id="send-code-error" message={sendCodeMessage} />
             </div>
-
-            {codeMatchesEmail ? (
-              <div className="space-y-2 rounded-xl border border-rose-200 bg-rose-50 p-4">
-                <p className="flex items-start gap-2 text-sm leading-6 text-stone-700">
-                  <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
-                  <span>
-                    We sent a code to <span className="font-semibold text-stone-950">{codeSentTo}</span>.
-                    Check your inbox or Spam folder. The code expires in {codeMinutes} minutes.
-                  </span>
-                </p>
-                <label htmlFor="verificationCode" className="block text-sm font-medium text-stone-700">
-                  Verification Code <RequiredIndicator />
-                </label>
-                <input
-                  ref={codeRef}
-                  id="verificationCode"
-                  name="verificationCode"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  required
-                  placeholder="Enter 6-digit code"
-                  value={verificationCode}
-                  onChange={(event) => {
-                    setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-                    setCodeError("");
-                  }}
-                  aria-invalid={codeError ? true : undefined}
-                  aria-describedby={codeError ? "verification-code-error" : undefined}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-lg font-semibold tracking-[0.5em] outline-none transition placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
-                />
-                <FieldError id="verification-code-error" message={codeError} />
-              </div>
-            ) : null}
 
             <div className="space-y-2">
               <label htmlFor="contactNumber" className="text-sm font-medium text-stone-700">
@@ -437,23 +498,18 @@ export function RegisterAccountPage({
               Conditions is saved with your new account.
             </p>
 
-            {errorMessage ? (
-              <p
-                role="alert"
-                aria-live="polite"
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-              >
-                {errorMessage}
-              </p>
-            ) : null}
+            {step === "details" ? errorAlert : null}
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSendingCode}
               className="w-full rounded-xl bg-red-700 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isSubmitting ? "Creating account…" : "Create Client Account"}
+              {isSendingCode ? "Sending code…" : "Continue"}
             </button>
+            <p className="text-center text-xs leading-5 text-stone-500">
+              Next, confirm your email with the code we send. Your account is created only after the code is confirmed.
+            </p>
 
             <p className="text-center text-sm text-stone-600">
               Already have an account?{" "}
@@ -465,6 +521,89 @@ export function RegisterAccountPage({
               </Link>
             </p>
           </form>
+
+          {step === "verify" && details ? (
+          <form className="mt-6 max-w-xl space-y-5" onSubmit={handleVerify} noValidate>
+            <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+              <div className="min-w-0 text-sm leading-6 text-stone-700">
+                <p className="font-semibold text-stone-950">Check your email</p>
+                <p>
+                  We sent a 6-digit code to <span className="break-all font-semibold text-stone-950">{codeSentTo}</span>.
+                  Check your inbox or Spam folder. The code expires in {codeMinutes} minutes.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="verificationCode" className="block text-sm font-medium text-stone-700">
+                Verification Code <RequiredIndicator />
+              </label>
+              <input
+                ref={codeRef}
+                id="verificationCode"
+                name="verificationCode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                required
+                placeholder="Enter 6-digit code"
+                value={verificationCode}
+                onChange={(event) => {
+                  setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  setCodeError("");
+                }}
+                aria-invalid={codeError ? true : undefined}
+                aria-describedby={codeError ? "verification-code-error" : undefined}
+                className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-lg font-semibold tracking-[0.5em] outline-none transition placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
+              />
+              <FieldError id="verification-code-error" message={codeError} />
+              {codeNotice ? (
+                <p role="status" className="text-sm text-stone-600">
+                  {codeNotice}
+                </p>
+              ) : null}
+            </div>
+
+            {errorAlert}
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-xl bg-red-700 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? "Creating account…" : "Verify & Create Account"}
+            </button>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <button
+                type="button"
+                onClick={editDetails}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 font-semibold text-stone-700 transition hover:text-stone-950 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Edit details
+              </button>
+              <p className="text-stone-600">
+                Didn&apos;t get the code?{" "}
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={isSendingCode || isSubmitting || resendIn > 0}
+                  className="font-semibold text-red-700 hover:underline disabled:cursor-not-allowed disabled:text-stone-500 disabled:no-underline"
+                >
+                  {isSendingCode ? "Sending…" : resendIn > 0 ? `Resend in ${resendIn}s` : "Resend code"}
+                </button>
+              </p>
+            </div>
+
+            <p className="text-xs leading-5 text-stone-500">
+              Your account is not created until the code is confirmed. If the code is wrong or expired, nothing is saved.
+            </p>
+          </form>
+          ) : null}
           </>
           ) : (
           <div className="mt-8 max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-5">

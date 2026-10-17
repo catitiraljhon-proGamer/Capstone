@@ -6,14 +6,14 @@ import {
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
-import { accountTermsRecords, termsVersionSchema } from "@/lib/server/account-terms";
+import { accountTermsRecords } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
 import { billingTransaction } from "@/lib/server/billing";
-import { createClientSchema, signInDestination, toClientDetails } from "@/lib/server/clients";
+import { signInDestination, toClientDetails } from "@/lib/server/clients";
 import {
   checkEmailVerificationCode,
   EmailVerificationError,
-  registrationEmailSchema,
+  registrationDetailsSchema,
 } from "@/lib/server/email-verification";
 import {
   clientIp,
@@ -29,22 +29,11 @@ import { MongoServerError, ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const registrationSchema = createClientSchema.extend({
-  email: registrationEmailSchema,
-  name: z
-    .string()
-    .trim()
-    .min(2, "Enter your full name.")
-    .max(100, "Your name must be 100 characters or fewer."),
-  password: z
-    .string()
-    .min(8, "Your password must contain at least 8 characters.")
-    .max(72, "Your password must contain 72 characters or fewer."),
+const registrationSchema = registrationDetailsSchema.extend({
   verificationCode: z
     .string()
     .trim()
     .regex(/^\d{6}$/, "Enter the 6-digit code sent to your email."),
-  termsVersion: termsVersionSchema,
 });
 
 export async function POST(request: Request) {

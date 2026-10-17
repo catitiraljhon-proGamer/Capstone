@@ -1,9 +1,11 @@
 import { collections, type EmailVerificationDocument } from "@/lib/database/collections";
 import { gmailAddressMessage, isGmailAddress } from "@/lib/gmail";
+import { termsVersionSchema } from "@/lib/server/account-terms";
 import { getAuthSecret } from "@/lib/server/auth-secret";
 import { createClientSchema } from "@/lib/server/clients";
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { type Db, MongoServerError } from "mongodb";
+import { z } from "zod";
 
 export const verificationCodeMinutes = 10;
 export const verificationResendSeconds = 60;
@@ -11,6 +13,21 @@ const maxCodeAttempts = 5;
 
 /** Self-registration email: a valid, normalized Gmail address. */
 export const registrationEmailSchema = createClientSchema.shape.email.refine(isGmailAddress, gmailAddressMessage);
+
+/** Everything a self-registration needs except the emailed code; checked before the code is sent and again on sign-up. */
+export const registrationDetailsSchema = createClientSchema.extend({
+  email: registrationEmailSchema,
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter your full name.")
+    .max(100, "Your name must be 100 characters or fewer."),
+  password: z
+    .string()
+    .min(8, "Your password must contain at least 8 characters.")
+    .max(72, "Your password must contain 72 characters or fewer."),
+  termsVersion: termsVersionSchema,
+});
 
 export class EmailVerificationError extends Error {
   constructor(

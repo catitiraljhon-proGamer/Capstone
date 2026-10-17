@@ -6,7 +6,7 @@ import {
   clearEmailVerification,
   EmailVerificationError,
   issueEmailVerificationCode,
-  registrationEmailSchema,
+  registrationDetailsSchema,
   verificationCodeMinutes,
   verificationResendSeconds,
 } from "@/lib/server/email-verification";
@@ -19,15 +19,13 @@ import {
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 export const runtime = "nodejs";
 
-const sendCodeSchema = z.object({ email: registrationEmailSchema }).strict();
-
 export async function POST(request: Request) {
   try {
-    const { email } = sendCodeSchema.parse(await request.json());
+    // The whole sign-up form is checked first, so a code is sent only for details that can register.
+    const { email } = registrationDetailsSchema.parse(await request.json());
     if (!isEmailConfigured() && process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { error: "Email verification is not available right now. Please register with Google or try again later." },
