@@ -5,7 +5,7 @@ import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
 import { sumMoney } from "@/lib/billing";
 import { exportXlsx, type XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
-import type { AdminCollectionsReport, ProjectCollectionRow } from "@/types/admin-reports";
+import type { AdminCollectionsReport } from "@/types/admin-reports";
 import { AlertTriangle, Banknote, Download, FileText, HandCoins, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -18,22 +18,9 @@ const headRight = head.replace("text-left", "text-right");
 const cell = "px-4 py-4 align-top text-sm";
 const money = `${cell} whitespace-nowrap text-right tabular-nums`;
 
-const collectedShare = (project: ProjectCollectionRow) => (project.contractPrice > 0 ? project.collected / project.contractPrice : 0);
 const monthLabel = (month: string) =>
   new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", year: "numeric", timeZone: "UTC" });
 
-const projectColumns: XlsxColumn<ProjectCollectionRow>[] = [
-  { header: "Project", width: 16, value: (project) => project.reference },
-  { header: "Project Name", width: 32, value: (project) => project.name },
-  { header: "Client", width: 24, value: (project) => project.customerName },
-  { header: "Status", width: 20, value: (project) => project.status },
-  { header: "Contract Price", width: 17, format: "peso", value: (project) => project.contractPrice },
-  { header: "Billed", width: 17, format: "peso", value: (project) => project.billed },
-  { header: "Collected", width: 17, format: "peso", value: (project) => project.collected },
-  { header: "Outstanding", width: 17, format: "peso", value: (project) => project.outstanding },
-  { header: "Overdue", width: 17, format: "peso", value: (project) => project.overdue },
-  { header: "Contract Collected", width: 18, format: "percent", value: collectedShare },
-];
 const monthColumns: XlsxColumn<MonthRow>[] = [
   { header: "Month", width: 18, format: "month", value: (row) => row.month },
   { header: "Invoices Issued", width: 16, value: (row) => row.invoiceCount },
@@ -49,7 +36,6 @@ export function AdminReports() {
   const [status, setStatus] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [selectedProjects, setSelectedProjects] = useState<ReadonlySet<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
@@ -107,7 +93,6 @@ export function AdminReports() {
     outstanding: sumMoney(visibleProjects.map((project) => project.outstanding)),
     overdue: sumMoney(visibleProjects.map((project) => project.overdue)),
   };
-  const exportProjects = visibleProjects.filter((project) => selectedProjects.has(project.id));
   const exportMonths = months.filter((row) => selectedMonths.has(row.id));
   const exportReport = <Row,>(filename: string, sheetName: string, columns: XlsxColumn<Row>[], rows: Row[]) => {
     exportXlsx({ filename, sheetName, columns, rows }).catch(() => setError("Unable to create the Excel file. Try again."));
@@ -150,7 +135,7 @@ export function AdminReports() {
           </label>
         </div>
         <p className="mt-3 text-xs leading-5 text-stone-500">
-          The date range applies to the monthly summary. Project totals show each project&apos;s current position.
+          The totals show the current position of the selected projects. The date range applies to the monthly summary.
         </p>
       </section>
 
@@ -165,64 +150,6 @@ export function AdminReports() {
           icon={totals.overdue > 0 ? AlertTriangle : Wallet}
         />
       </div>
-
-      <section className={panel}>
-        <ReportHeader
-          title="By Project"
-          summary={`${visibleProjects.length} projects · ${formatPeso(totals.collected)} collected`}
-          exportCount={exportProjects.length}
-          onExport={() => exportReport("g4-collections-by-project.xlsx", "By Project", projectColumns, exportProjects)}
-        />
-        {visibleProjects.length === 0 ? <EmptyRow /> : (
-          <div className="-mx-5 overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse">
-              <caption className="sr-only">Collections by project</caption>
-              <thead className="border-y border-stone-200 bg-stone-50">
-                <tr>
-                  <SelectAllHeader ids={visibleProjects.map((project) => project.id)} selection={{ selected: selectedProjects, onChange: setSelectedProjects }} />
-                  <th scope="col" className={head}>Project / Client</th>
-                  <th scope="col" className={head}>Status</th>
-                  <th scope="col" className={headRight}>Contract</th>
-                  <th scope="col" className={headRight}>Billed</th>
-                  <th scope="col" className={headRight}>Collected</th>
-                  <th scope="col" className={headRight}>Outstanding</th>
-                  <th scope="col" className={head}>Contract Collected</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {visibleProjects.map((project) => {
-                  const share = collectedShare(project);
-                  return (
-                    <tr key={project.id} className="hover:bg-rose-50/30">
-                      <SelectRowCell id={project.id} label={project.reference} selection={{ selected: selectedProjects, onChange: setSelectedProjects }} />
-                      <td className={cell}>
-                        <p className="font-semibold">{project.reference} · {project.name}</p>
-                        <p className="mt-1 text-stone-600">{project.customerName}</p>
-                      </td>
-                      <td className={cell}><span className="whitespace-nowrap rounded bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-700">{project.status}</span></td>
-                      <td className={money}>{formatPeso(project.contractPrice)}</td>
-                      <td className={money}>{formatPeso(project.billed)}</td>
-                      <td className={`${money} font-semibold`}>{formatPeso(project.collected)}</td>
-                      <td className={money}>
-                        <p>{formatPeso(project.outstanding)}</p>
-                        {project.overdue > 0 ? <p className="mt-1 text-xs font-medium text-red-700">{formatPeso(project.overdue)} overdue</p> : null}
-                      </td>
-                      <td className={cell}>
-                        <div className="flex min-w-32 items-center gap-2">
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-rose-50">
-                            <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.min(100, share * 100)}%` }} />
-                          </div>
-                          <span className="w-12 text-right text-xs tabular-nums text-stone-600">{(share * 100).toFixed(0)}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
 
       <section className={panel}>
         <ReportHeader

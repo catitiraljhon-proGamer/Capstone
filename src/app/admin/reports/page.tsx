@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Admin Reports | G4 Builders Inc",
-  description: "Contract value, billing, and collections by project and by month.",
+  description: "Contract value, billing, and monthly collections across projects.",
 };
 
 export default function AdminReportsPage() {
@@ -12,7 +12,7 @@ export default function AdminReportsPage() {
     <AdminSectionPage
       activeLabel="Reports"
       title="Reports"
-      description="Contract value, billing, and collections by project and by month."
+      description="Contract value, billing, and monthly collections across projects."
       mainContent={<AdminReports />}
     />
   );
