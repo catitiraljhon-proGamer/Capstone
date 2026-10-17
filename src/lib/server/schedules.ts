@@ -35,7 +35,7 @@ export const scheduleInputSchema = z.object({
   clientId: objectIdSchema,
   projectId: z.union([objectIdSchema, z.literal("")]).optional(),
   scheduledFor: z.iso.datetime(),
-  durationMinutes: z.number().int().min(15).max(480),
+  durationMinutes: z.number().int().min(15).max(480).optional(),
   location: z.string().trim().max(160).optional(),
   notes: z.string().trim().max(1_000).optional(),
   status: statusSchema,
@@ -199,12 +199,14 @@ export async function createSchedule(db: Db, actor: SessionUser, raw: unknown, n
   const { client, project } = await findCustomerAndProject(db, clientId, input.projectId ? recordId(input.projectId, "Project") : undefined);
   const scheduledFor = new Date(input.scheduledFor);
   const isMeeting = eventType === "Client meeting";
-  if (isMeeting && input.status === "Scheduled") await assertMeetingSlotFree(db, scheduledFor, input.durationMinutes);
+  // Payment follow-ups are point-in-time reminders; only meetings block a time slot.
+  const durationMinutes = isMeeting ? input.durationMinutes ?? 60 : 15;
+  if (isMeeting && input.status === "Scheduled") await assertMeetingSlotFree(db, scheduledFor, durationMinutes);
 
   const document: ScheduleDocument = {
     _id: new ObjectId(), title: input.title, eventType, clientId, clientName: client.name,
     ...(project ? { projectId: project._id, projectName: projectLabel(project) } : {}),
-    scheduledFor, durationMinutes: input.durationMinutes,
+    scheduledFor, durationMinutes,
     ...(input.location ? { location: input.location } : {}),
     ...(input.notes ? { notes: input.notes } : {}),
     status: input.status, paymentStatus: "Not applicable",

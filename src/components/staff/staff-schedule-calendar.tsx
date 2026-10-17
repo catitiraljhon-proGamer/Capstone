@@ -4,6 +4,7 @@ import { AdminMeetingRequests } from "@/components/admin/admin-meeting-requests"
 import { PaymentDueCard } from "@/components/billing/payment-due-card";
 import { Button } from "@/components/ui/button";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatPeso } from "@/lib/house-design-data";
 import {
   eventTypeClass,
@@ -129,6 +130,7 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
   const unpaidMonthDues = monthDues.filter((due) => due.status !== "Paid");
   const overdueDues = data.paymentDues.filter((due) => due.status === "Overdue");
   const clientProjects = data.projects.filter((project) => project.clientId === form.clientId);
+  const clientOptions = useMemo(() => data.clients.map((client) => ({ value: client.id, label: client.name })), [data.clients]);
 
   const metrics: { label: string; value: number; note?: string; icon: ComponentType<{ className?: string }> }[] = role === "admin"
     ? [
@@ -179,7 +181,12 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
       const response = await fetch("/api/schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, scheduledFor: scheduledFor.toISOString(), durationMinutes: Number(form.durationMinutes) }),
+        body: JSON.stringify({
+          ...form,
+          scheduledFor: scheduledFor.toISOString(),
+          // Follow-ups are reminders, so only meetings carry a duration.
+          durationMinutes: role === "admin" ? Number(form.durationMinutes) : undefined,
+        }),
       });
       const { schedule } = await readScheduleJson<{ schedule: ScheduleDto }>(response);
       showSchedule(schedule);
@@ -263,13 +270,19 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
               Title
               <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={copy.titlePlaceholder} className={fieldClass} />
             </label>
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
-              Client
-              <select required value={form.clientId} onChange={(event) => setForm({ ...form, clientId: event.target.value, projectId: "" })} className={fieldClass}>
-                <option value="">Select client</option>
-                {data.clients.map((client) => <option key={client.id} value={client.id}>{client.name} · {client.email}</option>)}
-              </select>
-            </label>
+            <div className="text-sm font-medium text-stone-700 xl:col-span-2">
+              <label htmlFor="schedule-client">Client</label>
+              <SearchableSelect
+                id="schedule-client"
+                required
+                value={form.clientId}
+                onChange={(clientId) => setForm({ ...form, clientId, projectId: "" })}
+                options={clientOptions}
+                placeholder="Search client by name"
+                emptyMessage="No client matches that name."
+                className={fieldClass}
+              />
+            </div>
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
               Project (optional)
               <select value={form.projectId} disabled={!form.clientId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className={fieldClass}>
@@ -277,20 +290,22 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 {clientProjects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}
               </select>
             </label>
-            <label className="text-sm font-medium text-stone-700">
+            <label className={`text-sm font-medium text-stone-700 ${role === "admin" ? "" : "xl:col-span-2"}`}>
               Date and Time
               <input required type="datetime-local" value={form.scheduledFor} onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })} className={fieldClass} />
             </label>
-            <label className="text-sm font-medium text-stone-700">
-              Duration
-              <select value={form.durationMinutes} onChange={(event) => setForm({ ...form, durationMinutes: event.target.value })} className={fieldClass}>
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
-                <option value="90">1 hour 30 minutes</option>
-                <option value="120">2 hours</option>
-              </select>
-            </label>
+            {role === "admin" ? (
+              <label className="text-sm font-medium text-stone-700">
+                Duration
+                <select value={form.durationMinutes} onChange={(event) => setForm({ ...form, durationMinutes: event.target.value })} className={fieldClass}>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="90">1 hour 30 minutes</option>
+                  <option value="120">2 hours</option>
+                </select>
+              </label>
+            ) : null}
             <label className="text-sm font-medium text-stone-700 xl:col-span-2">
               {role === "admin" ? "Location or meeting link (optional)" : "Phone number or channel (optional)"}
               <input
@@ -416,7 +431,7 @@ function ScheduleCard({ schedule, canUpdate, isUpdating, onStatusChange }: {
         <span className={`rounded px-2 py-1 text-xs font-semibold ${scheduleStatusClass[schedule.status]}`}>{schedule.status}</span>
       </div>
       <div className="mt-3 space-y-2 text-sm text-stone-600">
-        <p className="flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" />{formatScheduleDateTime(schedule.scheduledFor)} · {schedule.durationMinutes} min</p>
+        <p className="flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" />{formatScheduleDateTime(schedule.scheduledFor)}{schedule.eventType === "Client meeting" ? ` · ${schedule.durationMinutes} min` : ""}</p>
         <p className="flex items-start gap-2"><Users className="mt-0.5 h-4 w-4 shrink-0" />{schedule.clientName}</p>
         {schedule.projectName ? <p className="pl-6 text-xs">{schedule.projectName}</p> : null}
         {schedule.location ? <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" /><span className="break-all">{schedule.location}</span></p> : null}
