@@ -2,12 +2,28 @@ export type XlsxColumn<Row> = {
   header: string;
   width: number;
   value: (row: Row) => string | number;
-  /** "peso" formats numbers as ₱1,234.56; "date" turns a YYYY-MM-DD string into a real Excel date. */
-  format?: "text" | "peso" | "date";
+  /**
+   * "peso" formats numbers as ₱1,234.56; "date" (YYYY-MM-DD) and "month" (YYYY-MM) become real Excel dates;
+   * "percent" expects a fraction such as 0.25.
+   */
+  format?: "text" | "peso" | "date" | "month" | "percent";
 };
 
-const pesoFormat = '"₱"#,##0.00';
-const dateFormat = "mmm d, yyyy";
+type XlsxFormat = NonNullable<XlsxColumn<unknown>["format"]>;
+
+const numberFormats: Partial<Record<XlsxFormat, string>> = {
+  peso: '"₱"#,##0.00',
+  date: "mmm d, yyyy",
+  month: "mmmm yyyy",
+  percent: "0.0%",
+};
+
+function cellValue(value: string | number, format?: XlsxFormat) {
+  // Date-only values become UTC midnight so Excel shows the same calendar day in any time zone.
+  if (format === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T00:00:00Z`);
+  if (format === "month" && typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) return new Date(`${value}-01T00:00:00Z`);
+  return value;
+}
 
 /** Builds a one-sheet .xlsx in the browser and downloads it. exceljs is loaded only when a report is exported. */
 export async function exportXlsx<Row>({ filename, sheetName, columns, rows }: { filename: string; sheetName: string; columns: XlsxColumn<Row>[]; rows: Row[] }) {
@@ -19,15 +35,12 @@ export async function exportXlsx<Row>({ filename, sheetName, columns, rows }: { 
   sheet.columns = columns.map((column) => ({
     header: column.header,
     width: column.width,
-    style: column.format === "peso" ? { numFmt: pesoFormat } : column.format === "date" ? { numFmt: dateFormat, alignment: { horizontal: "left" } } : {},
+    style: {
+      ...(column.format && numberFormats[column.format] ? { numFmt: numberFormats[column.format] } : {}),
+      ...(column.format === "date" || column.format === "month" ? { alignment: { horizontal: "left" as const } } : {}),
+    },
   }));
-  for (const row of rows) {
-    sheet.addRow(columns.map((column) => {
-      const value = column.value(row);
-      // Date-only values become UTC midnight so Excel shows the same calendar day in any time zone.
-      return column.format === "date" && typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00Z`) : value;
-    }));
-  }
+  for (const row of rows) sheet.addRow(columns.map((column) => cellValue(column.value(row), column.format)));
 
   const header = sheet.getRow(1);
   header.font = { bold: true, color: { argb: "FFFFFFFF" } };

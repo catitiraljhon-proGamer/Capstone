@@ -7,6 +7,7 @@ import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingEmpty, billingDate } from "@/components/billing/billing-primitives";
 import type { BillingInvoice, BillingPayment } from "@/types/billing";
 import { paymongoMethodLabels } from "@/types/paymongo";
+import { SelectAllHeader, SelectRowCell, type RowSelection } from "@/components/ui/row-selection";
 
 const head = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500";
 const cell = "px-4 py-4 align-top text-sm";
@@ -19,41 +20,6 @@ export function GatewayPills({ payment }: { payment: BillingPayment }) {
     <span className="inline-flex rounded-md bg-rose-50 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">Online · PayMongo ({paymongoMethodLabels[gateway.method] ?? gateway.method})</span>
     {!gateway.livemode && <span className="inline-flex rounded-md bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600 ring-1 ring-inset ring-stone-200">Test Mode</span>}
   </span>;
-}
-
-/** Optional row checkboxes; reports use them to choose which records to export. */
-export type RowSelection = { selected: ReadonlySet<string>; onChange: (selected: Set<string>) => void };
-
-const checkboxClass = "h-4 w-4 cursor-pointer accent-red-700";
-
-function SelectAllHeader({ ids, selection }: { ids: string[]; selection: RowSelection }) {
-  const count = ids.filter((id) => selection.selected.has(id)).length;
-  return <th scope="col" className="w-10 py-3 pl-4">
-    <input
-      type="checkbox"
-      className={checkboxClass}
-      aria-label="Select all rows"
-      checked={count > 0 && count === ids.length}
-      ref={(input) => { if (input) input.indeterminate = count > 0 && count < ids.length; }}
-      onChange={(event) => selection.onChange(new Set(event.target.checked ? ids : []))}
-    />
-  </th>;
-}
-
-function SelectRowCell({ id, label, selection }: { id: string; label: string; selection: RowSelection }) {
-  return <td className="w-10 py-4 pl-4 align-top">
-    <input
-      type="checkbox"
-      className={checkboxClass}
-      aria-label={`Select ${label}`}
-      checked={selection.selected.has(id)}
-      onChange={(event) => {
-        const next = new Set(selection.selected);
-        if (event.target.checked) next.add(id); else next.delete(id);
-        selection.onChange(next);
-      }}
-    />
-  </td>;
 }
 
 function Pager({ page, total, onPage }: { page: number; total: number; onPage: (value: number) => void }) {

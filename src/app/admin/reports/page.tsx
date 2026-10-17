@@ -1,9 +1,10 @@
+import { AdminReports } from "@/components/admin/admin-reports";
 import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Admin Reports | G4 Builders Inc",
-  description: "Admin reports.",
+  description: "Contract value, billing, and collections by project and by month.",
 };
 
 export default function AdminReportsPage() {
@@ -11,7 +12,8 @@ export default function AdminReportsPage() {
     <AdminSectionPage
       activeLabel="Reports"
       title="Reports"
-      description="Generate project, estimate, approval, and user reports."
+      description="Contract value, billing, and collections by project and by month."
+      mainContent={<AdminReports />}
     />
   );
 }
