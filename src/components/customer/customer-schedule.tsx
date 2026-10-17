@@ -323,8 +323,7 @@ export function CustomerSchedule() {
             <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-6 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
               <p className="mt-3 text-sm font-medium text-stone-700">Nothing Scheduled for This Day</p>
-              <p className="mt-1 text-xs leading-5 text-stone-500">Need to talk with the team? Request a meeting.</p>
-              <Button type="button" size="sm" className="mt-4" onClick={openForm}>Request a Meeting</Button>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Need to talk with the team? Use Request a Meeting above the calendar.</p>
             </div>
           ) : null}
         </aside>
