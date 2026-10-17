@@ -180,7 +180,7 @@ export function SignInPage({
                       id="email"
                       name="email"
                       type="email"
-                      placeholder="name@example.com"
+                      placeholder="Enter your email address"
                       autoComplete="email"
                       defaultValue={googleLinkEmail ?? ""}
                       readOnly={Boolean(googleLinkEmail)}
