@@ -1,6 +1,5 @@
 import {
   collections,
-  type NotificationDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import {
@@ -8,6 +7,7 @@ import {
   type GoogleLink,
   type GoogleProfile,
 } from "@/lib/server/google-oauth";
+import { insertNotifications } from "@/lib/server/notifications";
 import { type Db, MongoServerError, ObjectId } from "mongodb";
 
 function classifyAccount(user: UserDocument, profile: GoogleProfile) {
@@ -57,22 +57,19 @@ export async function resolveGoogleAccount(db: Db, profile: GoogleProfile) {
   const admins = await users
     .find({ role: "admin", status: "active" }, { projection: { _id: 1 } })
     .toArray();
-  if (admins.length) {
-    await db
-      .collection<NotificationDocument>(collections.notifications)
-      .insertMany(
-        admins.map((admin) => ({
-          _id: new ObjectId(),
-          userId: admin._id,
-          title: "New customer account",
-          body: `${user.name} registered a customer account with Google.`,
-          href: "/admin/users-roles",
-          kind: "account",
-          entityId: user._id,
-          createdAt: now,
-        })),
-      );
-  }
+  await insertNotifications(
+    db,
+    admins.map((admin) => ({
+      _id: new ObjectId(),
+      userId: admin._id,
+      title: "New customer account",
+      body: `${user.name} registered a customer account with Google.`,
+      href: "/admin/users-roles",
+      kind: "account",
+      entityId: user._id,
+      createdAt: now,
+    })),
+  );
   return { user, created: true, needsLink: false };
 }
 

@@ -6,7 +6,6 @@ import {
   type ApprovalDocument,
   type DesignRequestDocument,
   type HouseDesignDocument,
-  type NotificationDocument,
   type ProjectDocument,
   type UserDocument,
 } from "@/lib/database/collections";
@@ -18,6 +17,7 @@ import {
   openDesignRequestStatuses,
 } from "@/lib/design-request-limit";
 import { recordAuditLog } from "@/lib/server/audit";
+import { insertNotifications } from "@/lib/server/notifications";
 import { makePendingApproval } from "@/lib/server/approvals";
 import { BillingError } from "@/lib/server/billing";
 import { requireAccountTerms } from "@/lib/server/account-terms";
@@ -118,13 +118,11 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   const subject = document.selectedDesign
     ? `requested ${document.selectedDesign.name}`
     : `submitted a ${document.finish.toLowerCase()} design request for ${document.floorArea.toLocaleString("en-PH")} sq m`;
-  if (admins.length) {
-    await db.collection<NotificationDocument>(collections.notifications).insertMany(admins.map((admin) => ({
-      _id: new ObjectId(), userId: admin._id, title: "New design request",
-      body: `${actor.name} ${subject}: ${document.notes.length > 120 ? `${document.notes.slice(0, 117)}…` : document.notes} (Needed by ${input.neededBy})`,
-      href: "/admin/approvals", kind: "design-request", entityId: document._id, createdAt: now,
-    })));
-  }
+  await insertNotifications(db, admins.map((admin) => ({
+    _id: new ObjectId(), userId: admin._id, title: "New design request",
+    body: `${actor.name} ${subject}: ${document.notes.length > 120 ? `${document.notes.slice(0, 117)}…` : document.notes} (Needed by ${input.neededBy})`,
+    href: "/admin/approvals", kind: "design-request", entityId: document._id, createdAt: now,
+  })));
   await recordAuditLog({
     db, actor, action: "design-request.created", entityType: "design_request", entityId: document._id,
     details: {

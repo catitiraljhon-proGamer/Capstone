@@ -8,7 +8,7 @@ import type { ClientSession, Db, ObjectId } from "mongodb";
 import { after } from "next/server";
 
 /**
- * Saves in-app notifications and emails the customer recipients a copy.
+ * Saves in-app notifications and emails each recipient a copy, whatever their role.
  * Pass the transaction session when called inside one; the emails go out
  * only after the response, so a rolled-back notification is never sent.
  */
@@ -50,7 +50,7 @@ export async function deliverNotificationEmails(db: Db, ids: ObjectId[]) {
     );
     if (!notification) continue;
     const recipient = await users.findOne(
-      { _id: notification.userId, role: "customer", status: "active" },
+      { _id: notification.userId, status: "active" },
       { projection: { email: 1, name: 1 } },
     );
     if (!recipient) continue;

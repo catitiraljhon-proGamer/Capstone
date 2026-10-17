@@ -1,7 +1,6 @@
 import {
   collections,
   type AuditLogDocument,
-  type NotificationDocument,
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
@@ -15,6 +14,7 @@ import {
   EmailVerificationError,
   registrationDetailsSchema,
 } from "@/lib/server/email-verification";
+import { insertNotifications } from "@/lib/server/notifications";
 import {
   clientIp,
   formatRetryAfter,
@@ -111,22 +111,19 @@ export async function POST(request: Request) {
         { projection: { _id: 1 } },
       )
       .toArray();
-    if (admins.length > 0) {
-      await db
-        .collection<NotificationDocument>(collections.notifications)
-        .insertMany(
-          admins.map((admin) => ({
-            _id: new ObjectId(),
-            userId: admin._id,
-            title: "New customer account",
-            body: `${user.name} registered a customer account.`,
-            href: "/admin/clients",
-            kind: "account",
-            entityId: user._id,
-            createdAt: now,
-          })),
-        );
-    }
+    await insertNotifications(
+      db,
+      admins.map((admin) => ({
+        _id: new ObjectId(),
+        userId: admin._id,
+        title: "New customer account",
+        body: `${user.name} registered a customer account.`,
+        href: "/admin/clients",
+        kind: "account",
+        entityId: user._id,
+        createdAt: now,
+      })),
+    );
 
     const sessionUser = toSessionUser(user);
     const response = NextResponse.json(

@@ -438,7 +438,7 @@ export type NotificationDocument = {
   kind?: string;
   entityId?: ObjectId;
   readAt?: Date;
-  /** Set when the customer's email copy is claimed for sending, so it is sent once. */
+  /** Set when the recipient's email copy is claimed for sending, so it is sent once. */
   emailedAt?: Date;
   createdAt: Date;
 };

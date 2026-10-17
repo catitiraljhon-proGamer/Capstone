@@ -54,12 +54,13 @@ function note(userId: ObjectId, title: string): NotificationDocument {
   return { _id: new ObjectId(), userId, title, body: "INV-0001 is ready for payment.", href: "/customer/billing", createdAt: new Date() };
 }
 
-test("customer notifications are emailed exactly once; staff, disabled and rolled-back ones are not", async () => {
+test("every role's notifications are emailed exactly once; disabled and rolled-back ones are not", async () => {
   const customer = person({});
   const clerk = person({ email: "clerk@example.test", role: "billing-clerk" });
+  const admin = person({ email: "admin@example.test", role: "admin" });
   const disabled = person({ email: "disabled@example.test", status: "disabled" });
-  await db.collection<UserDocument>("users").insertMany([customer, clerk, disabled]);
-  const notes = [note(customer._id, "New invoice"), note(clerk._id, "Payment needs review"), note(disabled._id, "New invoice")];
+  await db.collection<UserDocument>("users").insertMany([customer, clerk, admin, disabled]);
+  const notes = [note(customer._id, "New invoice"), note(clerk._id, "Payment needs review"), note(admin._id, "New design request"), note(disabled._id, "New invoice")];
   await db.collection<NotificationDocument>("notifications").insertMany(notes);
   // Never saved, as when its transaction was rolled back.
   const rolledBack = note(customer._id, "Rolled back");
@@ -67,13 +68,17 @@ test("customer notifications are emailed exactly once; staff, disabled and rolle
   const ids = [...notes.map((item) => item._id), rolledBack._id];
   await Promise.all([deliverNotificationEmails(db, ids), deliverNotificationEmails(db, ids)]);
 
-  assert.equal(sent.length, 1);
-  assert.equal(sent[0].to, customer.email);
-  assert.equal(sent[0].subject, "New invoice | G4 Builders Inc");
-  assert.match(sent[0].text, /INV-0001 is ready for payment\./);
-  assert.match(sent[0].html, /\/customer\/billing/);
-  const saved = await db.collection<NotificationDocument>("notifications").findOne({ _id: notes[0]._id });
-  assert.ok(saved?.emailedAt);
+  assert.deepEqual(sent.map((message) => message.to).sort(), [admin.email, clerk.email, customer.email].sort());
+  const invoice = sent.find((message) => message.to === customer.email);
+  assert.equal(invoice?.subject, "New invoice | G4 Builders Inc");
+  assert.match(invoice?.text ?? "", /INV-0001 is ready for payment\./);
+  assert.match(invoice?.html ?? "", /\/customer\/billing/);
+  assert.equal(sent.find((message) => message.to === clerk.email)?.subject, "Payment needs review | G4 Builders Inc");
+  const emailed = await db.collection<NotificationDocument>("notifications")
+    .countDocuments({ _id: { $in: notes.slice(0, 3).map((item) => item._id) }, emailedAt: { $exists: true } });
+  assert.equal(emailed, 3);
+  const skipped = await db.collection<NotificationDocument>("notifications").findOne({ _id: notes[3]._id });
+  assert.equal(skipped?.emailedAt, undefined);
 });
 
 test("email content escapes notification text and shows the verification code", () => {
