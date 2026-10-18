@@ -222,7 +222,7 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
       </section>
 
       {view === "overview" ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <Metric label="Contract Value" value={formatPeso(totals.contract)} note={`${visibleProjects.length} projects`} icon={FileText} />
           <Metric label="Billed" value={formatPeso(totals.billed)} note="Issued invoices" icon={Banknote} />
           <Metric label="Collected" value={formatPeso(totals.collected)} note="Verified payments" icon={HandCoins} />
@@ -284,15 +284,16 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
 
 function Metric({ label, value, note, icon: Icon }: { label: string; value: string; note: string; icon: LucideIcon }) {
   return (
-    <div className={panel}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-stone-600">{label}</p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-          <p className="mt-1 text-xs text-stone-500">{note}</p>
-        </div>
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-rose-50 text-red-700"><Icon className="h-5 w-5" /></span>
+    <div className={`${panel} min-w-0`}>
+      {/* The icon shares the label row, so long amounts get the full card width below. */}
+      <div className="flex items-center justify-between gap-3">
+        <p className="min-w-0 text-sm text-stone-600">{label}</p>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-50 text-red-700">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
       </div>
+      <p className="mt-3 break-words text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-stone-500">{note}</p>
     </div>
   );
 }
