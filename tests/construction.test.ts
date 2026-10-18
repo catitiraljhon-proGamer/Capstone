@@ -40,7 +40,7 @@ async function designFixture(owner: SessionUser, paid: boolean) {
   const now = new Date();
   const id = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
-    _id: id, customerId: new ObjectId(owner.id), floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
+    _id: id, customerId: new ObjectId(owner.id), houseType: "Ranch", floorArea: 120, rooms: "3 bedrooms, 2 bathrooms",
     notes: "Courtyard home", status: "Completed", completedDesignImages: ["data:image/png;base64,AAAA"], completedAt: now, createdAt: now, updatedAt: now,
   });
   const invoiceId = new ObjectId();
@@ -588,6 +588,8 @@ test("an admin controls project status, and completion waits until every milesto
   assert.equal(designs.length, 1);
   const [design] = designs;
   assert.equal(design.status, "Draft");
+  // Filed under the house type the customer chose on the design request.
+  assert.equal(design.houseType, "Ranch");
   assert.equal(design.area, 120);
   assert.equal(design.rooms, "3 bedrooms, 2 bathrooms");
   assert.deepEqual(design.images, ["data:image/png;base64,AAAA"]);

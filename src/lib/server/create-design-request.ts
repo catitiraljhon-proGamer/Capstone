@@ -22,6 +22,7 @@ import { BillingError } from "@/lib/server/billing";
 import { requireAccountTerms } from "@/lib/server/account-terms";
 import { customerDesignDto } from "@/lib/server/design-requests";
 import { embeddedImageSchema, embeddedImagesSchema } from "@/lib/server/embedded-images";
+import { isActiveHouseType } from "@/lib/server/house-designs";
 import type { SessionUser } from "@/types/domain";
 
 const preferredDate = z.iso.date("Choose a Preferred Date after today.");
@@ -36,6 +37,7 @@ const inputSchema = z.union([
     neededBy,
   }).strict(),
   z.object({
+    houseType: z.string().trim().min(1, "Choose a house type.").max(80),
     floorArea: z.number().finite().positive().max(100_000),
     bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
     bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
@@ -65,7 +67,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   // The account-level agreement from registration (or first sign-in) covers every request.
   const termsAcceptance = await requireAccountTerms(db, actor);
   let details: Pick<DesignRequestDocument,
-    "floorArea" | "rooms" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign"
+    "floorArea" | "rooms" | "notes" | "bedrooms" | "bathrooms" | "houseDesignId" | "projectId" | "selectedDesign" | "houseType"
   >;
 
   if ("houseDesignId" in input) {
@@ -81,15 +83,20 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
         id: design._id.toHexString(), name: design.name, floorArea: design.area, rooms: design.rooms,
       },
       floorArea: design.area, rooms: design.rooms,
+      ...(design.houseType ? { houseType: design.houseType } : {}),
       notes: input.notes || "I would like to request this design as shown.",
     };
   } else {
+    if (!(await isActiveHouseType(db, input.houseType))) {
+      throw new BillingError("Choose one of the available house types.", 400);
+    }
     const project = await db.collection<ProjectDocument>(collections.projects).findOne(
       { customerId, status: { $in: ["Awaiting downpayment", "Scheduled", "Pending", "Active", "On hold"] } },
       { sort: { createdAt: -1 } },
     );
     details = {
       projectId: project?._id, houseDesignId: project?.houseDesignId,
+      houseType: input.houseType,
       floorArea: input.floorArea, bedrooms: input.bedrooms, bathrooms: input.bathrooms,
       rooms: `${input.bedrooms} bedroom${input.bedrooms === 1 ? "" : "s"}, ${input.bathrooms} bathroom${input.bathrooms === 1 ? "" : "s"}`,
       notes: input.notes,
@@ -123,6 +130,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
     db, actor, action: "design-request.created", entityType: "design_request", entityId: document._id,
     details: {
       floorArea: document.floorArea, status: document.status,
+      ...(document.houseType ? { houseType: document.houseType } : {}),
       inspirationImageCount: input.inspirationImages.length,
       preferredDate: input.preferredDate, neededBy: input.neededBy,
       ...(document.selectedDesign ? { selectedHouseDesignId: document.selectedDesign.id } : {}),

@@ -126,9 +126,12 @@ test("customers can have at most three design requests waiting for review", asyn
 
 test("custom design requests still require requirements and inspiration images", async () => {
   await agree();
-  const input = { floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
+  const input = { houseType: "Modern", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
   // Finish levels were removed; an old form that still sends one is rejected.
   await assert.rejects(createDesignRequest(db, customer, { ...input, finish: "Standard" }), ZodError);
+  // Custom requests choose one of the offered house types.
+  await assert.rejects(createDesignRequest(db, customer, { ...input, houseType: undefined }), ZodError);
+  await assert.rejects(createDesignRequest(db, customer, { ...input, houseType: "Castle" }), isError(400));
   await assert.rejects(createDesignRequest(db, customer, { ...input, inspirationImages: [] }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, notes: "" }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, bedrooms: 101 }), /Bedrooms cannot be more than 100/);
@@ -137,6 +140,7 @@ test("custom design requests still require requirements and inspiration images",
   const request = await createDesignRequest(db, customer, input);
   assert.equal(request.selectedDesign, undefined);
   assert.equal(request.rooms, "2 bedrooms, 1 bathroom");
+  assert.equal(request.houseType, "Modern");
   assert.deepEqual(request.inspirationImages, [privateImage]);
 });
 
@@ -144,7 +148,7 @@ test("design requests require a Preferred Date and Needed By in the future, in o
   const design = await publishedHouseDesign();
   await agree();
   const input = { houseDesignId: design._id.toHexString(), ...dates };
-  const custom = { floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom layout", inspirationImages: [privateImage], ...dates };
+  const custom = { houseType: "Modern", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom layout", inspirationImages: [privateImage], ...dates };
   const withoutPreferred = { ...input, preferredDate: undefined };
   const withoutNeeded = { ...custom, neededBy: undefined };
   await assert.rejects(createDesignRequest(db, customer, withoutPreferred), ZodError);

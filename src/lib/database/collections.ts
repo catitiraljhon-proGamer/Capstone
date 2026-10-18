@@ -199,6 +199,8 @@ export type DesignRequestDocument = {
   houseDesignId?: ObjectId;
   /** Snapshot of the published design explicitly chosen by the customer. */
   selectedDesign?: RequestedHouseDesign;
+  /** House type (category) the finished design is filed under; missing on older requests. */
+  houseType?: string;
   floorArea: number;
   /** Older requests only have a free-text rooms summary. */
   bedrooms?: number;

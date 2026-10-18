@@ -59,6 +59,8 @@ export type DesignRequestDto = {
   id: string;
   workflow: DesignWorkflow;
   selectedDesign?: RequestedHouseDesign;
+  /** Missing on requests made before house types were chosen. */
+  houseType?: string;
   floorArea: number;
   bedrooms?: number;
   bathrooms?: number;

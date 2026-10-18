@@ -72,7 +72,12 @@ export async function listHouseTypes(db: Db): Promise<HouseType[]> {
   return documents.map(({ heading, description, imgSrc }) => ({ heading, description, imgSrc }));
 }
 
-const globalForHouseTypes = globalThis as typeof globalThis & { houseTypesRestored?: boolean };
+/** True when the heading names a house type that is currently offered. */
+export async function isActiveHouseType(db: Db, heading: string) {
+  return (await listHouseTypes(db)).some((houseType) => houseType.heading === heading);
+}
+
+const globalForHouseTypes =globalThis as typeof globalThis & { houseTypesRestored?: boolean };
 
 /**
  * Designs saved while house types were turned off lost their type. Where the style label names a

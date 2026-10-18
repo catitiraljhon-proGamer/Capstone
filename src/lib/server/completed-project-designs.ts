@@ -76,6 +76,7 @@ async function createDesignFromProject(db: Db, actor: Pick<SessionUser, "id" | "
   const rooms = request?.rooms || sourceDesign?.rooms || "Not specified";
   const label = project.name.replace(constructionSuffix, "") || "Completed project";
   const completedAt = project.completedAt ?? project.updatedAt;
+  const houseType = request?.houseType ?? sourceDesign?.houseType;
 
   // The rate is set so the design's estimate with its default materials equals what the project cost.
   const exteriorItems = exteriorItemDocuments.map(({ item, detail, quantity, quantityByArea, options }) => ({
@@ -92,7 +93,8 @@ async function createDesignFromProject(db: Db, actor: Pick<SessionUser, "id" | "
     _id: new ObjectId(),
     name: await uniqueName(db, `${label} – ${project.reference}`),
     style: sourceDesign?.style ?? "Completed Project",
-    ...(sourceDesign?.houseType ? { houseType: sourceDesign.houseType } : {}),
+    // Filed under the house type the customer chose for the request, else the chosen design's type.
+    ...(houseType ? { houseType } : {}),
     area,
     rooms,
     rate,

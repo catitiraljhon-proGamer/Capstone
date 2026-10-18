@@ -10,6 +10,7 @@ import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
+import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
@@ -80,11 +81,12 @@ function DesignRequestForm({ houseDesignId }: {
   houseDesignId?: string;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const { designs, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
+  const { designs, catalog, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
   const hasDesignSelection = houseDesignId !== undefined;
   const selectedDesign = designs.find((design) => design.id === houseDesignId);
   const selectionUnavailable = hasDesignSelection && !isCatalogLoading && !selectedDesign;
   const [requests, setRequests] = useState<DesignRequestDto[]>([]);
+  const [houseType, setHouseType] = useState<string | null>(null);
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
@@ -194,6 +196,7 @@ function DesignRequestForm({ houseDesignId }: {
       ? `Needed By must be on or after the Preferred Date (${formatDay(preferredDate)}).`
       : null);
   const fieldErrors: Record<string, string | null> = {
+    houseType: hasDesignSelection || houseType ? null : "Choose the house type for your design.",
     floorArea: hasDesignSelection ? null : numberError(floorArea, { label: "Floor area", max: 100_000, unit: " sq m" }) ??
       (Number(floorArea) <= 0 ? "Floor area must be more than 0 sq m." : null),
     bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount }),
@@ -210,10 +213,10 @@ function DesignRequestForm({ houseDesignId }: {
       : null,
   };
   const fieldIds: Record<string, string> = {
-    floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms",
+    houseType: "dr-house-type", floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms",
     notes: "dr-notes", preferredDate: "dr-preferred-date", neededBy: "dr-needed-by", images: "dr-images",
   };
-  const fieldOrder = ["floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
+  const fieldOrder = ["houseType", "floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
   const touch = (name: string) => setTouched((current) => (current[name] ? current : { ...current, [name]: true }));
   /** The message for a field, shown after it was left or a submit was attempted. */
   const showError = (name: string) => {
@@ -258,6 +261,7 @@ function DesignRequestForm({ houseDesignId }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(selectedDesign ? { houseDesignId: selectedDesign.id } : {
+            houseType,
             floorArea: Number(floorArea),
             bedrooms: Number(bedrooms),
             bathrooms: Number(bathrooms),
@@ -282,6 +286,7 @@ function DesignRequestForm({ houseDesignId }: {
       }
 
       setRequests((current) => [payload.request as DesignRequestDto, ...current]);
+      setHouseType(null);
       setFloorArea("");
       setBedrooms("");
       setBathrooms("");
@@ -361,7 +366,7 @@ function DesignRequestForm({ houseDesignId }: {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Design</p>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
-                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.area} sqm</p>
+                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType ? `${selectedDesign.houseType} · ` : ""}{selectedDesign.area} sqm</p>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
                     <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The design review is free; only the blueprint is billed.</p>
                   </div>
@@ -369,6 +374,36 @@ function DesignRequestForm({ houseDesignId }: {
               ) : null}
             </div>
           ) : (
+          <>
+          <fieldset
+            id={fieldIds.houseType}
+            tabIndex={-1}
+            className="mt-5 outline-none"
+            aria-describedby={showError("houseType") ? `${fieldIds.houseType}-error` : undefined}
+          >
+            <legend className="text-sm font-semibold">
+              House Type <RequiredIndicator />
+            </legend>
+            <p className="mt-1 text-sm text-stone-600">
+              Choose the style for your design. When the house is built, it is filed under this category in our house designs.
+            </p>
+            <div className="mt-3">
+              {catalog.houseTypes.length ? (
+                <HouseTypeCards
+                  compact
+                  houseTypes={catalog.houseTypes}
+                  selected={houseType}
+                  onSelect={(heading) => {
+                    setHouseType(heading);
+                    touch("houseType");
+                  }}
+                />
+              ) : (
+                <p role="status" className="text-sm text-stone-500">Loading house types…</p>
+              )}
+            </div>
+            <FieldError id={`${fieldIds.houseType}-error`} message={showError("houseType")} />
+          </fieldset>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label className="block">
@@ -437,6 +472,7 @@ function DesignRequestForm({ houseDesignId }: {
               <FieldError id={`${fieldIds.bathrooms}-error`} message={showError("bathrooms")} />
             </div>
           </div>
+          </>
           )}
 
           <div className="mt-5">
@@ -632,7 +668,7 @@ function DesignRequestForm({ houseDesignId }: {
                   <div>
                     {request.selectedDesign ? <p className="mb-1 text-sm font-semibold text-red-800">{request.selectedDesign.name}</p> : null}
                     <p className="text-sm font-semibold">
-                      {request.floorArea} sqm · {request.rooms}
+                      {request.floorArea} sqm{request.houseType ? ` · ${request.houseType}` : ""} · {request.rooms}
                     </p>
                     <p className="mt-1 text-xs text-stone-500">
                       Submitted {formatDate(request.createdAt)}
