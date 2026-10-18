@@ -102,6 +102,8 @@ export type ConstructionProjectDto = {
   id: string;
   reference: string;
   name: string;
+  /** House type the client chose on the design request; null on older requests. */
+  houseType: string | null;
   status: ProjectStatus;
   customer: { id: string; name: string };
   estimateId: string | null;
@@ -133,4 +135,10 @@ export type EstimateAction =
   | { action: "request-revision"; reason: string }
   | { action: "accept"; downpaymentPercent: number };
 
-export type ProjectStatusAction = { action: "status"; status: "Active" | "On hold" | "Completed" };
+export type ProjectStatusAction = {
+  action: "status";
+  status: "Active" | "On hold" | "Completed";
+  /** Completed only: name and house type of the house design saved from the finished project. */
+  designName?: string;
+  houseType?: string;
+};

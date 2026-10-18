@@ -21,7 +21,8 @@ import {
   scheduleTemplateError,
 } from "@/lib/construction";
 import { BillingError, audit, billingTransaction, nextReference } from "@/lib/server/billing";
-import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
+import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
+import { isActiveHouseType } from "@/lib/server/house-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
 import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
@@ -102,6 +103,8 @@ const estimateActionSchema = z.discriminatedUnion("action", [
 const projectActionSchema = z.object({
   action: z.literal("status"),
   status: z.enum(["Active", "On hold", "Completed"]),
+  designName: z.string().trim().min(2, "Enter a design name of at least 2 characters.").max(120, "Keep the design name within 120 characters.").optional(),
+  houseType: z.string().trim().min(1, "Choose a house type.").max(80).optional(),
 }).strict();
 
 // ───────────────────────── Notifications ─────────────────────────
@@ -407,18 +410,22 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
   if (!projects.length) return [];
   const customerIds = [...new Set(projects.map((project) => project.customerId.toHexString()))].map((id) => new ObjectId(id));
   const estimateIds = projects.flatMap((project) => (project.estimateId ? [project.estimateId] : []));
-  const [billing, customers, estimates] = await Promise.all([
+  const requestIds = projects.flatMap((project) => (project.designRequestId ? [project.designRequestId] : []));
+  const [billing, customers, estimates, requests] = await Promise.all([
     loadProjectBilling(db, projects.map((project) => project._id), session),
     db.collection<UserDocument>(collections.users).find({ _id: { $in: customerIds } }, { session, projection: { name: 1 } }).toArray(),
     estimateIds.length ? db.collection<EstimateDocument>(collections.estimates).find({ _id: { $in: estimateIds } }, { session, projection: { reference: 1 } }).toArray() : [],
+    requestIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: requestIds } }, { session, projection: { houseType: 1 } }).toArray() : [],
   ]);
   const customerNames = new Map(customers.map((customer) => [customer._id.toHexString(), customer.name]));
   const estimateReferences = new Map(estimates.map((estimate) => [estimate._id.toHexString(), estimate.reference]));
+  const houseTypes = new Map(requests.map((request) => [request._id.toHexString(), request.houseType ?? null]));
   return projects.map((project) => {
     const milestones = milestoneDtos(project, billing, viewer === "customer");
     const paid = billing.paidByProject.get(project._id.toHexString()) ?? 0;
     return {
       id: project._id.toHexString(), reference: project.reference, name: project.name, status: project.status,
+      houseType: project.designRequestId ? houseTypes.get(project.designRequestId.toHexString()) ?? null : null,
       customer: { id: project.customerId.toHexString(), name: customerNames.get(project.customerId.toHexString()) ?? "Unknown customer" },
       estimateId: project.estimateId?.toHexString() ?? null,
       estimateReference: project.estimateId ? estimateReferences.get(project.estimateId.toHexString()) ?? null : null,
@@ -445,6 +452,14 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
   requireRole(actor, ["admin"], "Only an administrator can change a project's status.");
   const input = projectActionSchema.parse(raw);
   const projectId = objectId(id, "Project not found.");
+  const design = input.status === "Completed" ? { name: input.designName, houseType: input.houseType } : null;
+  // Checked before completing, so a rejected name or type leaves the project as it was.
+  if (design?.name && await houseDesignNameTaken(db, design.name)) {
+    throw new BillingError(`A house design named "${design.name}" already exists. Use a different name.`, 409);
+  }
+  if (design?.houseType && !(await isActiveHouseType(db, design.houseType))) {
+    throw new BillingError("Choose one of the available house types.", 400);
+  }
   await promoteScheduledProjects(db);
   const result = await billingTransaction(db, async (session) => {
     const projects = db.collection<ProjectDocument>(collections.projects);
@@ -475,9 +490,9 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
     const updated = await projects.findOne({ _id: project._id }, { session });
     return { project: (await toProjectDtos(db, [updated!], actor.role, session))[0] };
   });
-  if (input.status === "Completed") {
+  if (design) {
     // The finished project becomes a draft house design; completing the project must not fail because of it.
-    await syncCompletedProjectDesigns(db, actor).catch((error: unknown) => {
+    await saveCompletedProjectDesign(db, actor, projectId, design).catch((error: unknown) => {
       console.error("Could not create the house design for a completed project", { errorType: error instanceof Error ? error.name : "UnknownError" });
     });
   }

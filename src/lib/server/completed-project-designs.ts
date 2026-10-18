@@ -55,7 +55,25 @@ async function uniqueName(db: Db, base: string) {
   return `${trimmed} ${new ObjectId().toHexString().slice(-6)}`;
 }
 
-async function createDesignFromProject(db: Db, actor: Pick<SessionUser, "id" | "name" | "role">, project: ProjectDocument) {
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Design names are unique regardless of letter case, matching the house design form. */
+export async function houseDesignNameTaken(db: Db, name: string) {
+  return Boolean(await db.collection<HouseDesignDocument>(collections.houseDesigns).findOne(
+    { name: { $regex: `^${escapeRegex(name.trim())}$`, $options: "i" } },
+    { projection: { _id: 1 } },
+  ));
+}
+
+/** What the Admin chose when marking the project completed. */
+type DesignChoice = { name?: string; houseType?: string };
+
+async function createDesignFromProject(
+  db: Db,
+  actor: Pick<SessionUser, "id" | "name" | "role">,
+  project: ProjectDocument,
+  choice: DesignChoice = {},
+) {
   const [estimate, request, customer, exteriorItemDocuments] = await Promise.all([
     project.estimateId
       ? db.collection<EstimateDocument>(collections.estimates).findOne({ _id: project.estimateId })
@@ -76,7 +94,7 @@ async function createDesignFromProject(db: Db, actor: Pick<SessionUser, "id" | "
   const rooms = request?.rooms || sourceDesign?.rooms || "Not specified";
   const label = project.name.replace(constructionSuffix, "") || "Completed project";
   const completedAt = project.completedAt ?? project.updatedAt;
-  const houseType = request?.houseType ?? sourceDesign?.houseType;
+  const houseType = choice.houseType ?? request?.houseType ?? sourceDesign?.houseType;
 
   // The rate is set so the design's estimate with its default materials equals what the project cost.
   const exteriorItems = exteriorItemDocuments.map(({ item, detail, quantity, quantityByArea, options }) => ({
@@ -91,9 +109,9 @@ async function createDesignFromProject(db: Db, actor: Pick<SessionUser, "id" | "
   const now = new Date();
   const document: HouseDesignDocument = {
     _id: new ObjectId(),
-    name: await uniqueName(db, `${label} – ${project.reference}`),
+    name: await uniqueName(db, choice.name?.trim() || `${label} – ${project.reference}`),
     style: sourceDesign?.style ?? "Completed Project",
-    // Filed under the house type the customer chose for the request, else the chosen design's type.
+    // Filed under the Admin's choice, else the house type the customer chose, else the chosen design's type.
     ...(houseType ? { houseType } : {}),
     area,
     rooms,
@@ -160,4 +178,18 @@ export async function syncCompletedProjectDesigns(db: Db, actor: Pick<SessionUse
     if (design) created.push(design);
   }
   return created;
+}
+
+/** Saves the house design for a project the Admin just marked completed, with the name and type they chose. */
+export async function saveCompletedProjectDesign(
+  db: Db,
+  actor: Pick<SessionUser, "id" | "name" | "role">,
+  projectId: ObjectId,
+  choice: DesignChoice,
+) {
+  const project = await db.collection<ProjectDocument>(collections.projects).findOne({ _id: projectId, status: "Completed" });
+  if (!project) return null;
+  const existing = await db.collection<HouseDesignDocument>(collections.houseDesigns)
+    .findOne({ "sourceProject.projectId": projectId }, { projection: { _id: 1 } });
+  return existing ? null : createDesignFromProject(db, actor, project, choice);
 }

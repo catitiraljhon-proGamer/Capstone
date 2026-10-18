@@ -575,7 +575,19 @@ test("an admin controls project status, and completion waits until every milesto
   const remaining = await submitPayment(db, customer, payInput(invoiceId, 500_000));
   await reviewPayment(db, clerk, remaining, { action: "verify" });
 
-  const completed = (await changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed" })).project;
+  // The client chose Ranch on the design request; the Admin names the design and may file it elsewhere.
+  assert.equal((await projectDto(projectId)).houseType, "Ranch");
+  const now = new Date();
+  await db.collection<HouseDesignDocument>("house_designs").insertOne({
+    _id: new ObjectId(), name: "Taken Name", area: 90, rooms: "2 bedrooms", rate: 1, images: [], notes: "", status: "Draft",
+    defaultSelections: [], customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
+  });
+  const complete = (extra: object) => changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed", ...extra });
+  await assert.rejects(complete({ designName: "taken name", houseType: "Tudor" }), isError(409));
+  await assert.rejects(complete({ designName: "Courtyard Family Home", houseType: "Castle" }), isError(400));
+  await assert.rejects(complete({ designName: "x", houseType: "Tudor" }), ZodError);
+  assert.equal((await projectDto(projectId)).status, "Active");
+  const completed = (await complete({ designName: "  Courtyard Family Home ", houseType: "Tudor" })).project;
   assert.equal(completed.status, "Completed");
   assert.equal(completed.paid, 6_000_000);
   assert.equal(completed.balance, 0);
@@ -588,12 +600,12 @@ test("an admin controls project status, and completion waits until every milesto
   assert.equal(designs.length, 1);
   const [design] = designs;
   assert.equal(design.status, "Draft");
-  // Filed under the house type the customer chose on the design request.
-  assert.equal(design.houseType, "Ranch");
+  // Saved under the name and house type the Admin entered when completing the project.
+  assert.equal(design.name, "Courtyard Family Home");
+  assert.equal(design.houseType, "Tudor");
   assert.equal(design.area, 120);
   assert.equal(design.rooms, "3 bedrooms, 2 bathrooms");
   assert.deepEqual(design.images, ["data:image/png;base64,AAAA"]);
-  assert.ok(design.name.endsWith(completed.reference));
   assert.equal(design.sourceProject!.contractPrice, 6_000_000);
   assert.ok(design.sourceProject!.lineItems.length > 0);
   // Running the sync again (as the House Design page does) does not duplicate it.

@@ -9,8 +9,9 @@ import type {
   ProjectStatus,
   ProjectStatusAction,
 } from "@/types/construction";
-import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import type { HouseType } from "@/lib/house-design-data";
+import { Building2, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 const projectTone: Record<ProjectStatus, string> = {
   "Awaiting downpayment": "bg-rose-50 text-red-700 ring-rose-200",
@@ -34,6 +35,168 @@ const head = "px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide 
 
 type StatusChange = ProjectStatusAction["status"];
 
+const fieldClass =
+  "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600";
+
+/** A starting name such as "Munarriz Prairie Home"; the Admin can change it. */
+function suggestedDesignName(project: ConstructionProjectDto) {
+  const surname = project.customer.name.trim().split(/\s+/).pop() ?? "";
+  return [surname, project.houseType, "Home"].filter(Boolean).join(" ");
+}
+
+/** Marking a project completed also names the house design saved from it and files it under a house type. */
+function CompleteProjectDialog({
+  project,
+  onClose,
+  onCompleted,
+}: {
+  project: ConstructionProjectDto;
+  onClose: () => void;
+  onCompleted: (project: ConstructionProjectDto) => void;
+}) {
+  const [name, setName] = useState(() => suggestedDesignName(project));
+  const [houseType, setHouseType] = useState(project.houseType ?? "");
+  const [houseTypes, setHouseTypes] = useState<HouseType[]>([]);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [typeError, setTypeError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const typeRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    nameRef.current?.select();
+    let active = true;
+    fetch("/api/catalog/house-designs", { cache: "no-store" })
+      .then((response) => response.json() as Promise<{ houseTypes?: HouseType[] }>)
+      .then((catalog) => {
+        if (active) setHouseTypes(catalog.houseTypes ?? []);
+      })
+      .catch(() => {
+        if (active) setError("House types could not be loaded. Close this and try again.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isSaving) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isSaving, onClose]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    const nextNameError = trimmed.length < 2
+      ? "Enter a name for the house design."
+      : trimmed.length > 120 ? "Keep the design name within 120 characters." : null;
+    const nextTypeError = houseType ? null : "Choose the house type it is filed under.";
+    setNameError(nextNameError);
+    setTypeError(nextTypeError);
+    if (nextNameError || nextTypeError) {
+      (nextNameError ? nameRef : typeRef).current?.focus();
+      return;
+    }
+    setIsSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/construction/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "status", status: "Completed", designName: trimmed, houseType,
+        } satisfies ProjectStatusAction),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        project?: ConstructionProjectDto; error?: string; issues?: { message?: string }[];
+      };
+      if (!response.ok || !payload.project) {
+        throw new Error(payload.issues?.[0]?.message ?? payload.error ?? "Unable to complete this project.");
+      }
+      onCompleted(payload.project);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to complete this project.");
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`complete-${project.id}-title`}
+        aria-describedby={`complete-${project.id}-description`}
+        onSubmit={(event) => void submit(event)}
+        noValidate
+        className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+      >
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700">
+          <Building2 className="h-4 w-4" aria-hidden="true" />
+          Complete Project · {project.reference}
+        </p>
+        <h2 id={`complete-${project.id}-title`} className="mt-1 text-lg font-semibold tracking-tight">
+          Save It as a House Design
+        </h2>
+        <p id={`complete-${project.id}-description`} className="mt-1 text-sm leading-6 text-stone-600">
+          The finished house is saved to House Design with its cost estimate and design images.
+        </p>
+
+        <label htmlFor={`complete-${project.id}-name`} className="mt-5 block text-sm font-semibold text-stone-950">
+          Design Name <span className="text-red-700" aria-hidden="true">*</span>
+        </label>
+        <input
+          ref={nameRef}
+          id={`complete-${project.id}-name`}
+          value={name}
+          maxLength={120}
+          onChange={(event) => { setName(event.target.value); setNameError(null); setError(null); }}
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? `complete-${project.id}-name-error` : undefined}
+          className={fieldClass}
+        />
+        {nameError ? <p id={`complete-${project.id}-name-error`} className="mt-1.5 text-sm text-red-700">{nameError}</p> : null}
+
+        <label htmlFor={`complete-${project.id}-type`} className="mt-4 block text-sm font-semibold text-stone-950">
+          House Type <span className="text-red-700" aria-hidden="true">*</span>
+        </label>
+        <select
+          ref={typeRef}
+          id={`complete-${project.id}-type`}
+          value={houseType}
+          onChange={(event) => { setHouseType(event.target.value); setTypeError(null); }}
+          aria-invalid={typeError ? true : undefined}
+          aria-describedby={`complete-${project.id}-type-hint${typeError ? ` complete-${project.id}-type-error` : ""}`}
+          className={fieldClass}
+        >
+          <option value="">Select a house type</option>
+          {houseType && !houseTypes.some((type) => type.heading === houseType) ? <option value={houseType}>{houseType}</option> : null}
+          {houseTypes.map((type) => <option key={type.heading} value={type.heading}>{type.heading}</option>)}
+        </select>
+        <p id={`complete-${project.id}-type-hint`} className="mt-1.5 text-xs text-stone-500">
+          {project.houseType ? "Chosen by the client on the design request." : "The client did not choose one on the design request."}
+        </p>
+        {typeError ? <p id={`complete-${project.id}-type-error`} className="mt-1 text-sm text-red-700">{typeError}</p> : null}
+
+        <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+          Saved as a draft. Customers see it only after you publish it in House Design.
+        </p>
+
+        {error ? <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : "Complete and Save"}</Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ProjectCard({
   project,
   onUpdated,
@@ -44,6 +207,7 @@ function ProjectCard({
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState<StatusChange | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const progress = project.contractPrice > 0 ? Math.min(100, Math.max(0, (project.paid / project.contractPrice) * 100)) : 0;
   const allPaid =
@@ -153,9 +317,9 @@ function ProjectCard({
               size="sm"
               variant="outline"
               disabled={Boolean(busy) || !allPaid}
-              onClick={() => void changeStatus("Completed")}
+              onClick={() => setIsCompleting(true)}
             >
-              {busy === "Completed" ? "Saving…" : "Mark Completed"}
+              Mark Completed
             </Button>
           ) : null}
           {isActive && !allPaid ? (
@@ -216,6 +380,16 @@ function ProjectCard({
             </tbody>
           </table>
         </div>
+      ) : null}
+      {isCompleting ? (
+        <CompleteProjectDialog
+          project={project}
+          onClose={() => setIsCompleting(false)}
+          onCompleted={(updated) => {
+            setIsCompleting(false);
+            onUpdated(updated);
+          }}
+        />
       ) : null}
     </article>
   );
