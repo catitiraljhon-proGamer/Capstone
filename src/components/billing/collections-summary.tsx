@@ -58,8 +58,10 @@ const paymentColumns: XlsxColumn<CollectedEntry>[] = [
 const generatedAt = () =>
   new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" });
 
-/** Contract value, billed, collected, and outstanding totals with a month-by-month summary. */
-export function CollectionsSummary() {
+export type CollectionsView = "overview" | "monthly";
+
+/** Overview: contract value, billed, collected, and outstanding totals. Monthly: the month-by-month summary and its export. */
+export function CollectionsSummary({ view }: { view: CollectionsView }) {
   const [report, setReport] = useState<CollectionsReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState("");
@@ -183,11 +185,13 @@ export function CollectionsSummary() {
       {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
 
       <section className={panel}>
-        <h2 className="text-lg font-semibold tracking-tight">Collections Summary</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{view === "overview" ? "Overview" : "By Month"}</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Contract value, billing, and collections across projects.
+          {view === "overview"
+            ? "The current contract value, billing, and collections of the selected projects."
+            : "Invoiced and collected amounts per month. Narrow it down by project, status, or dates."}
         </p>
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className={`mt-5 grid gap-4 md:grid-cols-2 ${view === "monthly" ? "xl:grid-cols-4" : ""}`}>
           <label className="text-sm font-medium text-stone-700">
             Project
             <select className={field} value={projectId} onChange={(event) => setProjectId(event.target.value)}>
@@ -202,73 +206,78 @@ export function CollectionsSummary() {
               {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-stone-700">
-            From
-            <input type="date" className={field} max={to || undefined} value={from} onChange={(event) => setFrom(event.target.value)} />
-          </label>
-          <label className="text-sm font-medium text-stone-700">
-            To
-            <input type="date" className={field} min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} />
-          </label>
+          {view === "monthly" ? (
+            <>
+              <label className="text-sm font-medium text-stone-700">
+                From
+                <input type="date" className={field} max={to || undefined} value={from} onChange={(event) => setFrom(event.target.value)} />
+              </label>
+              <label className="text-sm font-medium text-stone-700">
+                To
+                <input type="date" className={field} min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} />
+              </label>
+            </>
+          ) : null}
         </div>
-        <p className="mt-3 text-xs leading-5 text-stone-500">
-          The totals show the current position of the selected projects. The date range applies to the monthly summary.
-        </p>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Contract Value" value={formatPeso(totals.contract)} note={`${visibleProjects.length} projects`} icon={FileText} />
-        <Metric label="Billed" value={formatPeso(totals.billed)} note="Issued invoices" icon={Banknote} />
-        <Metric label="Collected" value={formatPeso(totals.collected)} note="Verified payments" icon={HandCoins} />
-        <Metric
-          label="Outstanding"
-          value={formatPeso(totals.outstanding)}
-          note={totals.overdue > 0 ? `${formatPeso(totals.overdue)} overdue` : "None overdue"}
-          icon={totals.overdue > 0 ? AlertTriangle : Wallet}
-        />
-      </div>
+      {view === "overview" ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric label="Contract Value" value={formatPeso(totals.contract)} note={`${visibleProjects.length} projects`} icon={FileText} />
+          <Metric label="Billed" value={formatPeso(totals.billed)} note="Issued invoices" icon={Banknote} />
+          <Metric label="Collected" value={formatPeso(totals.collected)} note="Verified payments" icon={HandCoins} />
+          <Metric
+            label="Outstanding"
+            value={formatPeso(totals.outstanding)}
+            note={totals.overdue > 0 ? `${formatPeso(totals.overdue)} overdue` : "None overdue"}
+            icon={totals.overdue > 0 ? AlertTriangle : Wallet}
+          />
+        </div>
+      ) : null}
 
-      <section className={panel}>
-        <ReportHeader
-          title="By Month"
-          summary={`${isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}. The export adds a summary and every invoice and payment in the checked months.`}
-          exportCount={invalidRange ? 0 : exportMonths.length}
-          onExport={exportReport}
-        />
-        {invalidRange ? (
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">The From date must be on or before the To date.</p>
-        ) : months.length === 0 ? <EmptyRow /> : (
-          <div className="-mx-5 overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse">
-              <caption className="sr-only">Collections by month</caption>
-              <thead className="border-y border-stone-200 bg-stone-50">
-                <tr>
-                  <SelectAllHeader ids={months.map((row) => row.id)} selection={{ selected: selectedMonths, onChange: setSelectedMonths }} />
-                  <th scope="col" className={head}>Month</th>
-                  <th scope="col" className={headRight}>Invoiced</th>
-                  <th scope="col" className={headRight}>Collected</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {months.map((row) => (
-                  <tr key={row.id} className="hover:bg-rose-50/30">
-                    <SelectRowCell id={row.id} label={monthLabel(row.month)} selection={{ selected: selectedMonths, onChange: setSelectedMonths }} />
-                    <td className={`${cell} font-semibold`}>{monthLabel(row.month)}</td>
-                    <td className={money}>
-                      <p>{formatPeso(row.invoiced)}</p>
-                      <p className="mt-1 text-xs text-stone-500">{row.invoiceCount} {row.invoiceCount === 1 ? "invoice" : "invoices"}</p>
-                    </td>
-                    <td className={money}>
-                      <p className="font-semibold">{formatPeso(row.collected)}</p>
-                      <p className="mt-1 text-xs text-stone-500">{row.paymentCount} {row.paymentCount === 1 ? "payment" : "payments"}</p>
-                    </td>
+      {view === "monthly" ? (
+        <section className={panel}>
+          <ReportHeader
+            title="Months"
+            summary={`${isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}. The export adds a summary and every invoice and payment in the checked months.`}
+            exportCount={invalidRange ? 0 : exportMonths.length}
+            onExport={exportReport}
+          />
+          {invalidRange ? (
+            <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">The From date must be on or before the To date.</p>
+          ) : months.length === 0 ? <EmptyRow /> : (
+            <div className="-mx-5 overflow-x-auto">
+              <table className="w-full min-w-[640px] border-collapse">
+                <caption className="sr-only">Collections by month</caption>
+                <thead className="border-y border-stone-200 bg-stone-50">
+                  <tr>
+                    <SelectAllHeader ids={months.map((row) => row.id)} selection={{ selected: selectedMonths, onChange: setSelectedMonths }} />
+                    <th scope="col" className={head}>Month</th>
+                    <th scope="col" className={headRight}>Invoiced</th>
+                    <th scope="col" className={headRight}>Collected</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {months.map((row) => (
+                    <tr key={row.id} className="hover:bg-rose-50/30">
+                      <SelectRowCell id={row.id} label={monthLabel(row.month)} selection={{ selected: selectedMonths, onChange: setSelectedMonths }} />
+                      <td className={`${cell} font-semibold`}>{monthLabel(row.month)}</td>
+                      <td className={money}>
+                        <p>{formatPeso(row.invoiced)}</p>
+                        <p className="mt-1 text-xs text-stone-500">{row.invoiceCount} {row.invoiceCount === 1 ? "invoice" : "invoices"}</p>
+                      </td>
+                      <td className={money}>
+                        <p className="font-semibold">{formatPeso(row.collected)}</p>
+                        <p className="mt-1 text-xs text-stone-500">{row.paymentCount} {row.paymentCount === 1 ? "payment" : "payments"}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

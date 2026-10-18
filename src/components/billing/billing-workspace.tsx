@@ -102,7 +102,8 @@ function clearCheckoutParam() {
   window.history.replaceState(null, "", url.pathname + url.search + url.hash);
 }
 
-export function BillingWorkspace({ section = "Dashboard", customer = false }: { section?: BillingSection; customer?: boolean }) {
+/** `reportView` picks the Reports tab: verified collections or outstanding invoices. */
+export function BillingWorkspace({ section = "Dashboard", customer = false, reportView = "collections" }: { section?: BillingSection; customer?: boolean; reportView?: "collections" | "outstanding" }) {
   const [data, setData] = useState<BillingData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -195,15 +196,17 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
   const invoiceStatuses = ["Draft", "Ready", "Sent", "Partially Paid", "Paid", "Overdue", "Void"];
   const paymentStatuses = ["Pending", "Verified", "Rejected", "Reversed"];
 
+  // Reports sits inside the Reports tabs, which have their own heading and totals.
+  const inReportTab = section === "Reports";
   return <div className="space-y-6">
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    {!inReportTab && <div className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">{customer ? "Customer Billing" : "Billing Clerk"}</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">{description}</p></div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={loading} onClick={() => { setSuccess(null); setLoading(true); void load(); }}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
         {!customer && ["Dashboard", "Progress Billings", "Invoices"].includes(section) && <Button disabled={loading || Boolean(error)} onClick={() => setDialog({ type: "invoice-form" })}><Plus className="mr-2 h-4 w-4" />Prepare billing</Button>}
         {(customer || section === "Payments") && <Button disabled={loading || Boolean(error) || !unpaid.length} onClick={() => setDialog({ type: "payment-form" })}><Plus className="mr-2 h-4 w-4" />{customer ? "Submit Payment" : "Record Payment"}</Button>}
       </div>
-    </div>
+    </div>}
     {customer && checkoutId && <CheckoutReturnBanner key={checkoutId} sessionId={checkoutId} onResolved={checkoutResolved} onDismiss={dismissCheckout} />}
     <BillingErrorMessage message={error} />
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">{success}</p>}
@@ -213,7 +216,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
         <h2 className="text-lg font-semibold tracking-tight">Blueprints and Designs Awaiting Fee Invoice</h2><p className="mt-1 text-sm text-stone-600">These customers accepted their cost estimate and the admin uploaded the blueprint (or, for older requests, delivered the design). Prepare the agreed fee so the customer can pay and unlock their files.</p>
         <div className="mt-4 divide-y divide-stone-200">{data.designRequests.filter((design) => !design.invoiceId).map((design) => <div key={design.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">{design.customerName}</p><p className="mt-1 text-xs text-stone-500">{designFeeLabels[design.feeType]} · {design.label}</p></div><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", designRequestId: design.id })}>Prepare {designFeeLabels[design.feeType]}</Button></div>)}</div>
       </BillingPanel>}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {!inReportTab && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(customer ? [
           { label: "Total Invoiced", value: formatPeso(sumMoney(issued.map((invoice) => invoice.amount))), note: "Construction, blueprint, and design fee invoices", icon: FileText },
           { label: "Verified Payments", value: formatPeso(sumMoney(verified.map((payment) => payment.amount))), note: "Confirmed payments only", icon: WalletCards },
@@ -225,7 +228,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
           { label: "Payments to Review", value: String(pending.length), note: "Awaiting transaction confirmation", icon: ReceiptText },
           { label: "Overdue Invoices", value: String(overdue.length), note: `${formatPeso(sumMoney(overdue.map((invoice) => invoice.balance)))} outstanding`, icon: Clock3 },
         ]).map((metric) => <BillingPanel key={metric.label}><div className="flex items-start justify-between gap-2"><p className="text-sm text-stone-600">{metric.label}</p><metric.icon className="h-5 w-5 shrink-0 text-red-700" /></div><p className="mt-3 break-words text-2xl font-semibold tracking-tight">{metric.value}</p><p className="mt-2 text-xs text-stone-500">{metric.note}</p></BillingPanel>)}
-      </div>
+      </div>}
       {!customer && section === "Dashboard" ? <>
         <section className="rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-6 text-white">
           <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your Billing Workflow</p>
@@ -248,12 +251,12 @@ export function BillingWorkspace({ section = "Dashboard", customer = false }: { 
         {(customer || section === "Payments") && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Payment History & Receipts</h2><PaymentTable key={search + projectId + status} payments={filteredPayments} customer={customer} onView={viewPayment} /></BillingPanel>}
         {section === "Customer Accounts" && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Customer Balances</h2>{!accounts.length ? <BillingEmpty /> : <div className="divide-y divide-stone-200">{accounts.map((account) => <div key={account.id} className="flex flex-wrap items-center justify-between gap-4 py-5"><div><p className="font-semibold">{account.name}</p><p className="mt-1 text-xs text-stone-500">{account.projects.length} projects · {formatPeso(account.billed)} invoiced · {formatPeso(account.paid)} paid</p></div><div className="flex items-center gap-4"><div className="text-right"><p className="font-semibold text-red-700">{formatPeso(account.outstanding)}</p><p className="text-xs text-stone-500">Outstanding</p></div><Button variant="outline" onClick={() => setDialog({ type: "account", customerId: account.id, customerName: account.name })}>View Account</Button></div></div>)}</div>}</BillingPanel>}
         {section === "Reports" && <>
-          <p className="text-sm text-stone-600">Collections use the payment date and currently verified payments. Outstanding invoices use their due date and current balance. Pending, rejected, and reversed payments are excluded from collections. Check the rows you want, then use Export Selected.</p>
-          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><Button variant="outline" disabled={!exportPayments.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-collections.xlsx", "Verified Collections", collectionColumns, exportPayments)}><Download className="mr-2 h-4 w-4" />{exportPayments.length ? `Export Selected (${exportPayments.length})` : "Select Rows to Export"}</Button></div>
+          <p className="text-sm text-stone-600">{reportView === "collections" ? "Collections use the payment date and currently verified payments. Pending, rejected, and reversed payments are excluded." : "Outstanding invoices use their due date and current balance."} Check the rows you want, then use Export Selected.</p>
+          {reportView === "collections" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><Button variant="outline" disabled={!exportPayments.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-collections.xlsx", "Verified Collections", collectionColumns, exportPayments)}><Download className="mr-2 h-4 w-4" />{exportPayments.length ? `Export Selected (${exportPayments.length})` : "Select Rows to Export"}</Button></div>
             <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{paymentMethods.map((method) => <div className="rounded-lg bg-stone-50 p-3" key={method}><p className="text-xs text-stone-500">{method}</p><p className="mt-2 font-semibold">{formatPeso(sumMoney(reportPayments.filter((payment) => payment.method === method).map((payment) => payment.amount)))}</p></div>)}</div>
             <PaymentTable key={from + to + projectId} payments={reportPayments} customer={false} onView={viewPayment} selection={{ selected: selectedPaymentIds, onChange: setSelectedPaymentIds }} />
-          </BillingPanel>
-          <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><Button variant="outline" disabled={!exportInvoices.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-outstanding-invoices.xlsx", "Outstanding Invoices", outstandingColumns, exportInvoices)}><Download className="mr-2 h-4 w-4" />{exportInvoices.length ? `Export Selected (${exportInvoices.length})` : "Select Rows to Export"}</Button></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>
+          </BillingPanel>}
+          {reportView === "outstanding" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><Button variant="outline" disabled={!exportInvoices.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-outstanding-invoices.xlsx", "Outstanding Invoices", outstandingColumns, exportInvoices)}><Download className="mr-2 h-4 w-4" />{exportInvoices.length ? `Export Selected (${exportInvoices.length})` : "Select Rows to Export"}</Button></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>}
         </>}
       </>}
     </>}
