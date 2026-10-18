@@ -22,6 +22,7 @@ import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/c
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 import type { SettingKey, SystemSettings } from "@/lib/system-settings";
+import type { ContactDetails, ContactField } from "@/lib/contact-details";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -514,6 +515,14 @@ export type SystemSettingsDocument = {
   _id: "system";
   values: Partial<SystemSettings>;
   changes: Partial<Record<SettingKey, { by: string; at: Date }>>;
+  updatedAt: Date;
+};
+
+/** The Contact Us details (Maintenance > Contact Us); missing values use lib/contact-details defaults. */
+export type ContactDetailsDocument = {
+  _id: "contact";
+  values: Partial<ContactDetails>;
+  changes: Partial<Record<ContactField, { by: string; at: Date }>>;
   updatedAt: Date;
 };
 

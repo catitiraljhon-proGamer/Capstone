@@ -27,6 +27,8 @@ import {
   runDailyBackup,
 } from "@/lib/server/backup";
 import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
+import { getContactDetails, updateContactDetails } from "@/lib/server/contact-details";
+import { defaultContactDetails, phoneHref } from "@/lib/contact-details";
 import { defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
 import type { SessionUser } from "@/types/domain";
 
@@ -88,6 +90,30 @@ test("saving records who changed each setting and audits old and new values", as
   const log = await db.collection("audit_logs").findOne({ action: "Updated settings" });
   assert.deepEqual(log?.details, { "Minimum length": "8 characters → 12 characters", Customer: "On → Off" });
   assert.equal((await getSystemSettingsView(db)).settings.passwordMinLength, 12);
+});
+
+test("the Admin edits the Contact Us details, which are checked, stamped, and audited", async () => {
+  assert.deepEqual(await getContactDetails(db), defaultContactDetails);
+  const next = { phone: "+63 917 555 0142", email: "projects@g4builders.test", address: "123 Rizal Avenue, Balayan, Batangas, 4213" };
+  await assert.rejects(updateContactDetails(db, clerk, next), isStatus(403));
+  for (const bad of [{ phone: "call us" }, { phone: "12-34" }, { email: "not-an-email" }, { address: "Balayan" }, { website: "https://example.test" }]) {
+    await assert.rejects(updateContactDetails(db, admin, { ...next, ...bad }), ZodError);
+  }
+  const view = await updateContactDetails(db, admin, { ...next, address: defaultContactDetails.address });
+  assert.deepEqual(view.contact, { ...next, address: defaultContactDetails.address });
+  assert.equal(view.changes.phone?.by, "Admin");
+  // The unchanged address is not stamped or audited.
+  assert.equal(view.changes.address, undefined);
+  const log = await db.collection("audit_logs").findOne({ action: "Updated contact details" });
+  assert.deepEqual(log?.details, {
+    "Phone number": `${defaultContactDetails.phone} → +63 917 555 0142`,
+    "Email address": `${defaultContactDetails.email} → projects@g4builders.test`,
+  });
+  assert.equal((await getContactDetails(db)).phone, "+63 917 555 0142");
+  // The system settings stored beside them are untouched.
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+  assert.equal(phoneHref("(043) 407 3561"), "tel:+63434073561");
+  assert.equal(phoneHref("+63 917 555 0142"), "tel:+639175550142");
 });
 
 test("new passwords follow the Admin's password rules", async () => {

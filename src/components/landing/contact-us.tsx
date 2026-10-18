@@ -1,31 +1,34 @@
 "use client";
 
+import { mapsHref, phoneHref, type ContactDetails as ContactInfo } from "@/lib/contact-details";
+import { useContactDetails } from "@/lib/use-contact-details";
 import { ExternalLink, Mail, MapPin, Phone, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-const address = "Dr. Bahia St. ICV Poblacion 3, Balayan, Philippines, 4213";
-const mapsUrl = `https://www.bing.com/maps/default.aspx?where1=${encodeURIComponent(address)}`;
-
-export function ContactDetails() {
+/** The office details the Admin keeps in Maintenance > Contact Us. */
+export function ContactDetails({ contact }: { contact: ContactInfo | null }) {
+  if (!contact) {
+    return <p role="status" className="py-6 text-center text-sm text-stone-500">Loading contact details…</p>;
+  }
   return (
     <div className="space-y-3 text-sm">
       <p className="text-base font-semibold text-stone-950">G4 Builders Incorporated</p>
       <a
-        href="tel:+63434073561"
+        href={phoneHref(contact.phone)}
         className="flex min-h-14 items-center gap-3 rounded-lg border border-stone-200 p-3 text-stone-950 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700"
       >
         <Phone aria-hidden="true" className="h-5 w-5 shrink-0 text-red-700" />
-        <span><span className="block text-xs text-stone-500">Call Us</span><span className="mt-1 block font-semibold">(043) 407 3561</span></span>
+        <span><span className="block text-xs text-stone-500">Call Us</span><span className="mt-1 block font-semibold">{contact.phone}</span></span>
       </a>
       <a
-        href="mailto:g4builders2014@gmail.com"
+        href={`mailto:${contact.email}`}
         className="flex min-h-14 items-center gap-3 rounded-lg border border-stone-200 p-3 text-stone-950 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700"
       >
         <Mail aria-hidden="true" className="h-5 w-5 shrink-0 text-red-700" />
-        <span className="min-w-0"><span className="block text-xs text-stone-500">Email Us</span><span className="mt-1 block break-all font-semibold">g4builders2014@gmail.com</span></span>
+        <span className="min-w-0"><span className="block text-xs text-stone-500">Email Us</span><span className="mt-1 block break-all font-semibold">{contact.email}</span></span>
       </a>
       <a
-        href={mapsUrl}
+        href={mapsHref(contact.address)}
         target="_blank"
         rel="noopener noreferrer"
         className="flex min-h-14 items-start gap-3 rounded-lg border border-stone-200 p-3 text-stone-950 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700"
@@ -33,7 +36,7 @@ export function ContactDetails() {
         <MapPin aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-red-700" />
         <span className="min-w-0">
           <span className="block text-xs text-stone-500">Visit us for walk-in inquiries</span>
-          <span className="mt-1 block leading-6">{address}</span>
+          <span className="mt-1 block leading-6">{contact.address}</span>
           <span className="mt-2 inline-flex items-center gap-1.5 font-semibold text-red-700">Open in Maps<ExternalLink aria-hidden="true" className="h-3.5 w-3.5" /><span className="sr-only"> (opens in a new tab)</span></span>
         </span>
       </a>
@@ -46,6 +49,7 @@ export function ContactUs() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const contact = useContactDetails(open);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -109,7 +113,7 @@ export function ContactUs() {
               <X aria-hidden="true" className="h-5 w-5" />
             </button>
           </div>
-          <ContactDetails />
+          <ContactDetails contact={contact} />
         </section>
       </dialog>
     </div>
