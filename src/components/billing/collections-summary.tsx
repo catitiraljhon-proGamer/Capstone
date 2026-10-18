@@ -5,7 +5,7 @@ import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
-import type { AdminCollectionsReport, CollectedEntry, InvoicedEntry } from "@/types/admin-reports";
+import type { CollectionsReport, CollectedEntry, InvoicedEntry } from "@/types/collections-report";
 import { AlertTriangle, Banknote, Download, FileText, HandCoins, Wallet, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -58,8 +58,9 @@ const paymentColumns: XlsxColumn<CollectedEntry>[] = [
 const generatedAt = () =>
   new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" });
 
-export function AdminReports() {
-  const [report, setReport] = useState<AdminCollectionsReport | null>(null);
+/** Contract value, billed, collected, and outstanding totals with a month-by-month summary. */
+export function CollectionsSummary() {
+  const [report, setReport] = useState<CollectionsReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [projectId, setProjectId] = useState("");
   const [status, setStatus] = useState("");
@@ -71,7 +72,7 @@ export function AdminReports() {
     let active = true;
     fetch("/api/reports/collections", { cache: "no-store" })
       .then(async (response) => {
-        const payload = (await response.json().catch(() => ({}))) as AdminCollectionsReport & { error?: string };
+        const payload = (await response.json().catch(() => ({}))) as CollectionsReport & { error?: string };
         if (!response.ok || !payload.projects) throw new Error(payload.error ?? "Unable to load the collections report.");
         if (active) setReport(payload);
       })
@@ -184,7 +185,7 @@ export function AdminReports() {
       <section className={panel}>
         <h2 className="text-lg font-semibold tracking-tight">Collections Summary</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Contract value, billing, and collections across projects. Billing records are managed by the Billing Clerk; this report is view-only.
+          Contract value, billing, and collections across projects.
         </p>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="text-sm font-medium text-stone-700">

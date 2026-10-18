@@ -68,7 +68,6 @@ const adminNav = [
   { label: "Projects", icon: FolderKanban, href: "/admin/projects" },
   { label: "Approvals", icon: ShieldCheck, href: "/admin/approvals" },
   { label: "Scheduling", icon: CalendarDays, href: "/admin/scheduling" },
-  { label: "Reports", icon: ClipboardCheck, href: "/admin/reports" },
   { label: "Users & Roles", icon: Users, href: "/admin/users-roles" },
   { label: "Maintenance", icon: Wrench, href: "/admin/maintenance" },
   { label: "Audit Logs", icon: FileText, href: "/admin/audit-logs" },

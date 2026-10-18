@@ -45,7 +45,7 @@ export type CollectedEntry = {
   receiptNumber: string;
 };
 
-export type AdminCollectionsReport = {
+export type CollectionsReport = {
   projects: ProjectCollectionRow[];
   invoiced: InvoicedEntry[];
   collected: CollectedEntry[];

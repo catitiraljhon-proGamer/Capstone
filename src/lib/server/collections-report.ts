@@ -4,12 +4,12 @@ import { invoiceState, manilaDate, sumMoney } from "@/lib/billing";
 import { designInvoiceName } from "@/lib/server/billing";
 import { promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { normalizePaymentMethod } from "@/types/billing";
-import type { AdminCollectionsReport } from "@/types/admin-reports";
+import type { CollectionsReport } from "@/types/collections-report";
 
 const unissued = ["Draft", "Ready", "Void"];
 
-/** Read-only billing totals for the Admin: per-project positions plus dated invoice and payment entries. */
-export async function getAdminCollectionsReport(db: Db): Promise<AdminCollectionsReport> {
+/** Billing totals for the Billing Clerk's Reports: per-project positions plus dated invoice and payment entries. */
+export async function getCollectionsReport(db: Db): Promise<CollectionsReport> {
   await promoteScheduledProjects(db);
   const [projects, invoices, payments] = await Promise.all([
     db.collection<ProjectDocument>(collections.projects).find({}).sort({ createdAt: -1 }).toArray(),

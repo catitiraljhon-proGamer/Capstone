@@ -1,3 +1,5 @@
+import { BillingWorkspace } from "@/components/billing/billing-workspace";
+import { CollectionsSummary } from "@/components/billing/collections-summary";
 import { BillingClerkSectionPage } from "@/components/staff/staff-dashboard";
 import type { Metadata } from "next";
 
@@ -11,7 +13,13 @@ export default function BillingReportsPage() {
     <BillingClerkSectionPage
       activeLabel="Reports"
       title="Reports"
-      description="Generate billing, payment, invoice, and collection reports."
+      description="Contract value, monthly billing and collections, verified payments, and outstanding invoices."
+      mainContent={
+        <div className="space-y-6">
+          <CollectionsSummary />
+          <BillingWorkspace section="Reports" />
+        </div>
+      }
     />
   );
 }

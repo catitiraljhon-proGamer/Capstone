@@ -4,7 +4,7 @@ import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
 import { getDatabase } from "@/lib/database/mongodb";
 import type { InvoiceDocument, PaymentDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
-import { getAdminCollectionsReport } from "@/lib/server/admin-reports";
+import { getCollectionsReport } from "@/lib/server/collections-report";
 
 let mongo: MongoMemoryReplSet;
 let db: Db;
@@ -56,7 +56,7 @@ test("project totals count issued invoices and verified payments only", async ()
     payment({ reference: "PAY-FEE", amount: 15000, status: "Verified", projectId: undefined, paidAt: new Date("2026-08-06T03:00:00Z") }),
   ]);
 
-  const report = await getAdminCollectionsReport(db);
+  const report = await getCollectionsReport(db);
   assert.deepEqual(report.projects, [{
     id: projectId.toHexString(), reference: "PRJ-001", name: "Test residence", customerName: "Test Customer", status: "Active",
     contractPrice: 500000, billed: 180000, collected: 110000, outstanding: 70000, overdue: 50000,
