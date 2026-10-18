@@ -1,5 +1,11 @@
 export type HouseDesignStatus = "Draft" | "Published" | "Archived";
 
+export type HouseType = {
+  heading: string;
+  description: string;
+  imgSrc: string;
+};
+
 export type ExteriorMaterialOption = {
   name: string;
   unit: string;
@@ -24,6 +30,7 @@ export type MaterialPriceOverride = {
 };
 
 export type HouseDesignCatalog = {
+  houseTypes: HouseType[];
   exteriorItems: ExteriorItemChoice[];
 };
 
@@ -37,11 +44,32 @@ export type CustomExteriorItem = {
   unitPrice: number;
 };
 
+/** The completed construction project a design was created from, with its accepted cost estimate. Admin only. */
+export type CompletedProjectSource = {
+  projectId: string;
+  projectReference: string;
+  estimateReference: string | null;
+  customerName: string;
+  contractPrice: number;
+  subtotal: number;
+  completedAt: string;
+  lineItems: {
+    item: string;
+    description: string;
+    unit: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+  }[];
+};
+
 export type HouseDesign = {
   id: string;
   name: string;
-  /** Optional sub-label shown under the card title. */
+  /** Optional sub-label shown under the card title. Falls back to houseType. */
   style?: string;
+  /** Missing on designs saved while house types were turned off; the Admin assigns one when editing. */
+  houseType?: string;
   area: number;
   rooms: string;
   rate: number;
@@ -53,6 +81,8 @@ export type HouseDesign = {
   defaultSelections: number[];
   materialPrices?: MaterialPriceOverride[];
   customItems: CustomExteriorItem[];
+  /** Set on designs created automatically when a construction project is completed. */
+  sourceProject?: CompletedProjectSource;
   createdAt: string;
   createdBy: string;
 };

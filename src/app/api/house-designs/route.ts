@@ -6,6 +6,7 @@ import {
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { canViewFullDesignImages } from "@/lib/server/account-terms";
+import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
 import { houseDesignInputSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     }
 
     const db = await getDatabase();
+    if (scope === "all" && session) await syncCompletedProjectDesigns(db, session);
     const documents = await db
       .collection<HouseDesignDocument>(collections.houseDesigns)
       .find(scope === "all" ? {} : { status: "Published" })
@@ -34,7 +36,7 @@ export async function GET(request: Request) {
     // Without staff access or accepted Terms and Conditions, only each
     // design's cover image is sent, so the full gallery cannot be scraped.
     const fullImages = await canViewFullDesignImages(db, session);
-    const designs = documents.map(toHouseDesignDto).map((design) =>
+    const designs = documents.map((document) => toHouseDesignDto(document, { includeSource: scope === "all" })).map((design) =>
       fullImages ? design : { ...design, images: design.images.slice(0, 1) },
     );
     return NextResponse.json(
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
       createdAt: now,
     });
 
-    return NextResponse.json({ design: toHouseDesignDto(document) }, { status: 201 });
+    return NextResponse.json({ design: toHouseDesignDto(document, { includeSource: true }) }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

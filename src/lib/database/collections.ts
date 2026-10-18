@@ -2,6 +2,7 @@ import type {
   CustomExteriorItem,
   ExteriorItemChoice,
   HouseDesignStatus,
+  HouseType,
   MaterialPriceOverride,
 } from "@/lib/house-design-data";
 import type {
@@ -27,6 +28,7 @@ export type { ProjectStatus } from "@/types/construction";
 export const collections = {
   users: "users",
   houseDesigns: "house_designs",
+  houseTypes: "house_types",
   exteriorItems: "exterior_items",
   messages: "messages",
   projects: "projects",
@@ -97,6 +99,8 @@ export type HouseDesignDocument = {
   _id: ObjectId;
   name: string;
   style?: string;
+  /** Missing on designs saved while house types were turned off. */
+  houseType?: string;
   area: number;
   rooms: string;
   rate: number;
@@ -106,10 +110,27 @@ export type HouseDesignDocument = {
   defaultSelections: number[];
   materialPrices?: MaterialPriceOverride[];
   customItems: CustomExteriorItem[];
+  /** The completed project this design was created from, with a snapshot of its accepted estimate. */
+  sourceProject?: {
+    projectId: ObjectId;
+    projectReference: string;
+    estimateReference?: string;
+    customerName: string;
+    contractPrice: number;
+    subtotal: number;
+    completedAt: Date;
+    lineItems: EstimateLineItemDocument[];
+  };
   createdAt: Date;
   createdBy: ObjectId;
   createdByName: string;
   updatedAt: Date;
+};
+
+export type HouseTypeDocument = HouseType & {
+  _id: ObjectId;
+  order: number;
+  active: boolean;
 };
 
 export type ExteriorItemDocument = ExteriorItemChoice & {

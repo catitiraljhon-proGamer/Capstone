@@ -2,6 +2,7 @@
   {
     "name": "Modern Minimalist",
     "style": "Modern",
+    "houseType": "Modern",
     "area": 150,
     "rooms": "3 bedrooms, 2 toilets",
     "rate": 40000,
@@ -26,6 +27,7 @@
   {
     "name": "Modern Glass Front",
     "style": "Modern",
+    "houseType": "Modern",
     "area": 165,
     "rooms": "3 bedrooms, 3 toilets",
     "rate": 45000,
@@ -49,6 +51,7 @@
   {
     "name": "Contemporary Family",
     "style": "Contemporary",
+    "houseType": "Contemporary",
     "area": 180,
     "rooms": "4 bedrooms, 3 toilets",
     "rate": 48000,
@@ -71,6 +74,7 @@
   {
     "name": "Contemporary Corner Lot",
     "style": "Contemporary",
+    "houseType": "Contemporary",
     "area": 145,
     "rooms": "3 bedrooms, 2 toilets",
     "rate": 42000,
@@ -93,6 +97,7 @@
   {
     "name": "Compact Bungalow",
     "style": "Minimalist",
+    "houseType": "Minimalist",
     "area": 120,
     "rooms": "2 bedrooms, 2 toilets",
     "rate": 35000,
@@ -115,6 +120,7 @@
   {
     "name": "Minimalist Two-Storey",
     "style": "Minimalist",
+    "houseType": "Minimalist",
     "area": 135,
     "rooms": "3 bedrooms, 2 toilets",
     "rate": 39000,

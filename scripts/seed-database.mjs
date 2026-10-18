@@ -59,7 +59,8 @@ for (const account of accounts) {
   }
 }
 
-const [exteriorItems, houseDesigns] = await Promise.all([
+const [houseTypes, exteriorItems, houseDesigns] = await Promise.all([
+  loadJson("house-types.json"),
   loadJson("exterior-items.json"),
   loadJson("house-designs.json"),
 ]);
@@ -98,6 +99,16 @@ try {
   const admin = await db.collection("users").findOne({ role: "admin", status: "active" });
   if (!admin) throw new Error("The admin seed account was not created.");
 
+  await db.collection("house_types").bulkWrite(
+    houseTypes.map((houseType, order) => ({
+      updateOne: {
+        filter: { heading: houseType.heading },
+        update: { $set: { ...houseType, order, active: true } },
+        upsert: true,
+      },
+    })),
+  );
+
   await db.collection("exterior_items").bulkWrite(
     exteriorItems.map((item, order) => ({
       updateOne: {
@@ -114,7 +125,7 @@ try {
         filter: { name: design.name },
         update: {
           $set: { ...design, createdByName: admin.name, updatedAt: now },
-          $unset: { houseType: "", finish: "" },
+          $unset: { finish: "" },
           $setOnInsert: {
             _id: new ObjectId(),
             createdAt: now,
@@ -127,7 +138,7 @@ try {
   );
 
   console.log(
-    `Seeded ${accounts.length} user(s), ${exteriorItems.length} exterior items, and ${houseDesigns.length} house designs into ${databaseName}.`,
+    `Seeded ${accounts.length} user(s), ${houseTypes.length} house types, ${exteriorItems.length} exterior items, and ${houseDesigns.length} house designs into ${databaseName}.`,
   );
 } finally {
   await client.close();

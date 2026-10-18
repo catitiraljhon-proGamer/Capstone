@@ -2,6 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
+import HouseTypeCards, { HouseTypeCard, houseTypeGridClass } from "@/components/house-designs/house-type-cards";
 import { HouseDesignForm } from "@/components/house-designs/house-design-form";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import {
@@ -20,12 +21,107 @@ import {
   ArchiveRestore,
   ChevronRight,
   CircleCheck,
+  HardHat,
   ImageOff,
 } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
-type Step = "designs" | "create" | "details" | "edit";
+type Step = "types" | "designs" | "create" | "details" | "edit";
+
+/** The designs listed after a card is chosen: one house type, the completed projects, or designs without a type. */
+type DesignGroup =
+  | { kind: "house-type"; houseType: string }
+  | { kind: "completed-projects" }
+  | { kind: "unassigned" };
+
+function groupTitle(group: DesignGroup | null) {
+  if (!group) return "House Designs";
+  if (group.kind === "house-type") return `${group.houseType} House Designs`;
+  return group.kind === "completed-projects" ? "Completed Projects" : "Designs Without a House Type";
+}
+
+function isInGroup(design: HouseDesign, group: DesignGroup | null) {
+  if (!group) return false;
+  if (group.kind === "house-type") return design.houseType === group.houseType;
+  return group.kind === "completed-projects" ? Boolean(design.sourceProject) : !design.houseType;
+}
+
+function CompletedProjectPanel({
+  source,
+}: {
+  source: NonNullable<HouseDesign["sourceProject"]>;
+}) {
+  return (
+    <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700">
+            <HardHat className="h-4 w-4" aria-hidden="true" />
+            Completed Project
+          </p>
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-stone-950">
+            Cost Estimate From {source.projectReference}
+          </h2>
+          <p className="mt-1 text-sm text-stone-600">
+            Built for {source.customerName}
+            {source.estimateReference ? ` under estimate ${source.estimateReference}` : ""}, completed{" "}
+            {new Date(source.completedAt).toLocaleDateString("en-PH", { dateStyle: "long" })}.
+          </p>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-sm font-semibold text-stone-600">Contract Price</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-red-700">
+            {formatPeso(source.contractPrice)}
+          </p>
+        </div>
+      </div>
+
+      {source.lineItems.length > 0 ? (
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[640px] border-separate border-spacing-0 text-sm">
+            <caption className="sr-only">Accepted cost estimate for {source.projectReference}</caption>
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase text-stone-500">
+                <th scope="col" className="border-b border-stone-200 py-2 pr-3">Item</th>
+                <th scope="col" className="border-b border-stone-200 px-3 py-2 text-right">Qty</th>
+                <th scope="col" className="border-b border-stone-200 px-3 py-2">Unit</th>
+                <th scope="col" className="border-b border-stone-200 px-3 py-2 text-right">Unit Price</th>
+                <th scope="col" className="border-b border-stone-200 py-2 pl-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {source.lineItems.map((line, index) => (
+                <tr key={`${line.item}-${index}`} className="align-top">
+                  <td className="border-b border-stone-100 py-2 pr-3">
+                    <p className="font-semibold text-stone-950">{line.item}</p>
+                    {line.description ? <p className="text-xs text-stone-600">{line.description}</p> : null}
+                  </td>
+                  <td className="border-b border-stone-100 px-3 py-2 text-right tabular-nums">{line.quantity}</td>
+                  <td className="border-b border-stone-100 px-3 py-2">{line.unit}</td>
+                  <td className="border-b border-stone-100 px-3 py-2 text-right tabular-nums">{formatPeso(line.unitPrice)}</td>
+                  <td className="border-b border-stone-100 py-2 pl-3 text-right font-semibold tabular-nums">{formatPeso(line.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row" colSpan={4} className="py-2 pr-3 text-right text-sm font-semibold text-stone-600">
+                  Total
+                </th>
+                <td className="py-2 pl-3 text-right font-semibold tabular-nums text-stone-950">
+                  {formatPeso(source.subtotal)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-stone-600">This project has no itemized estimate on record.</p>
+      )}
+    </section>
+  );
+}
 
 const statusBadgeClass: Record<HouseDesignStatus, string> = {
   Draft: "bg-stone-100 text-stone-700",
@@ -130,20 +226,37 @@ export function AdminHouseDesignManager() {
     updateDesign,
     setDesignStatus,
   } = useHouseDesigns({ includeAll: true });
-  const [activeStep, setActiveStep] = useState<Step>("designs");
+  const [activeStep, setActiveStep] = useState<Step>("types");
+  const [selectedGroup, setSelectedGroup] = useState<DesignGroup | null>(null);
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isConfirmingArchive, setIsConfirmingArchive] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const selectedHouseType =
+    selectedGroup?.kind === "house-type" ? selectedGroup.houseType : null;
   const selectedDesign =
     designs.find((design) => design.id === selectedDesignId) ?? null;
   const filteredDesigns = designs.filter(
-    (design) => showArchived || design.status !== "Archived",
+    (design) =>
+      isInGroup(design, selectedGroup) &&
+      (showArchived ? true : design.status !== "Archived"),
   );
   const archivedCount = designs.filter(
-    (design) => design.status === "Archived",
+    (design) =>
+      isInGroup(design, selectedGroup) && design.status === "Archived",
   ).length;
+  const projectDesigns = designs.filter((design) => design.sourceProject);
+  const projectCover = projectDesigns.find((design) => design.images[0])?.images[0] ?? "";
+  const unassignedCount = designs.filter(
+    (design) => !design.houseType && design.status !== "Archived",
+  ).length;
+
+  const openGroup = (group: DesignGroup) => {
+    setSelectedGroup(group);
+    setSelectedDesignId(null);
+    goToStep("designs");
+  };
 
   const goToStep = (step: Step) => {
     setActiveStep(step);
@@ -151,9 +264,10 @@ export function AdminHouseDesignManager() {
     setIsConfirmingArchive(false);
   };
 
-  const goToDesigns = () => {
+  const goToTypes = () => {
+    setSelectedGroup(null);
     setSelectedDesignId(null);
-    goToStep("designs");
+    goToStep("types");
   };
 
   const openDesign = (design: HouseDesign) => {
@@ -191,7 +305,18 @@ export function AdminHouseDesignManager() {
   };
 
   const breadcrumbItems = [
-    { label: "House Designs", onClick: goToDesigns },
+    { label: "House Designs", onClick: goToTypes },
+    ...(selectedGroup
+      ? [
+          {
+            label:
+              selectedGroup.kind === "house-type"
+                ? selectedGroup.houseType
+                : groupTitle(selectedGroup),
+            onClick: () => goToStep("designs"),
+          },
+        ]
+      : []),
     ...(activeStep === "create" ? [{ label: "New Design" }] : []),
     ...((activeStep === "details" || activeStep === "edit") && selectedDesign
       ? [{ label: selectedDesign.name }]
@@ -231,16 +356,73 @@ export function AdminHouseDesignManager() {
         </p>
       ) : null}
 
-      {activeStep !== "designs" ? <Breadcrumb items={breadcrumbItems} /> : null}
+      {activeStep !== "types" ? <Breadcrumb items={breadcrumbItems} /> : null}
 
-      {activeStep === "create" ? (
+      {activeStep === "types" ? (
+        <div>
+          <div className="mb-5">
+            <h1 className="text-xl font-semibold tracking-tight text-stone-950">
+              Select House Type
+            </h1>
+            <p className="mt-1 text-sm leading-6 text-stone-600">
+              Admin can choose a house type first, then manage the designs and
+              exterior materials under that category.
+            </p>
+          </div>
+          <HouseTypeCards
+            houseTypes={catalog.houseTypes}
+            onSelect={(houseType) => openGroup({ kind: "house-type", houseType })}
+          />
+          {projectDesigns.length > 0 ? (
+            <div className="mt-6">
+              <h2 className="text-base font-semibold tracking-tight text-stone-950">
+                From Completed Projects
+              </h2>
+              <p className="mt-1 text-sm text-stone-600">
+                Every completed construction project is saved here as a draft design with its cost estimate.
+              </p>
+              <div className={`mt-4 ${houseTypeGridClass}`}>
+                <HouseTypeCard
+                  heading="Completed Projects"
+                  description={`${projectDesigns.length} finished ${projectDesigns.length === 1 ? "build" : "builds"} with ${projectDesigns.length === 1 ? "its" : "their"} cost estimate.`}
+                  imgSrc={projectCover}
+                  ariaLabel="Choose designs from completed projects"
+                  onSelect={() => openGroup({ kind: "completed-projects" })}
+                />
+              </div>
+            </div>
+          ) : null}
+          {unassignedCount > 0 ? (
+            <div className="mt-5 flex flex-col gap-3 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="flex items-start gap-2 text-sm text-stone-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
+                {unassignedCount} {unassignedCount === 1 ? "design has" : "designs have"} no house type yet,
+                so customers cannot find {unassignedCount === 1 ? "it" : "them"} by category.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openGroup({ kind: "unassigned" })}
+              >
+                Review Designs
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : activeStep === "create" ? (
         <HouseDesignForm
+          defaultHouseType={selectedHouseType}
           existingNames={designs.map((design) => design.name)}
+          houseTypes={catalog.houseTypes}
           exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("designs")}
           onSubmit={async (draft) => {
             try {
               const created = await addDesign(draft);
+              if (created.houseType) {
+                setSelectedGroup({ kind: "house-type", houseType: created.houseType });
+              }
               setSelectedDesignId(created.id);
               setActiveStep("details");
               setStatusMessage(
@@ -259,11 +441,15 @@ export function AdminHouseDesignManager() {
           existingNames={designs
             .filter((design) => design.id !== selectedDesign.id)
             .map((design) => design.name)}
+          houseTypes={catalog.houseTypes}
           exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("details")}
           onSubmit={async (changes) => {
             try {
               await updateDesign(selectedDesign.id, changes);
+              if (selectedGroup?.kind === "house-type" && changes.houseType) {
+                setSelectedGroup({ kind: "house-type", houseType: changes.houseType });
+              }
               setActiveStep("details");
               setStatusMessage(`${changes.name} was updated.`);
             } catch {
@@ -276,10 +462,14 @@ export function AdminHouseDesignManager() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-                House Designs
+                {groupTitle(selectedGroup)}
               </h1>
               <p className="mt-1 text-sm leading-6 text-stone-600">
-                Select a design to review its details and exterior materials.
+                {selectedGroup?.kind === "completed-projects"
+                  ? "Each completed project is saved here as a draft design with its cost estimate. Assign a house type and publish it to show customers."
+                  : selectedGroup?.kind === "unassigned"
+                    ? "Edit each design and select a house type so customers can find it."
+                    : "Select a design to review its details and exterior materials."}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
@@ -330,7 +520,9 @@ export function AdminHouseDesignManager() {
                         <StatusBadge status={design.status} />
                       </div>
                       <p className="mt-1 text-xs text-stone-600">
-                        {design.style ? `${design.style} - ` : ""}
+                        {design.style || design.houseType
+                          ? `${design.style || design.houseType} - `
+                          : ""}
                         <span className="tabular-nums">{design.area}</span> sqm
                       </p>
                     </div>
@@ -365,12 +557,16 @@ export function AdminHouseDesignManager() {
           ) : (
             <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-8 text-center">
               <p className="text-sm font-semibold text-stone-950">
-                No house designs yet.
+                {selectedHouseType
+                  ? `No designs under ${selectedHouseType} yet.`
+                  : "No designs here right now."}
               </p>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
                 {archivedCount > 0
-                  ? "All designs are archived. Turn on Show archived to restore one."
-                  : "Create the first design record. It is saved as a draft until you publish it."}
+                  ? "All designs here are archived. Turn on Show archived to restore one."
+                  : selectedHouseType
+                    ? "Create the first design record for this house type. It is saved as a draft until you publish it."
+                    : "Create a design record. It is saved as a draft until you publish it."}
               </p>
               <Button
                 type="button"
@@ -493,6 +689,19 @@ export function AdminHouseDesignManager() {
             </div>
           </div>
 
+          {!selectedDesign.houseType ? (
+            <p className="mt-5 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              Edit this design and select a house type before publishing it.
+            </p>
+          ) : null}
+
+          {selectedDesign.sourceProject ? (
+            <div className="mt-6">
+              <CompletedProjectPanel source={selectedDesign.sourceProject} />
+            </div>
+          ) : null}
+
           <div className="mt-6">
             <ProjectExteriorEstimatePanel
               design={selectedDesign}
@@ -518,8 +727,12 @@ export function AdminHouseDesignManager() {
   return (
     <AdminSectionPage
       activeLabel="House Design"
-      title="House Designs"
-      description="Select a design to review and edit its details, materials, and custom items."
+      title={groupTitle(selectedGroup)}
+      description={
+        selectedGroup
+          ? "Select a design to review and edit its details, materials, and custom items."
+          : "Review house design submissions and design-related project records."
+      }
       mainContent={mainContent}
     />
   );

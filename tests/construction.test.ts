@@ -5,9 +5,10 @@ import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
 import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
-import type { DesignRequestDocument, InvoiceDocument, PaymentDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
+import type { DesignRequestDocument, HouseDesignDocument, InvoiceDocument, PaymentDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
 import { BillingError, changeInvoice, createInvoice, getBillingData, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { changeEstimate, changeProjectStatus, createConstructionRequest, getEstimate, listEstimates, listProjects } from "@/lib/server/construction";
+import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
 import { defaultScheduleTemplate } from "@/lib/construction";
 import { listPaymentDues } from "@/lib/server/payment-dues";
 import { removeVatFromEstimates } from "@/lib/server/vat-cleanup";
@@ -581,6 +582,21 @@ test("an admin controls project status, and completion waits until every milesto
   assert.equal(completed.nextMilestone, null);
   assert.ok(completed.milestones.every((milestone) => milestone.status === "Paid"));
   assert.equal(await db.collection("schedules").countDocuments({ projectId: new ObjectId(projectId), paymentStatus: "Paid" }), 4);
+
+  // The completed project is saved as a draft house design with its design images and accepted estimate.
+  const designs = await db.collection<HouseDesignDocument>("house_designs").find({ "sourceProject.projectId": new ObjectId(projectId) }).toArray();
+  assert.equal(designs.length, 1);
+  const [design] = designs;
+  assert.equal(design.status, "Draft");
+  assert.equal(design.area, 120);
+  assert.equal(design.rooms, "3 bedrooms, 2 bathrooms");
+  assert.deepEqual(design.images, ["data:image/png;base64,AAAA"]);
+  assert.ok(design.name.endsWith(completed.reference));
+  assert.equal(design.sourceProject!.contractPrice, 6_000_000);
+  assert.ok(design.sourceProject!.lineItems.length > 0);
+  // Running the sync again (as the House Design page does) does not duplicate it.
+  assert.deepEqual(await syncCompletedProjectDesigns(db, admin), []);
+  assert.equal(await db.collection("house_designs").countDocuments({ "sourceProject.projectId": new ObjectId(projectId) }), 1);
 });
 
 test("legacy projects without a payment schedule keep their existing billing rules", async () => {

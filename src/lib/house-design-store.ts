@@ -10,10 +10,11 @@ import { useCallback, useEffect, useState } from "react";
 
 export type NewHouseDesignInput = Omit<
   HouseDesign,
-  "id" | "createdAt" | "createdBy"
+  "id" | "createdAt" | "createdBy" | "sourceProject"
 >;
 
 const emptyCatalog: HouseDesignCatalog = {
+  houseTypes: [],
   exteriorItems: [],
 };
 

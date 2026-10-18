@@ -6,6 +6,7 @@ import { BrandLogo } from "@/components/ui/brand-logo";
 import { ClientInformationReminder, ClientProfileForm } from "@/components/clients/client-profile";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { BackButton } from "@/components/ui/back-button";
+import HouseTypeCards, { HouseTypeCard, houseTypeGridClass } from "@/components/house-designs/house-type-cards";
 import {
   formatPeso,
   getExteriorEstimate,
@@ -318,12 +319,18 @@ export function CustomerFinishedDesignsPage() {
 
 function FinishedDesignsBrowser() {
   const { designs, catalog, isLoading, error } = useHouseDesigns();
-  const [activeStep, setActiveStep] = useState<"designs" | "details">("designs");
+  const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
+  const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
   const [materialSelections, setMaterialSelections] = useState<number[]>([]);
   const publishedDesigns = designs.filter(
     (design) => design.status === "Published",
   );
+  // `null` type with the designs step open lists published designs that have no house type yet.
+  const untypedDesigns = publishedDesigns.filter((design) => !design.houseType);
+  const filteredDesigns = selectedHouseType
+    ? publishedDesigns.filter((design) => design.houseType === selectedHouseType)
+    : untypedDesigns;
   const selectedDesign =
     publishedDesigns.find((design) => design.id === selectedDesignId) ?? null;
 
@@ -348,22 +355,55 @@ function FinishedDesignsBrowser() {
               Loading house-design records from MongoDB…
             </p>
           ) : null}
-          {activeStep === "designs" ? (
+          {activeStep === "types" ? (
+            <div>
+              <div className="mb-5">
+                <h1 className="text-xl font-semibold tracking-tight">Select House Type</h1>
+                <p className="mt-1 text-sm text-stone-600">
+                  Start by choosing a house type. Design images appear after a type is selected.
+                </p>
+              </div>
+              <HouseTypeCards
+                houseTypes={catalog.houseTypes}
+                onSelect={(houseType) => {
+                  setSelectedHouseType(houseType);
+                  setSelectedDesignId(null);
+                  setActiveStep("designs");
+                }}
+              />
+              {untypedDesigns.length > 0 ? (
+                <div className={`mt-4 ${houseTypeGridClass}`}>
+                  <HouseTypeCard
+                    heading="Other Designs"
+                    description="More finished designs from G4 Builders Inc that are not under a house type yet."
+                    imgSrc={untypedDesigns[0].images[0] ?? ""}
+                    ariaLabel="Choose other house designs"
+                    onSelect={() => {
+                      setSelectedHouseType(null);
+                      setSelectedDesignId(null);
+                      setActiveStep("designs");
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : activeStep === "designs" ? (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h1 className="text-xl font-semibold tracking-tight">
-                    House Designs
+                    {selectedHouseType ? `${selectedHouseType} House Designs` : "Other Designs"}
                   </h1>
                   <p className="mt-1 text-sm text-stone-600">
                     Select one house design to view project details and estimated construction cost.
                   </p>
                 </div>
+                <BackButton type="button" onClick={() => setActiveStep("types")} />
               </div>
 
-              {publishedDesigns.length > 0 ? (
+              {filteredDesigns.length > 0 ? (
                 <div className="mt-5 columns-1 gap-4 sm:columns-2 xl:columns-3">
-                  {publishedDesigns.map((design, designIndex) => (
+                  {filteredDesigns.map((design, designIndex) => (
                     <button
                       key={design.id}
                       type="button"
@@ -402,7 +442,7 @@ function FinishedDesignsBrowser() {
                           {design.name}
                         </h2>
                         <p className="mt-1 text-xs text-stone-600">
-                          {design.style ? `${design.style} - ` : ""}{design.area} sqm
+                          {design.style || design.houseType ? `${design.style || design.houseType} - ` : ""}{design.area} sqm
                         </p>
                       </div>
                     </button>
@@ -411,7 +451,7 @@ function FinishedDesignsBrowser() {
               ) : (
                 <div className="mt-6 rounded-lg border border-dashed border-stone-200 p-6 text-center">
                   <p className="text-sm font-semibold text-stone-950">
-                    No house designs are available yet.
+                    No designs available for this house type yet.
                   </p>
                 </div>
               )}
@@ -435,7 +475,15 @@ function FinishedDesignsBrowser() {
                 <p className="mt-1 text-sm text-stone-600">
                   {selectedDesign.notes}
                 </p>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                  <div className="rounded-lg border border-stone-200 p-4">
+                    <dt className="text-xs font-semibold uppercase text-stone-500">
+                      House Type
+                    </dt>
+                    <dd className="mt-1 font-semibold text-stone-950">
+                      {selectedDesign.houseType ?? "Not assigned"}
+                    </dd>
+                  </div>
                   <div className="rounded-lg border border-stone-200 p-4">
                     <dt className="text-xs font-semibold uppercase text-stone-500">
                       Floor Area

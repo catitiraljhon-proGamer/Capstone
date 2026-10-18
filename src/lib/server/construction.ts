@@ -21,6 +21,7 @@ import {
   scheduleTemplateError,
 } from "@/lib/construction";
 import { BillingError, audit, billingTransaction, nextReference } from "@/lib/server/billing";
+import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
 import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
@@ -445,7 +446,7 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
   const input = projectActionSchema.parse(raw);
   const projectId = objectId(id, "Project not found.");
   await promoteScheduledProjects(db);
-  return billingTransaction(db, async (session) => {
+  const result = await billingTransaction(db, async (session) => {
     const projects = db.collection<ProjectDocument>(collections.projects);
     const project = await projects.findOneAndUpdate({ _id: projectId }, { $inc: { billingVersion: 1 } }, { session, returnDocument: "after" });
     if (!project) throw new BillingError("Project not found.", 404);
@@ -474,4 +475,11 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
     const updated = await projects.findOne({ _id: project._id }, { session });
     return { project: (await toProjectDtos(db, [updated!], actor.role, session))[0] };
   });
+  if (input.status === "Completed") {
+    // The finished project becomes a draft house design; completing the project must not fail because of it.
+    await syncCompletedProjectDesigns(db, actor).catch((error: unknown) => {
+      console.error("Could not create the house design for a completed project", { errorType: error instanceof Error ? error.name : "UnknownError" });
+    });
+  }
+  return result;
 }

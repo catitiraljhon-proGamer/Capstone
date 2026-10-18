@@ -48,7 +48,11 @@ export function ProjectExteriorEstimatePanel({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="rounded-lg border border-stone-200 p-4">
+          <p className="text-xs font-semibold uppercase text-stone-500">House Type</p>
+          <p className="mt-1 font-semibold text-stone-950">{design.houseType ?? "Not assigned"}</p>
+        </div>
         <div className="rounded-lg border border-stone-200 p-4">
           <p className="text-xs font-semibold uppercase text-stone-500">Floor Area</p>
           <p className="mt-1 font-semibold tabular-nums text-stone-950">

@@ -1,5 +1,11 @@
-import type { HouseDesign } from "@/lib/house-design-data";
-import type { HouseDesignDocument } from "@/lib/database/collections";
+import type { HouseDesign, HouseType } from "@/lib/house-design-data";
+import {
+  collections,
+  type HouseDesignDocument,
+  type HouseTypeDocument,
+} from "@/lib/database/collections";
+import defaultHouseTypes from "../../../database/seeds/house-types.json";
+import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
 
 const customExteriorItemSchema = z.object({
@@ -26,6 +32,7 @@ const materialPricesSchema = z.array(z.object({
 export const houseDesignInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   style: z.string().trim().max(80).optional(),
+  houseType: z.string().trim().min(1, "Select a house type.").max(80),
   area: z.number().finite().positive().max(100_000),
   rooms: z.string().trim().min(1).max(200),
   rate: z.number().finite().nonnegative().max(100_000_000),
@@ -43,11 +50,54 @@ export const houseDesignPatchSchema = houseDesignInputSchema
     message: "At least one field must be supplied.",
   });
 
-export function toHouseDesignDto(document: HouseDesignDocument): HouseDesign {
+/**
+ * Active house types in their saved order. An empty collection (a new database, or a backup taken
+ * while house types were turned off) is filled with the default types first.
+ */
+export async function listHouseTypes(db: Db): Promise<HouseType[]> {
+  const houseTypes = db.collection<HouseTypeDocument>(collections.houseTypes);
+  if ((await houseTypes.estimatedDocumentCount()) === 0) {
+    await houseTypes.bulkWrite(
+      defaultHouseTypes.map((houseType, order) => ({
+        updateOne: {
+          filter: { heading: houseType.heading },
+          update: { $setOnInsert: { _id: new ObjectId(), ...houseType, order, active: true } },
+          upsert: true,
+        },
+      })),
+    );
+  }
+  const documents = await houseTypes.find({ active: true }).sort({ order: 1 }).toArray();
+  await restoreMissingHouseTypes(db, documents.map((document) => document.heading));
+  return documents.map(({ heading, description, imgSrc }) => ({ heading, description, imgSrc }));
+}
+
+const globalForHouseTypes = globalThis as typeof globalThis & { houseTypesRestored?: boolean };
+
+/**
+ * Designs saved while house types were turned off lost their type. Where the style label names a
+ * house type (as on every seeded design), that type is put back; the rest stay unassigned for the Admin.
+ */
+async function restoreMissingHouseTypes(db: Db, headings: string[]) {
+  if (globalForHouseTypes.houseTypesRestored) return;
+  const designs = db.collection<HouseDesignDocument>(collections.houseDesigns);
+  await Promise.all(headings.map((heading) =>
+    designs.updateMany({ houseType: { $exists: false }, style: heading }, { $set: { houseType: heading } }),
+  ));
+  globalForHouseTypes.houseTypesRestored = true;
+}
+
+/** `includeSource` adds the completed-project record (client name and contract price); Admin only. */
+export function toHouseDesignDto(
+  document: HouseDesignDocument,
+  { includeSource = false }: { includeSource?: boolean } = {},
+): HouseDesign {
+  const source = document.sourceProject;
   return {
     id: document._id.toHexString(),
     name: document.name,
     style: document.style,
+    houseType: document.houseType,
     area: document.area,
     rooms: document.rooms,
     rate: document.rate,
@@ -57,6 +107,22 @@ export function toHouseDesignDto(document: HouseDesignDocument): HouseDesign {
     defaultSelections: document.defaultSelections,
     materialPrices: document.materialPrices ?? [],
     customItems: document.customItems,
+    ...(includeSource && source
+      ? {
+          sourceProject: {
+            projectId: source.projectId.toHexString(),
+            projectReference: source.projectReference,
+            estimateReference: source.estimateReference ?? null,
+            customerName: source.customerName,
+            contractPrice: source.contractPrice,
+            subtotal: source.subtotal,
+            completedAt: source.completedAt.toISOString(),
+            lineItems: source.lineItems.map(({ item, description, unit, quantity, unitPrice, amount }) => ({
+              item, description, unit, quantity, unitPrice, amount,
+            })),
+          },
+        }
+      : {}),
     createdAt: document.createdAt.toISOString(),
     createdBy: document.createdByName,
   };

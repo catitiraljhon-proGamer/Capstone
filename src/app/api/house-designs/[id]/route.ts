@@ -26,6 +26,18 @@ export async function PATCH(
 
     const changes = houseDesignPatchSchema.parse(await request.json());
     const db = await getDatabase();
+    // Customers browse designs by house type, so a design needs one before it is published.
+    if (changes.status === "Published" && !changes.houseType) {
+      const current = await db
+        .collection<HouseDesignDocument>(collections.houseDesigns)
+        .findOne({ _id: new ObjectId(id) }, { projection: { houseType: 1 } });
+      if (current && !current.houseType) {
+        return NextResponse.json(
+          { error: "Edit the design and select a house type before publishing it." },
+          { status: 400 },
+        );
+      }
+    }
     const now = new Date();
     const document = await db
       .collection<HouseDesignDocument>(collections.houseDesigns)
@@ -51,7 +63,7 @@ export async function PATCH(
       createdAt: now,
     });
 
-    return NextResponse.json({ design: toHouseDesignDto(document) });
+    return NextResponse.json({ design: toHouseDesignDto(document, { includeSource: true }) });
   } catch (error) {
     return apiError(error);
   }
