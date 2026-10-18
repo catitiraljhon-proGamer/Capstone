@@ -10,6 +10,7 @@ import {
   type SystemSettings,
   type SystemSettingsView,
 } from "@/lib/system-settings";
+import { refreshPublicSettings } from "@/lib/use-public-settings";
 import { Bell, DatabaseBackup, Lock, Mail, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -111,6 +112,8 @@ export function AdminMaintenance() {
       if (!response.ok || !payload.settings) throw new Error(payload.issues?.[0]?.message ?? payload.error ?? "Unable to save the settings.");
       setView(payload);
       setDraft(toDraft(payload.settings));
+      // The sign-out time and password rules take effect on this page now, not on the next reload.
+      refreshPublicSettings();
       setSuccess(changedKeys.length === 1 ? "Setting saved." : `${changedKeys.length} settings saved.`);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Unable to save the settings.");

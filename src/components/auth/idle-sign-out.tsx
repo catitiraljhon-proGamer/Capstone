@@ -8,6 +8,8 @@ import { useEffect } from "react";
 const lastActivityKey = "g4-last-activity";
 const signedInAreas = ["/admin", "/billing-clerk", "/customer"];
 const activityEvents = ["pointerdown", "keydown", "scroll", "touchstart", "mousemove"] as const;
+/** How often the limit is checked; short so a 1-minute limit signs out close to 1 minute, not 1.5. */
+const checkEveryMs = 5_000;
 
 function readLastActivity() {
   try {
@@ -25,11 +27,25 @@ function writeLastActivity(time: number) {
   }
 }
 
+function clearLastActivity() {
+  try {
+    window.localStorage.removeItem(lastActivityKey);
+  } catch {
+    // Nothing stored to clear.
+  }
+}
+
 /** Signs a signed-in person out after the Admin's set minutes of no activity (Maintenance > Account security). */
 export function IdleSignOut() {
   const pathname = usePathname();
   const { idleSignOutMinutes } = usePublicSettings();
   const inSignedInArea = signedInAreas.some((area) => pathname === area || pathname.startsWith(`${area}/`));
+
+  useEffect(() => {
+    // Outside the signed-in pages (the login page included), forget the last session's activity so the next
+    // sign-in starts counting from zero instead of being signed out at once for idling before the last sign-out.
+    if (!inSignedInArea) clearLastActivity();
+  }, [inSignedInArea]);
 
   useEffect(() => {
     if (!inSignedInArea || idleSignOutMinutes <= 0) return;
@@ -66,7 +82,7 @@ export function IdleSignOut() {
     if (!signingOut) markActive();
     for (const event of activityEvents) window.addEventListener(event, markActive, { passive: true });
     document.addEventListener("visibilitychange", check);
-    const timer = window.setInterval(check, 30_000);
+    const timer = window.setInterval(check, checkEveryMs);
     return () => {
       for (const event of activityEvents) window.removeEventListener(event, markActive);
       document.removeEventListener("visibilitychange", check);
