@@ -1,6 +1,5 @@
 "use client";
 
-import { AccountTermsDialog } from "@/components/auth/account-terms";
 import {
   countOpenDesignRequests,
   designRequestLimitMessage,
@@ -74,18 +73,10 @@ function formatDate(value: string) {
 
 /** The Terms and Conditions were agreed to once for the account, so the form opens directly. */
 export function CustomerDesignRequests({ houseDesignId }: { houseDesignId?: string }) {
-  const [isReviewingTerms, setIsReviewingTerms] = useState(false);
-
-  return (
-    <>
-      <DesignRequestForm houseDesignId={houseDesignId} onReviewTerms={() => setIsReviewingTerms(true)} />
-      {isReviewingTerms ? <AccountTermsDialog onClose={() => setIsReviewingTerms(false)} /> : null}
-    </>
-  );
+  return <DesignRequestForm houseDesignId={houseDesignId} />;
 }
 
-function DesignRequestForm({ onReviewTerms, houseDesignId }: {
-  onReviewTerms: () => void;
+function DesignRequestForm({ houseDesignId }: {
   houseDesignId?: string;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -333,14 +324,6 @@ function DesignRequestForm({ onReviewTerms, houseDesignId }: {
               ? "Request the selected house design as shown, or add notes about your preferred changes. The admin will review your request, then share the design and floor plan for your review."
               : "Share your requirements and reference images. The admin will first review whether the request is feasible before design work begins."}
           </p>
-        </div>
-
-        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm">
-          <p className="font-semibold text-red-900">Design review is free</p>
-          <p className="mt-1 leading-6 text-stone-600">You can review the design and floor plan and request changes for free. Only the blueprint is paid, after you accept the construction cost estimate.</p>
-          <button type="button" onClick={onReviewTerms} aria-haspopup="dialog" className="mt-2 rounded text-sm font-semibold text-red-700 underline underline-offset-4 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-red-600">
-            Review Terms and Conditions
-          </button>
         </div>
 
         {limitReached || error === designRequestLimitMessage ? (
