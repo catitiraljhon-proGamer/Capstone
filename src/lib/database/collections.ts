@@ -1,6 +1,7 @@
 import type {
   CustomExteriorItem,
   ExteriorItemChoice,
+  FinishLevel,
   HouseDesignStatus,
   HouseType,
   MaterialPriceOverride,
@@ -202,6 +203,8 @@ export type DesignRequestDocument = {
   selectedDesign?: RequestedHouseDesign;
   /** House type (category) the finished design is filed under; missing on older requests. */
   houseType?: string;
+  /** Finish level the customer expects; only on custom requests made after it returned. */
+  finish?: FinishLevel;
   floorArea: number;
   /** Older requests only have a free-text rooms summary. */
   bedrooms?: number;

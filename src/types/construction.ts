@@ -79,6 +79,8 @@ export type CostEstimateDto = {
   /** Selected design name, or "120 sqm · 3 bedrooms, 2 bathrooms" for custom requests. */
   designLabel: string;
   floorArea: number | null;
+  /** Finish level from the custom design request, when one was chosen. */
+  finish: string | null;
   preferredStartDate: string | null;
   neededBy: string | null;
   siteAddress: string;

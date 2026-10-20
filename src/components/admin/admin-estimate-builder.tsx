@@ -127,9 +127,9 @@ function DetailsCard({ estimate }: { estimate: CostEstimateDto }) {
         </Detail>
         <Detail label="Design">
           {estimate.designLabel}
-          {estimate.floorArea ? (
+          {estimate.floorArea || estimate.finish ? (
             <span className="block text-xs text-stone-500">
-              {estimate.floorArea} sq m
+              {[estimate.floorArea ? `${estimate.floorArea} sq m` : null, estimate.finish ? `${estimate.finish} finish` : null].filter(Boolean).join(" · ")}
             </span>
           ) : null}
         </Detail>

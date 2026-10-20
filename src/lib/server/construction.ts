@@ -131,7 +131,7 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
   const designIds = estimates.flatMap((estimate) => (estimate.designRequestId ? [estimate.designRequestId] : []));
   const [customers, designs] = await Promise.all([
     customerIds.length ? db.collection<UserDocument>(collections.users).find({ _id: { $in: customerIds } }, { projection: { name: 1, email: 1 } }).toArray() : [],
-    designIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: designIds } }, { projection: { selectedDesign: 1, floorArea: 1, rooms: 1 } }).toArray() : [],
+    designIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: designIds } }, { projection: { selectedDesign: 1, floorArea: 1, rooms: 1, finish: 1 } }).toArray() : [],
   ]);
   const customerById = new Map(customers.map((customer) => [customer._id.toHexString(), customer]));
   const designById = new Map(designs.map((design) => [design._id.toHexString(), design]));
@@ -145,6 +145,7 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
       designRequestId: estimate.designRequestId?.toHexString() ?? null,
       designLabel: designLabelOf(design as DesignRequestDocument | undefined),
       floorArea: design?.floorArea ?? null,
+      finish: design?.finish ?? null,
       preferredStartDate: isoDate(estimate.preferredStartDate), neededBy: isoDate(estimate.neededBy),
       siteAddress: estimate.siteAddress ?? "", siteAddressDetails: estimate.siteAddressDetails ?? null,
       customerNotes: estimate.customerNotes ?? "",

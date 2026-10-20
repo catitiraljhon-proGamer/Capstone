@@ -127,7 +127,7 @@ export async function GET() {
         subject: source.selectedDesign
           ? `${source.selectedDesign.name} — design request`
           : `${source.floorArea.toLocaleString("en-PH")} sqm ${source.houseType ? `${source.houseType} ` : ""}design request`,
-        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.rooms} — ${source.notes}`,
+        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.finish ? `${source.finish} finish · ` : ""}${source.rooms} — ${source.notes}`,
         sourceStatus: source.status,
         sourceAvailable: true,
         selectedDesign: source.selectedDesign,

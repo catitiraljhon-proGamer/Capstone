@@ -61,6 +61,8 @@ export type DesignRequestDto = {
   selectedDesign?: RequestedHouseDesign;
   /** Missing on requests made before house types were chosen. */
   houseType?: string;
+  /** Missing on published-design requests and older custom requests. */
+  finish?: string;
   floorArea: number;
   bedrooms?: number;
   bathrooms?: number;

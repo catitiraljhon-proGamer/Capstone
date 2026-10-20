@@ -1,5 +1,15 @@
 export type HouseDesignStatus = "Draft" | "Published" | "Archived";
 
+/** Quality of materials and finishes the customer expects; guides the Admin's design and estimate. */
+export const finishLevels = ["Standard", "Semi-luxury", "Luxury"] as const;
+export type FinishLevel = (typeof finishLevels)[number];
+
+export const finishLevelDescriptions: Record<FinishLevel, string> = {
+  Standard: "Durable, practical materials and finishes for a well-built home on a sensible budget.",
+  "Semi-luxury": "Upgraded materials and fixtures with more design detail, at a moderate added cost.",
+  Luxury: "Premium materials, fixtures, and detailing throughout, at a higher cost.",
+};
+
 export type HouseType = {
   heading: string;
   description: string;

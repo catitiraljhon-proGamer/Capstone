@@ -14,6 +14,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { useHouseDesigns } from "@/lib/house-design-store";
+import { finishLevelDescriptions, finishLevels, type FinishLevel } from "@/lib/house-design-data";
 import Link from "next/link";
 import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
@@ -86,6 +87,7 @@ function DesignRequestForm({ houseDesignId }: {
   const selectionUnavailable = hasDesignSelection && !isCatalogLoading && !selectedDesign;
   const [requests, setRequests] = useState<DesignRequestDto[]>([]);
   const [houseType, setHouseType] = useState<string | null>(null);
+  const [finish, setFinish] = useState<FinishLevel | "">("");
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
@@ -196,6 +198,7 @@ function DesignRequestForm({ houseDesignId }: {
       : null);
   const fieldErrors: Record<string, string | null> = {
     houseType: hasDesignSelection || houseType ? null : "Choose the house type for your design.",
+    finish: hasDesignSelection || finish ? null : "Choose the finish level you expect.",
     floorArea: hasDesignSelection ? null : numberError(floorArea, { label: "Floor area", max: 100_000, unit: " sq m" }) ??
       (Number(floorArea) <= 0 ? "Floor area must be more than 0 sq m." : null),
     bedrooms: hasDesignSelection ? null : numberError(bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount }),
@@ -212,10 +215,10 @@ function DesignRequestForm({ houseDesignId }: {
       : null,
   };
   const fieldIds: Record<string, string> = {
-    houseType: "dr-house-type", floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms",
+    houseType: "dr-house-type", finish: "dr-finish", floorArea: "dr-floor-area", bedrooms: "dr-bedrooms", bathrooms: "dr-bathrooms",
     notes: "dr-notes", preferredDate: "dr-preferred-date", neededBy: "dr-needed-by", images: "dr-images",
   };
-  const fieldOrder = ["houseType", "floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
+  const fieldOrder = ["houseType", "finish", "floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
   const touch = (name: string) => setTouched((current) => (current[name] ? current : { ...current, [name]: true }));
   /** The message for a field, shown after it was left or a submit was attempted. */
   const showError = (name: string) => {
@@ -261,6 +264,7 @@ function DesignRequestForm({ houseDesignId }: {
         body: JSON.stringify({
           ...(selectedDesign ? { houseDesignId: selectedDesign.id } : {
             houseType,
+            finish,
             floorArea: Number(floorArea),
             bedrooms: Number(bedrooms),
             bathrooms: Number(bathrooms),
@@ -286,6 +290,7 @@ function DesignRequestForm({ houseDesignId }: {
 
       setRequests((current) => [payload.request as DesignRequestDto, ...current]);
       setHouseType(null);
+      setFinish("");
       setFloorArea("");
       setBedrooms("");
       setBathrooms("");
@@ -374,7 +379,8 @@ function DesignRequestForm({ houseDesignId }: {
             </div>
           ) : (
           <>
-          <div className="mt-5">
+          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <div className="min-w-0">
             <label htmlFor={fieldIds.houseType} className="block text-sm font-semibold">
               House Type <RequiredIndicator />
             </label>
@@ -392,7 +398,7 @@ function DesignRequestForm({ houseDesignId }: {
               onBlur={() => touch("houseType")}
               aria-invalid={showError("houseType") ? true : undefined}
               aria-describedby={[`${fieldIds.houseType}-hint`, showError("houseType") ? `${fieldIds.houseType}-error` : ""].filter(Boolean).join(" ")}
-              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600 sm:max-w-sm"
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
             >
               <option value="">{catalog.houseTypes.length ? "Select a house type" : "Loading house types…"}</option>
               {catalog.houseTypes.map((type) => (
@@ -405,6 +411,34 @@ function DesignRequestForm({ houseDesignId }: {
               </p>
             ) : null}
             <FieldError id={`${fieldIds.houseType}-error`} message={showError("houseType")} />
+          </div>
+          <div className="min-w-0">
+            <label htmlFor={fieldIds.finish} className="block text-sm font-semibold">
+              Finish Level <RequiredIndicator />
+            </label>
+            <p id={`${fieldIds.finish}-hint`} className="mt-1 text-sm text-stone-600">
+              The quality of materials and fixtures you expect. It guides the design and your construction cost estimate.
+            </p>
+            <select
+              id={fieldIds.finish}
+              value={finish}
+              onChange={(event) => {
+                setFinish(event.target.value as FinishLevel | "");
+                touch("finish");
+              }}
+              onBlur={() => touch("finish")}
+              aria-invalid={showError("finish") ? true : undefined}
+              aria-describedby={[`${fieldIds.finish}-hint`, showError("finish") ? `${fieldIds.finish}-error` : ""].filter(Boolean).join(" ")}
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
+            >
+              <option value="">Select a finish level</option>
+              {finishLevels.map((level) => (
+                <option key={level} value={level}>{level}</option>
+              ))}
+            </select>
+            {finish ? <p className="mt-2 text-xs leading-5 text-stone-500">{finishLevelDescriptions[finish]}</p> : null}
+            <FieldError id={`${fieldIds.finish}-error`} message={showError("finish")} />
+          </div>
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
@@ -670,7 +704,7 @@ function DesignRequestForm({ houseDesignId }: {
                   <div>
                     {request.selectedDesign ? <p className="mb-1 text-sm font-semibold text-red-800">{request.selectedDesign.name}</p> : null}
                     <p className="text-sm font-semibold">
-                      {request.floorArea} sqm{request.houseType ? ` · ${request.houseType}` : ""} · {request.rooms}
+                      {request.floorArea} sqm{request.houseType ? ` · ${request.houseType}` : ""}{request.finish ? ` · ${request.finish} finish` : ""} · {request.rooms}
                     </p>
                     <p className="mt-1 text-xs text-stone-500">
                       Submitted {formatDate(request.createdAt)}
