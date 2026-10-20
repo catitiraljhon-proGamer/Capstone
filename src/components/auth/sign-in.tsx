@@ -237,15 +237,13 @@ export function SignInPage({
                     />
                     Keep me signed in
                   </label>
-                  {onResetPassword ? (
-                    <button
-                      type="button"
-                      onClick={onResetPassword}
-                      className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
-                    >
-                      Reset Password
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={onResetPassword}
+                    className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
 
                 <button
