@@ -200,8 +200,8 @@ export default function LandingPage() {
           </Link>
           <div className="flex items-center gap-1">
             <Link href="/" onClick={backToTop} className={navLinkClass}>Home</Link>
-            {/* About Us and FAQ are placeholders until their content is ready. */}
-            <button type="button" className={navLinkClass}>About Us</button>
+            {/* FAQ is a placeholder until its content is ready. */}
+            <Link href="/about" className={navLinkClass}>About Us</Link>
             <button type="button" className={navLinkClass}>FAQ</button>
           </div>
           <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:justify-self-end">
