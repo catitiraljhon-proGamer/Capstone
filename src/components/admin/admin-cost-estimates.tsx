@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import {
   EstimateBuilder,
   EstimateStatusPill,
@@ -8,7 +9,7 @@ import {
 } from "@/components/admin/admin-estimate-builder";
 import { formatPeso } from "@/lib/house-design-data";
 import type { CostEstimateDto, EstimateStatus } from "@/types/construction";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const filters = ["All", "Requested", "Draft", "Revision requested", "Sent", "Accepted"] as const;
@@ -148,14 +149,15 @@ export function AdminCostEstimates({ initialEstimateId }: { initialEstimateId: s
                 <th className={head}>Needed by</th>
                 <th className={`${head} text-right`}>Total</th>
                 <th className={head}>Status</th>
-                <th className={head}>
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {visible.map((estimate) => (
-                <tr key={estimate.id} className="hover:bg-rose-50/30">
+                <tr
+                  key={estimate.id}
+                  {...clickableRowProps(`Open ${estimate.reference}`, () => open(estimate.id))}
+                  className={clickableRowClass}
+                >
                   <td className={cell}>
                     <p className="font-semibold">{estimate.reference}</p>
                     <p className="mt-1 text-stone-600">{estimate.customer.name}</p>
@@ -168,18 +170,6 @@ export function AdminCostEstimates({ initialEstimateId }: { initialEstimateId: s
                   </td>
                   <td className={cell}>
                     <EstimateStatusPill status={estimate.status as EstimateStatus} />
-                  </td>
-                  <td className={cell}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Open ${estimate.reference}`}
-                      onClick={() => open(estimate.id)}
-                    >
-                      {["Requested", "Draft", "Revision requested"].includes(estimate.status) ? "Build" : "View"}
-                      <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
                   </td>
                 </tr>
               ))}

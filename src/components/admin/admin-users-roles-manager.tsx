@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import {
   roleLabels,
   type ManagedUserDto,
@@ -12,8 +13,6 @@ import {
   KeyRound,
   LoaderCircle,
   Pencil,
-  Power,
-  PowerOff,
   ReceiptText,
   RefreshCw,
   Search,
@@ -134,7 +133,6 @@ export function AdminUsersRolesManager() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [form, setForm] = useState<AccountForm>(emptyForm);
   const [isSaving, setIsSaving] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -243,6 +241,18 @@ export function AdminUsersRolesManager() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const disablingUser = editingUserId
+      ? users.find((user) => user.id === editingUserId && user.status === "active")
+      : undefined;
+    if (
+      disablingUser &&
+      form.status === "disabled" &&
+      !window.confirm(
+        `Disable ${disablingUser.name}'s account? They will no longer be able to sign in.`,
+      )
+    ) {
+      return;
+    }
     setIsSaving(true);
     setError(null);
     setSuccessMessage(null);
@@ -282,43 +292,6 @@ export function AdminUsersRolesManager() {
       );
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const updateStatus = async (user: ManagedUserDto) => {
-    const nextStatus: UserStatus =
-      user.status === "active" ? "disabled" : "active";
-    if (
-      nextStatus === "disabled" &&
-      !window.confirm(
-        `Disable ${user.name}'s account? They will no longer be able to sign in.`,
-      )
-    ) {
-      return;
-    }
-
-    setUpdatingId(user.id);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: nextStatus }),
-      });
-      const result = await readJson<{ user: ManagedUserDto }>(response);
-      setSuccessMessage(
-        `${result.user.name}'s account is now ${nextStatus}.`,
-      );
-      await loadUsers(true);
-    } catch (updateError) {
-      setError(
-        updateError instanceof Error
-          ? updateError.message
-          : "Unable to update the account status.",
-      );
-    } finally {
-      setUpdatingId(null);
     }
   };
 
@@ -378,13 +351,25 @@ export function AdminUsersRolesManager() {
       ) : null}
 
       {isFormOpen ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-stone-950/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="user-form-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default"
+            aria-label="Close account form"
+            onClick={closeForm}
+          />
+        <section className="relative my-6 w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
                 {editingUser ? "Account Settings" : "New Access"}
               </p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight">
+              <h2 id="user-form-title" className="mt-1 text-xl font-semibold tracking-tight">
                 {editingUser ? `Edit ${editingUser.name}` : "Create User Account"}
               </h2>
               <p className="mt-1 text-sm text-stone-600">
@@ -411,9 +396,9 @@ export function AdminUsersRolesManager() {
 
           <form
             onSubmit={handleSubmit}
-            className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5"
+            className="mt-5 grid gap-4 sm:grid-cols-2"
           >
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+            <label className="text-sm font-medium text-stone-700">
               Full Name
               <input
                 required
@@ -429,7 +414,7 @@ export function AdminUsersRolesManager() {
               />
             </label>
 
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+            <label className="text-sm font-medium text-stone-700">
               Email Address
               <input
                 required
@@ -463,7 +448,7 @@ export function AdminUsersRolesManager() {
               </select>
             </label>
 
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+            <label className="text-sm font-medium text-stone-700">
               {editingUser ? "New Temporary Password (optional)" : "Temporary Password"}
               <span className="relative block">
                 <KeyRound className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-stone-400" />
@@ -505,7 +490,7 @@ export function AdminUsersRolesManager() {
               </select>
             </label>
 
-            <div className="flex items-end gap-3 xl:col-span-2">
+            <div className="flex items-end justify-end gap-3 sm:col-span-2">
               <Button type="submit" disabled={isSaving} className="min-w-32">
                 {isSaving ? (
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
@@ -522,6 +507,7 @@ export function AdminUsersRolesManager() {
             </div>
           </form>
         </section>
+        </div>
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -651,15 +637,17 @@ export function AdminUsersRolesManager() {
                   <th className="border-b border-stone-200 px-4 py-3">Role</th>
                   <th className="border-b border-stone-200 px-4 py-3">Status</th>
                   <th className="border-b border-stone-200 px-4 py-3">Created</th>
-                  <th className="border-b border-stone-200 px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleUsers.map((user) => {
                   const isCurrent = user.id === currentUserId;
-                  const isUpdating = updatingId === user.id;
                   return (
-                    <tr key={user.id} className="transition hover:bg-stone-50">
+                    <tr
+                      key={user.id}
+                      {...clickableRowProps(`Edit ${user.name}`, () => openEditForm(user))}
+                      className={clickableRowClass}
+                    >
                       <td className="border-b border-stone-100 px-5 py-4">
                         <div className="flex items-center gap-3">
                           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">
@@ -702,42 +690,6 @@ export function AdminUsersRolesManager() {
                       </td>
                       <td className="border-b border-stone-100 px-4 py-4 text-stone-600">
                         {formatAccountDate(user.createdAt)}
-                      </td>
-                      <td className="border-b border-stone-100 px-5 py-4">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openEditForm(user)}
-                          >
-                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                            Edit
-                          </Button>
-                          {!isCurrent ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              disabled={isUpdating}
-                              onClick={() => void updateStatus(user)}
-                              className={
-                                user.status === "active"
-                                  ? "text-stone-600 hover:bg-red-50 hover:text-red-700"
-                                  : "text-emerald-700 hover:bg-emerald-50"
-                              }
-                            >
-                              {isUpdating ? (
-                                <LoaderCircle className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                              ) : user.status === "active" ? (
-                                <PowerOff className="mr-1.5 h-3.5 w-3.5" />
-                              ) : (
-                                <Power className="mr-1.5 h-3.5 w-3.5" />
-                              )}
-                              {user.status === "active" ? "Disable" : "Activate"}
-                            </Button>
-                          ) : null}
-                        </div>
                       </td>
                     </tr>
                   );

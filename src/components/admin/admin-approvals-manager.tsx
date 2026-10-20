@@ -2,6 +2,7 @@
 
 import { AdminDesignWorkflow } from "@/components/admin/admin-design-workflow";
 import { Button } from "@/components/ui/button";
+import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import { formatPeso } from "@/lib/house-design-data";
 import {
   approvalRecordTypes,
@@ -709,16 +710,11 @@ export function AdminApprovalsManager() {
                 {visibleApprovals.map((approval) => (
                   <tr
                     key={approval.id}
-                    tabIndex={0}
-                    aria-label={`${approval.status === "Pending" ? "Review" : "View"} ${approval.reference}`}
-                    onClick={() => openReview(approval)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openReview(approval);
-                      }
-                    }}
-                    className="cursor-pointer outline-none transition hover:bg-stone-50 focus-visible:bg-rose-50"
+                    {...clickableRowProps(
+                      `${approval.status === "Pending" ? "Review" : "View"} ${approval.reference}`,
+                      () => openReview(approval),
+                    )}
+                    className={clickableRowClass}
                   >
                     <td className="border-b border-stone-100 px-5 py-4 align-top">
                       <p className="font-semibold">{approval.reference}</p>

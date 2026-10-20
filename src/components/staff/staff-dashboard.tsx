@@ -2,6 +2,7 @@
 
 import { AccountMenu } from "@/components/ui/account-menu";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import { MobileNavigation } from "@/components/ui/mobile-navigation";
 import { NotificationBell } from "@/components/customer/customer-notification-bell";
 import { useAdminDashboardData } from "@/lib/admin-dashboard-data";
@@ -396,16 +397,8 @@ function AdminDashboardOverview() {
                   {pendingApprovals.map((approval) => (
                     <tr
                       key={approval.reference}
-                      tabIndex={0}
-                      aria-label={`Review ${approval.reference}`}
-                      onClick={() => openApproval(approval.reference)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openApproval(approval.reference);
-                        }
-                      }}
-                      className="cursor-pointer outline-none transition hover:bg-stone-50 focus-visible:bg-rose-50"
+                      {...clickableRowProps(`Review ${approval.reference}`, () => openApproval(approval.reference))}
+                      className={clickableRowClass}
                     >
                       <td className="border-b border-stone-100 px-3 py-4 font-semibold">
                         {approval.reference}
