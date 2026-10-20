@@ -45,7 +45,7 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
           <p className="mt-1 break-words text-sm text-stone-600">{specs}</p>
           <p className="mt-1 text-xs text-stone-400">Request {design.id.slice(-8).toUpperCase()}</p>
         </div>
-        <JourneyStepper stages={journeyStages(design)} current={journeyProgress(design, estimate, project)} />
+        <JourneyStepper stages={journeyStages()} current={journeyProgress(design, estimate, project)} />
         <DreamHouseNextStep step={nextStep(design, estimate, project)} />
       </div>
       <div className="divide-y divide-stone-200">

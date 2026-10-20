@@ -20,10 +20,11 @@ export function dreamHouseName(design: DesignRequestDto) {
 
 export type JourneyStage = { label: string; optional?: boolean };
 
-export function journeyStages(design: DesignRequestDto): JourneyStage[] {
+export function journeyStages(): JourneyStage[] {
   return [
     { label: "Design" },
-    { label: design.workflow === "blueprint" ? "Blueprint" : "Design fee" },
+    // One name on every card, including requests from before the blueprint flow.
+    { label: "Blueprint fee" },
     { label: "Estimate", optional: true },
     { label: "Construction", optional: true },
   ];
