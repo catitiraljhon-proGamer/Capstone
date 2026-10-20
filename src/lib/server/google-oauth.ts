@@ -211,27 +211,7 @@ export async function exchangeGoogleCode(code: string, flow: GoogleFlow) {
     cache: "no-store",
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) {
-    // Log only Google's standard OAuth error label, never the response body.
-    const body: unknown = await response.json().catch(() => null);
-    const reason = z.object({ error: z.string() }).safeParse(body);
-    const knownReasons = [
-      "invalid_client",
-      "invalid_grant",
-      "invalid_request",
-      "unauthorized_client",
-      "unsupported_grant_type",
-      "redirect_uri_mismatch",
-    ];
-    console.error("Google token exchange rejected", {
-      status: response.status,
-      reason:
-        reason.success && knownReasons.includes(reason.data.error)
-          ? reason.data.error
-          : "other",
-    });
-    throw new GoogleAuthError("failed");
-  }
+  if (!response.ok) throw new GoogleAuthError("failed");
   const data: unknown = await response.json();
   const { id_token: idToken } = z
     .object({ id_token: z.string().min(1) })
