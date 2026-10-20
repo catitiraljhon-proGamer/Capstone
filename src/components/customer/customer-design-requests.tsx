@@ -10,7 +10,6 @@ import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
-import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
@@ -375,35 +374,38 @@ function DesignRequestForm({ houseDesignId }: {
             </div>
           ) : (
           <>
-          <fieldset
-            id={fieldIds.houseType}
-            tabIndex={-1}
-            className="mt-5 outline-none"
-            aria-describedby={showError("houseType") ? `${fieldIds.houseType}-error` : undefined}
-          >
-            <legend className="text-sm font-semibold">
+          <div className="mt-5">
+            <label htmlFor={fieldIds.houseType} className="block text-sm font-semibold">
               House Type <RequiredIndicator />
-            </legend>
-            <p className="mt-1 text-sm text-stone-600">
+            </label>
+            <p id={`${fieldIds.houseType}-hint`} className="mt-1 text-sm text-stone-600">
               Choose the style for your design. When the house is built, it is filed under this category in our house designs.
             </p>
-            <div className="mt-3">
-              {catalog.houseTypes.length ? (
-                <HouseTypeCards
-                  compact
-                  houseTypes={catalog.houseTypes}
-                  selected={houseType}
-                  onSelect={(heading) => {
-                    setHouseType(heading);
-                    touch("houseType");
-                  }}
-                />
-              ) : (
-                <p role="status" className="text-sm text-stone-500">Loading house types…</p>
-              )}
-            </div>
+            <select
+              id={fieldIds.houseType}
+              value={houseType ?? ""}
+              disabled={!catalog.houseTypes.length}
+              onChange={(event) => {
+                setHouseType(event.target.value || null);
+                touch("houseType");
+              }}
+              onBlur={() => touch("houseType")}
+              aria-invalid={showError("houseType") ? true : undefined}
+              aria-describedby={[`${fieldIds.houseType}-hint`, showError("houseType") ? `${fieldIds.houseType}-error` : ""].filter(Boolean).join(" ")}
+              className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600 sm:max-w-sm"
+            >
+              <option value="">{catalog.houseTypes.length ? "Select a house type" : "Loading house types…"}</option>
+              {catalog.houseTypes.map((type) => (
+                <option key={type.heading} value={type.heading}>{type.heading}</option>
+              ))}
+            </select>
+            {houseType ? (
+              <p className="mt-2 text-xs leading-5 text-stone-500">
+                {catalog.houseTypes.find((type) => type.heading === houseType)?.description}
+              </p>
+            ) : null}
             <FieldError id={`${fieldIds.houseType}-error`} message={showError("houseType")} />
-          </fieldset>
+          </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
               <label className="block">
