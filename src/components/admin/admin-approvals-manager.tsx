@@ -2,6 +2,7 @@
 
 import { AdminDesignWorkflow } from "@/components/admin/admin-design-workflow";
 import { Button } from "@/components/ui/button";
+import { useModalBehavior } from "@/lib/use-modal-behavior";
 import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import { formatPeso } from "@/lib/house-design-data";
 import {
@@ -189,6 +190,9 @@ function ApprovalReviewDialog({
   onNotice: (message: string) => void;
 }) {
   const [note, setNote] = useState(approval.reviewNote ?? "");
+  useModalBehavior(true, () => {
+    if (!isSaving) onClose();
+  });
   const inspirationImages = approval.inspirationImages ?? [];
   const deliveredImages = approval.completedDesignImages ?? [];
 

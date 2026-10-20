@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useModalBehavior } from "@/lib/use-modal-behavior";
 import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import {
   roleLabels,
@@ -238,6 +239,8 @@ export function AdminUsersRolesManager() {
     setEditingUserId(null);
     setForm(emptyForm);
   };
+
+  useModalBehavior(isFormOpen, closeForm);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
