@@ -188,9 +188,9 @@ export async function createConstructionRequest(db: Db, actor: SessionUser, raw:
     _id: objectId(input.designRequestId, "Design request not found."), customerId,
   });
   if (!design) throw new BillingError("Design request not found.", 404);
-  if (designWorkflow(design) === "blueprint" ? design.status !== "Design approved" : (await customerDesignDto(db, design)).access !== "unlocked") {
+  if ((await customerDesignDto(db, design)).access !== "unlocked") {
     throw new BillingError(designWorkflow(design) === "blueprint"
-      ? "Approve your design and floor plan in Dream House before requesting a construction cost estimate."
+      ? "Pay the blueprint fee in full before proceeding to construction."
       : "Your house design must be fully paid and unlocked before you can proceed to construction.", 409);
   }
   if (input.preferredStartDate <= manilaDate()) throw new BillingError("Choose a preferred start date after today.");
@@ -382,8 +382,8 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
   })), { session });
 
   const [clerks, admins] = await Promise.all([activeUsers(db, session, "billing-clerk"), activeUsers(db, session, "admin")]);
-  // Blueprint workflow: the blueprint fee is billed and paid before the downpayment invoice can be issued.
-  const blueprintFirst = Boolean(design && designWorkflow(design) === "blueprint");
+  // Estimates accepted before the blueprint was paid (older requests) still wait for the blueprint fee.
+  const blueprintFirst = Boolean(design && designWorkflow(design) === "blueprint" && (await customerDesignDto(db, design)).access !== "unlocked");
   await notify(db, session, clerks.map((clerk) => clerk._id), blueprintFirst ? {
     title: "Blueprint fee ready to bill",
     body: `${actor.name} accepted ${estimate.reference}. Once the admin submits the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) can be issued after the blueprint is paid.`,

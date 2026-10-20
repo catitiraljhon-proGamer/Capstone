@@ -6,6 +6,7 @@ import { CheckCircle2, Download, FileText, LockKeyhole, MessageSquareText, Send 
 import { BillingErrorMessage, billingDate, billingJson } from "@/components/billing/billing-primitives";
 import { constructionFieldClass, Eyebrow } from "@/components/customer/construction-shared";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
+import { BlueprintPickup } from "@/components/customer/blueprint-pickup";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import type { DesignRequestDto, DesignVersionDto } from "@/types/design-requests";
@@ -56,7 +57,7 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
         body: JSON.stringify({ decision, note: decision === "changes" ? note.trim() : "" }),
       }));
       onChanged(decision === "approved"
-        ? "Design approved. You can now request a construction cost estimate for it."
+        ? "Design approved. G4 Builders will now prepare your blueprint."
         : "Your requested changes were sent. The admin will upload a revised design for your review.");
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Unable to send your response.");
@@ -68,7 +69,7 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
   return (
     <div className="space-y-3 rounded-lg border border-red-200 bg-rose-50/60 p-4">
       <p className="text-sm font-semibold text-stone-950">Is this design and floor plan what you want?</p>
-      <p className="text-sm leading-6 text-stone-600">Approve it to continue to the construction cost estimate, or tell the admin what to change. Reviews are free.</p>
+      <p className="text-sm leading-6 text-stone-600">Approve it so G4 Builders can prepare your blueprint, or tell the admin what to change. Reviews are free.</p>
       <BillingErrorMessage message={error} />
       {mode === "changes" ? (
         <div>
@@ -96,8 +97,8 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
   );
 }
 
-/** Blueprint fee and download once the design is approved. */
-function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestDto; estimateAccepted: boolean }) {
+/** Blueprint fee, then the blueprint online and a printed copy at the office, once the design is approved. */
+function BlueprintSection({ design, onChanged }: { design: DesignRequestDto; onChanged: (message?: string) => void }) {
   return (
     <div className="space-y-3 rounded-lg border border-stone-200 p-4">
       <div className="flex items-center gap-2">
@@ -106,9 +107,7 @@ function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestD
       </div>
       {design.access === "awaiting-invoice" && (
         <p className="text-sm leading-6 text-stone-600">
-          {estimateAccepted
-            ? "The Billing Clerk is preparing your blueprint fee invoice. It will appear in Billing Status."
-            : "The blueprint is billed after you accept your construction cost estimate below. The design review and estimate are free."}
+          G4 Builders is preparing your blueprint. Its fee invoice will appear in Billing Status once it is ready.
         </p>
       )}
       {design.invoice && (
@@ -123,14 +122,14 @@ function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestD
           <p className="mb-3 text-sm leading-6 text-stone-600">
             {design.invoice?.pending
               ? "Payment submitted — awaiting Billing Clerk verification. The blueprint unlocks once the full fee is verified."
-              : "Pay the blueprint fee to unlock your blueprint. Partial payments do not unlock it. Your downpayment invoice follows after this."}
+              : "Pay the blueprint fee to unlock your blueprint. Partial payments do not unlock it."}
           </p>
           <Button asChild><Link href={`/customer/billing?invoice=${design.invoice?.id}`}>Pay / Review Blueprint Fee</Link></Button>
         </div>
       )}
       {design.access === "unlocked" && (
         <div>
-          <p className="mb-3 text-sm text-stone-600">Full payment verified. Download your blueprint files.</p>
+          <p className="mb-3 text-sm text-stone-600">Full payment verified. Download your blueprint files here, or pick up a printed copy at our office.</p>
           <ul className="divide-y divide-stone-200 rounded-lg border border-stone-200">
             {design.blueprintFiles.map((file) => (
               <li key={file.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
@@ -141,6 +140,7 @@ function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestD
               </li>
             ))}
           </ul>
+          <div className="mt-4"><BlueprintPickup design={design} onChanged={onChanged} /></div>
         </div>
       )}
     </div>
@@ -148,9 +148,8 @@ function BlueprintSection({ design, estimateAccepted }: { design: DesignRequestD
 }
 
 /** Blueprint workflow: free design and floor plan review, then the paid blueprint. */
-export function DreamHouseDesignReview({ design, estimateAccepted, onChanged }: {
+export function DreamHouseDesignReview({ design, onChanged }: {
   design: DesignRequestDto;
-  estimateAccepted: boolean;
   onChanged: (message?: string) => void;
 }) {
   const latest = design.versions.at(-1);
@@ -188,7 +187,7 @@ export function DreamHouseDesignReview({ design, estimateAccepted, onChanged }: 
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
             You approved this design{design.designApprovedAt ? ` on ${billingDate(design.designApprovedAt)}` : ""}.
           </p>
-          <BlueprintSection design={design} estimateAccepted={estimateAccepted} />
+          <BlueprintSection design={design} onChanged={onChanged} />
         </>
       )}
       <VersionHistory versions={design.versions} />

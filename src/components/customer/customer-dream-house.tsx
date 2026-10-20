@@ -59,7 +59,7 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
       </div>
       <div className="divide-y divide-stone-200">
         {design.workflow === "blueprint"
-          ? <DreamHouseDesignReview design={design} estimateAccepted={estimate?.status === "Accepted"} onChanged={onChanged} />
+          ? <DreamHouseDesignReview design={design} onChanged={onChanged} />
           : <DreamHouseDesignSection design={design} />}
         <DreamHouseConstructionSection
           design={design} estimate={estimate} project={project} starting={starting}
@@ -152,7 +152,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
         <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">From design to construction</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Dream House</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-rose-100">
-          Review your design and floor plan for free and request changes until it is right. Once you approve it, get a free construction cost estimate. After you accept the estimate, pay for the blueprint, then pay by stage as the house goes up.
+          Review your design and floor plan for free and request changes until it is right. Once you approve it, pay for the blueprint, then download it or pick up a printed copy at our office. If you want us to build it, proceed to construction for a free cost estimate and pay by stage as the house goes up.
         </p>
         <Button asChild variant="outline" className="mt-5 min-h-11"><Link href="/customer/design-requests">New Design Request</Link></Button>
       </section>

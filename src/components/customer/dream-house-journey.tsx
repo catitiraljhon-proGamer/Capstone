@@ -2,16 +2,16 @@ import { Check } from "lucide-react";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
 
-const blueprintSteps = ["Design Request", "Design Review", "Design Approved", "Cost Estimate", "Blueprint Paid", "Downpayment", "Construction"] as const;
+const blueprintSteps = ["Design Request", "Design Review", "Design Approved", "Blueprint Paid", "Cost Estimate", "Downpayment", "Construction"] as const;
 const legacySteps = ["Design Request", "Design Delivered", "Design Fee Paid", "Construction Estimate", "Downpayment", "Construction"] as const;
 
 export function journeySteps(design: DesignRequestDto): readonly string[] {
   return design.workflow === "blueprint" ? blueprintSteps : legacySteps;
 }
 
-/** Blueprint designs open the estimate once approved; legacy designs once their design fee is paid. */
+/** Construction is optional and opens once the blueprint (or, for legacy designs, the design fee) is fully paid. */
 export function canRequestEstimate(design: DesignRequestDto) {
-  return design.workflow === "blueprint" ? design.status === "Design approved" : design.access === "unlocked";
+  return design.access === "unlocked";
 }
 
 const designStatusText: Record<DesignRequestDto["status"], string> = {
@@ -31,8 +31,8 @@ export function journeyProgress(design: DesignRequestDto, estimate?: CostEstimat
       !["Pending", "In review", "Rejected"].includes(design.status),
       design.versions.length > 0,
       design.status === "Design approved",
-      estimate?.status === "Accepted",
       design.access === "unlocked",
+      estimate?.status === "Accepted",
       downpaymentDone(project),
       project?.status === "Completed",
     ]
@@ -60,10 +60,10 @@ function estimateStageText(estimate?: CostEstimateDto) {
 export function journeyStageText(design: DesignRequestDto, estimate?: CostEstimateDto, project?: ConstructionProjectDto) {
   if (design.workflow === "blueprint") {
     if (design.status !== "Design approved") return designStatusText[design.status];
-    if (estimate?.status !== "Accepted") return estimateStageText(estimate);
-    if (design.access === "awaiting-invoice") return "Awaiting blueprint fee invoice";
+    if (design.access === "awaiting-invoice") return "Preparing your blueprint";
     if (design.access === "payment-required") return design.invoice?.pending ? "Blueprint payment under verification" : "Blueprint fee payment required";
     if (project) return project.status === "Awaiting downpayment" ? "Awaiting downpayment" : `Project ${project.status.toLowerCase()}`;
+    if (estimate) return estimateStageText(estimate);
     return "Blueprint paid";
   }
   if (design.access === "awaiting-invoice") return "Design Ready · Awaiting Fee Invoice";

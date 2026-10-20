@@ -213,7 +213,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
     {loading && <p role="status" className="text-sm text-stone-500">Loading billing records…</p>}
     {!error && !loading && <>
       {!customer && ["Dashboard", "Progress Billings"].includes(section) && data.designRequests.some((design) => !design.invoiceId) && <BillingPanel>
-        <h2 className="text-lg font-semibold tracking-tight">Blueprints and Designs Awaiting Fee Invoice</h2><p className="mt-1 text-sm text-stone-600">These customers accepted their cost estimate and the admin uploaded the blueprint (or, for older requests, delivered the design). Prepare the agreed fee so the customer can pay and unlock their files.</p>
+        <h2 className="text-lg font-semibold tracking-tight">Blueprints and Designs Awaiting Fee Invoice</h2><p className="mt-1 text-sm text-stone-600">These customers approved their design and the admin submitted the blueprint (or, for older requests, delivered the design). Prepare the agreed fee so the customer can pay and unlock their files.</p>
         <div className="mt-4 divide-y divide-stone-200">{data.designRequests.filter((design) => !design.invoiceId).map((design) => <div key={design.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-semibold">{design.customerName}</p><p className="mt-1 text-xs text-stone-500">{designFeeLabels[design.feeType]} · {design.label}</p></div><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", designRequestId: design.id })}>Prepare {designFeeLabels[design.feeType]}</Button></div>)}</div>
       </BillingPanel>}
       {!inReportTab && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

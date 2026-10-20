@@ -56,6 +56,9 @@ test("a customer's meeting request reaches the admins, and only office-hour time
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-17T06:00:00.000Z"] }), now), isError(400)); // today
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-18T02:00:00.000Z"] }), now), isError(400)); // Sunday
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-19T10:00:00.000Z"] }), now), isError(400)); // 6:00 PM
+  await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-19T04:00:00.000Z"] }), now), isError(400)); // 12:00 PM lunch
+  await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-19T08:45:00.000Z"] }), now), isError(400)); // 4:45 PM, ends after 5:00
+  await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-24T04:00:00.000Z"] }), now), isError(400)); // Saturday 12:00 PM
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: [mondayTen, mondayTen] }), now), isError(400));
   await assert.rejects(requestMeeting(db, customer, request({ projectId: new ObjectId().toHexString() }), now), isError(400));
   await assert.rejects(requestMeeting(db, admin, request(), now), isError(403));

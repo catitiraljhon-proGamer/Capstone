@@ -256,7 +256,7 @@ test("the admin calendar lists every customer payment date with its live status"
   assert.equal(dues.filter((due) => due.status === "Upcoming").length, project.milestones.length - 2);
 });
 
-test("blueprint-flow designs open the free estimate once the customer approves them, and the clerk bills the blueprint first", async () => {
+test("blueprint-flow designs open the optional construction estimate only after the blueprint is fully paid", async () => {
   const now = new Date();
   const id = new ObjectId();
   await db.collection<DesignRequestDocument>("design_requests").insertOne({
@@ -264,19 +264,32 @@ test("blueprint-flow designs open the free estimate once the customer approves t
     notes: "Courtyard home", status: "Changes requested", currentVersion: 1, createdAt: now, updatedAt: now,
   });
   await assert.rejects(createConstructionRequest(db, customer, requestInput(id.toHexString())), isError(409));
+  // An approved design is not enough: the blueprint must be paid first.
   await db.collection("design_requests").updateOne({ _id: id }, { $set: { status: "Design approved", designApprovedAt: now } });
+  await assert.rejects(createConstructionRequest(db, customer, requestInput(id.toHexString())), isError(409));
+  const feeId = new ObjectId();
+  await db.collection<InvoiceDocument>("invoices").insertOne({
+    _id: feeId, invoiceNumber: "INV-BLUEPRINT", customerId: new ObjectId(customer.id), designRequestId: id, feeType: "blueprint",
+    label: "Blueprint fee", progressPercentage: 0, amount: 5000, dueDate: new Date("2099-12-31T00:00:00.000Z"), status: "Sent", createdAt: now, updatedAt: now,
+  });
+  await assert.rejects(createConstructionRequest(db, customer, requestInput(id.toHexString())), isError(409));
+  await db.collection<PaymentDocument>("payments").insertOne({
+    _id: new ObjectId(), reference: "PAY-BLUEPRINT", customerId: new ObjectId(customer.id), invoiceId: feeId, amount: 5000,
+    method: "Cash", status: "Verified", paidAt: now, createdAt: now, verifiedAt: now,
+  });
+  await db.collection("invoices").updateOne({ _id: feeId }, { $set: { status: "Paid" } });
   const estimate = await createConstructionRequest(db, customer, requestInput(id.toHexString()));
-  assert.equal(await db.collection("payments").countDocuments(), 0);
   await changeEstimate(db, admin, estimate.id, savePayload());
   await changeEstimate(db, admin, estimate.id, { action: "send" });
   const { projectId } = await changeEstimate(db, customer, estimate.id, { action: "accept", downpaymentPercent: 30 });
   assert.ok(projectId);
-  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
-  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 0);
+  // The blueprint is already paid, so the clerk can issue the downpayment right away.
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 1);
   const project = await projectDto(projectId);
   const downpaymentInvoice = project.milestones[0].invoice?.id;
   assert.ok(downpaymentInvoice);
-  await assert.rejects(changeInvoice(db, clerk, downpaymentInvoice, { action: "issue" }), isError(409));
+  await changeInvoice(db, clerk, downpaymentInvoice, { action: "issue" });
 });
 
 test("only the owner of an unlocked design can request construction, and each design allows one request", async () => {

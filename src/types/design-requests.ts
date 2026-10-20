@@ -55,6 +55,15 @@ export type DesignWorkflowDto = {
   blueprintCanReopen: boolean;
 };
 
+/** The customer's request to pick up the printed blueprint at the office. */
+export type BlueprintPickupDto = {
+  requestId: string;
+  status: "Pending" | "Approved" | "Declined" | "Cancelled";
+  preferredTimes: string[];
+  scheduledFor?: string;
+  declineReason?: string;
+};
+
 export type DesignRequestDto = {
   id: string;
   workflow: DesignWorkflow;
@@ -85,4 +94,6 @@ export type DesignRequestDto = {
   /** Paid files: the legacy design images, or the blueprint for the blueprint workflow. */
   access: "in-progress" | "awaiting-invoice" | "payment-required" | "unlocked";
   invoice: { id: string; number: string; amount: number; paid: number; balance: number; pending: number } | null;
+  /** Blueprint workflow only: the latest request to pick up the printed blueprint. */
+  pickup: BlueprintPickupDto | null;
 };

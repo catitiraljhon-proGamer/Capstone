@@ -2,6 +2,7 @@ import { ObjectId, type ClientSession, type Db } from "mongodb";
 import { z } from "zod";
 import {
   collections,
+  type DesignRequestDocument,
   type MeetingRequestDocument,
   type ProjectDocument,
   type ScheduleDocument,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/database/collections";
 import { audit, BillingError, billingTransaction } from "@/lib/server/billing";
 import { insertNotifications } from "@/lib/server/notifications";
+import { designWorkflow, feeInvoiceState } from "@/lib/server/design-requests";
+import { isWithinOfficeHours, officeHoursText } from "@/lib/office-hours";
 import { listPaymentDues } from "@/lib/server/payment-dues";
 import type { SessionUser } from "@/types/domain";
 import type {
@@ -22,7 +25,6 @@ import type {
 const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Select a valid record.");
 const statusSchema = z.enum(["Scheduled", "Completed", "Cancelled"]);
 const day = 24 * 60 * 60 * 1000;
-const manilaOffset = 8 * 60 * 60 * 1000;
 
 /** Each staff role manages one kind of event; the other kind is view-only for them. */
 const managedEventType: Record<"admin" | "billing-clerk", ScheduleEventType> = {
@@ -61,6 +63,11 @@ const meetingReviewSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({ action: z.literal("decline"), reason: z.string().trim().min(3, "Enter a reason for the customer.").max(500) }).strict(),
 ]);
+
+export const pickupRequestInputSchema = z.object({
+  preferredTimes: z.array(z.iso.datetime()).min(1, "Choose at least one preferred time.").max(3, "Choose up to three preferred times."),
+  details: z.string().trim().max(500).optional(),
+}).strict();
 
 /** Customers can keep this many requests waiting at once. */
 const maxPendingRequests = 3;
@@ -103,6 +110,8 @@ function toMeetingRequestDto(document: MeetingRequestDocument): MeetingRequestDt
     status: document.status,
     scheduledFor: document.scheduledFor?.toISOString(),
     declineReason: document.declineReason,
+    ...(document.purpose ? { purpose: document.purpose } : {}),
+    ...(document.designRequestId ? { designRequestId: document.designRequestId.toHexString() } : {}),
     createdAt: document.createdAt.toISOString(),
   };
 }
@@ -245,25 +254,23 @@ export async function updateScheduleStatus(db: Db, actor: SessionUser, id: strin
   });
 }
 
-/** Office hours for requested meetings: Monday to Saturday, starting 8:00 AM to 4:00 PM Manila time. */
-function isWithinOfficeHours(time: Date) {
-  const manila = new Date(time.getTime() + manilaOffset);
-  const minutes = manila.getUTCHours() * 60 + manila.getUTCMinutes();
-  return manila.getUTCDay() !== 0 && minutes >= 8 * 60 && minutes <= 16 * 60;
-}
-
-export async function requestMeeting(db: Db, actor: SessionUser, raw: unknown, now = new Date()) {
-  if (actor.role !== "customer") throw new BillingError("Only customers can request a meeting.", 403);
-  const input = meetingRequestInputSchema.parse(raw);
-  const preferredTimes = input.preferredTimes.map((time) => new Date(time));
+/** Requested times must be distinct, between one and 90 days ahead, and inside office hours. */
+function assertPreferredTimes(preferredTimes: Date[], now: Date) {
   if (new Set(preferredTimes.map((time) => time.getTime())).size !== preferredTimes.length) {
     throw new BillingError("Each preferred time must be different.", 400);
   }
   for (const time of preferredTimes) {
     if (time.getTime() < now.getTime() + day) throw new BillingError("Choose times at least one day from now.", 400);
     if (time.getTime() > now.getTime() + 90 * day) throw new BillingError("Choose times within the next 90 days.", 400);
-    if (!isWithinOfficeHours(time)) throw new BillingError("Choose times from Monday to Saturday, 8:00 AM to 4:00 PM.", 400);
+    if (!isWithinOfficeHours(time)) throw new BillingError(`Choose times during office hours: ${officeHoursText}.`, 400);
   }
+}
+
+export async function requestMeeting(db: Db, actor: SessionUser, raw: unknown, now = new Date()) {
+  if (actor.role !== "customer") throw new BillingError("Only customers can request a meeting.", 403);
+  const input = meetingRequestInputSchema.parse(raw);
+  const preferredTimes = input.preferredTimes.map((time) => new Date(time));
+  assertPreferredTimes(preferredTimes, now);
   const customerId = recordId(actor.id, "Account");
   const requests = db.collection<MeetingRequestDocument>(collections.meetingRequests);
   if (await requests.countDocuments({ customerId, status: "Pending" }) >= maxPendingRequests) {
@@ -346,10 +353,59 @@ export async function reviewMeetingRequest(db: Db, actor: SessionUser, id: strin
     await audit(db, session, actor, "meeting-request.approved", "meeting_request", requestId, { scheduleId: meeting._id.toHexString(), proposedNewTime });
     await insertNotifications(db, [{
       _id: new ObjectId(), userId: pending.customerId, kind: "meeting-request", entityId: meeting._id, href: "/customer/schedule",
-      title: proposedNewTime ? "Meeting set for a different time" : "Meeting request approved",
+      title: pending.purpose === "blueprint-pickup"
+        ? (proposedNewTime ? "Blueprint pickup set for a different time" : "Blueprint pickup scheduled")
+        : (proposedNewTime ? "Meeting set for a different time" : "Meeting request approved"),
       body: `${pending.topic} is scheduled for ${formatScheduleDate(scheduledFor)}${location ? ` · ${location}` : ""}.${proposedNewTime ? " Your preferred times were not available." : ""}`,
       createdAt: now,
     }], session);
     return { request: toMeetingRequestDto(approved!), schedule: toScheduleDto(meeting) };
   });
+}
+
+/**
+ * After the blueprint fee is fully paid, the customer asks to pick up the printed blueprint at the office.
+ * The admin confirms one of the times (or proposes another) through the usual meeting request review.
+ */
+export async function requestBlueprintPickup(db: Db, actor: SessionUser, designRequestId: string, raw: unknown, now = new Date()) {
+  if (actor.role !== "customer") throw new BillingError("Only customers can schedule a blueprint pickup.", 403);
+  const input = pickupRequestInputSchema.parse(raw);
+  const preferredTimes = input.preferredTimes.map((time) => new Date(time));
+  assertPreferredTimes(preferredTimes, now);
+  const customerId = recordId(actor.id, "Account");
+  const design = await db.collection<DesignRequestDocument>(collections.designRequests)
+    .findOne({ _id: recordId(designRequestId, "Design request"), customerId });
+  if (!design) throw new BillingError("Design request not found.", 404);
+  if (designWorkflow(design) !== "blueprint" || !(await feeInvoiceState(db, design)).unlocked) {
+    throw new BillingError("Pay the blueprint fee in full before scheduling a pickup.", 409);
+  }
+  const requests = db.collection<MeetingRequestDocument>(collections.meetingRequests);
+  const open = await requests.findOne({
+    designRequestId: design._id, purpose: "blueprint-pickup",
+    $or: [{ status: "Pending" }, { status: "Approved", scheduledFor: { $gt: now } }],
+  });
+  if (open) {
+    throw new BillingError(open.status === "Pending"
+      ? "Your pickup request is waiting for the admin. Cancel it first to choose other times."
+      : "Your blueprint pickup is already scheduled.", 409);
+  }
+  const { client } = await findCustomerAndProject(db, customerId, undefined);
+  const designName = design.selectedDesign?.name ?? `${design.floorArea.toLocaleString("en-PH")} sqm design`;
+  const document: MeetingRequestDocument = {
+    _id: new ObjectId(), customerId, customerName: client.name,
+    topic: `Blueprint pickup — ${designName}`, ...(input.details ? { details: input.details } : {}), mode: "In person",
+    purpose: "blueprint-pickup", designRequestId: design._id,
+    preferredTimes: [...preferredTimes].sort((left, right) => left.getTime() - right.getTime()),
+    status: "Pending", createdAt: now, updatedAt: now,
+  };
+  await billingTransaction(db, async (session) => {
+    await requests.insertOne(document, { session });
+    await audit(db, session, actor, "blueprint-pickup.requested", "meeting_request", document._id, { designRequestId: design._id.toHexString() });
+    const admins = await db.collection<UserDocument>(collections.users).find({ role: "admin", status: "active" }, { session, projection: { _id: 1 } }).toArray();
+    await insertNotifications(db, admins.map((admin) => ({
+      _id: new ObjectId(), userId: admin._id, kind: "meeting-request", entityId: document._id, href: "/admin/scheduling",
+      title: "Blueprint pickup request", body: `${client.name} wants to pick up the printed blueprint for ${designName}. Confirm a time in Scheduling.`, createdAt: now,
+    })), session);
+  });
+  return toMeetingRequestDto(document);
 }

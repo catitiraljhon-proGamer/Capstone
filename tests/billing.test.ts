@@ -11,6 +11,7 @@ import { receiptHtml } from "@/lib/server/billing-receipt";
 import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
 import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, reopenBlueprint, respondToDesign, submitBlueprint, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
+import { requestBlueprintPickup, reviewMeetingRequest } from "@/lib/server/schedules";
 import { acceptAccountTerms, requireAccountTerms } from "@/lib/server/account-terms";
 import { accountTerms, accountTermsText } from "@/lib/account-terms";
 import { designRequestTerms } from "@/lib/design-request-terms";
@@ -203,9 +204,7 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   assert.equal(listed.access, "awaiting-invoice");
   assert.equal(await db.collection("payments").countDocuments(), 0);
 
-  // The blueprint fee needs an accepted estimate and uploaded blueprint files.
-  await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
-  await acceptedEstimate(request.id);
+  // The blueprint fee needs submitted blueprint files; no construction estimate is needed.
   await assert.rejects(createInvoice(db, clerk, feeInput(request.id)), isError(409));
   const file = await uploadBlueprintFile(db, admin, request.id, { name: "A-101 floor plan.pdf", dataUrl: blueprintPdf });
   // The Billing Clerk is asked to bill only after the admin submits the finished blueprint.
@@ -238,6 +237,8 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   await assert.rejects(createInvoice(db, clerk, { ...draft, projectId: project }), isError(409));
   const paymentId = await submitPayment(db, customer, payment(invoiceId, 5000));
   assert.equal((await listCustomerDesigns(db, customer))[0].access, "payment-required");
+  // A pickup of the printed blueprint waits for full payment.
+  await assert.rejects(requestBlueprintPickup(db, customer, request.id, pickup, scheduleNow), isError(409));
   await reviewPayment(db, clerk, paymentId, { action: "verify" });
   listed = (await listCustomerDesigns(db, customer))[0];
   assert.equal(listed.selectedDesign?.id, design._id.toHexString());
@@ -248,8 +249,26 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   await assert.rejects(getBlueprintFile(db, other, request.id, file.id), isError(404));
   await assert.rejects(deleteBlueprintFile(db, admin, request.id, file.id), isError(409));
   assert.equal(await db.collection("notifications").countDocuments({ title: "Your blueprint is unlocked" }), 1);
-  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 1);
+  // No project is waiting for a downpayment, so the clerk is not asked to issue one.
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 0);
   await createInvoice(db, clerk, { ...draft, projectId: project });
+
+  // Once paid, the customer can also ask to pick up the printed blueprint; the admin confirms it.
+  await assert.rejects(requestBlueprintPickup(db, other, request.id, pickup, scheduleNow), isError(404));
+  await assert.rejects(requestBlueprintPickup(db, customer, request.id, { preferredTimes: ["2026-10-19T04:30:00.000Z"] }, scheduleNow), isError(400)); // 12:30 PM lunch
+  await assert.rejects(requestBlueprintPickup(db, customer, request.id, { preferredTimes: ["2026-10-24T05:00:00.000Z"] }, scheduleNow), isError(400)); // Saturday 1:00 PM
+  const sent = await requestBlueprintPickup(db, customer, request.id, pickup, scheduleNow);
+  assert.equal(sent.purpose, "blueprint-pickup");
+  assert.equal(sent.mode, "In person");
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Blueprint pickup request" }), 1);
+  assert.equal((await listCustomerDesigns(db, customer))[0].pickup?.status, "Pending");
+  await assert.rejects(requestBlueprintPickup(db, customer, request.id, pickup, scheduleNow), isError(409));
+  await reviewMeetingRequest(db, admin, sent.id, { action: "approve", scheduledFor: pickup.preferredTimes[0], durationMinutes: 30 }, scheduleNow);
+  const scheduled = (await listCustomerDesigns(db, customer))[0].pickup;
+  assert.equal(scheduled?.status, "Approved");
+  assert.equal(scheduled?.scheduledFor, pickup.preferredTimes[0]);
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Blueprint pickup scheduled" }), 1);
+  await assert.rejects(requestBlueprintPickup(db, customer, request.id, pickup, scheduleNow), isError(409));
 });
 
 test("the Terms and Conditions need an explicit customer agreement to the current version", async () => {
@@ -325,13 +344,9 @@ async function deliverLegacy(id: string) {
     status: "Completed", completedDesignImages: [privateImage], completedAt: new Date(),
   } });
 }
-async function acceptedEstimate(designRequestId: string) {
-  const now = new Date();
-  await db.collection("cost_estimates").insertOne({
-    _id: new ObjectId(), reference: `EST-${designRequestId.slice(-6)}`, customerId: new ObjectId(customer.id), designRequestId: new ObjectId(designRequestId),
-    lineItems: [], subtotal: 0, total: 0, scheduleTemplate: [], adminNotes: "", status: "Accepted", createdAt: now, updatedAt: now,
-  });
-}
+// Saturday, October 17, 2026, 8:00 AM in Manila; the pickup is Monday at 10:00 AM.
+const scheduleNow = new Date("2026-10-17T00:00:00.000Z");
+const pickup = { preferredTimes: ["2026-10-19T02:00:00.000Z"] };
 /** A construction project created from the request's accepted estimate. */
 async function linkedProject(designRequestId: string) {
   const now = new Date();
@@ -388,11 +403,14 @@ test("design versions need an approved feasibility record and blueprint files ne
   await assert.rejects(uploadBlueprintFile(db, admin, id, { name: "fake.pdf", dataUrl: "data:application/pdf;base64,aGVsbG8=" }), isError(400));
   await assert.rejects(submitBlueprint(db, admin, id), isError(409));
   const file = await uploadBlueprintFile(db, admin, id, { name: "plan.pdf", dataUrl: blueprintPdf });
-  // Without an accepted estimate the blueprint cannot be submitted yet.
-  await assert.rejects(submitBlueprint(db, admin, id), isError(409));
-  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
+  // Before submitting, files can still be removed.
   await deleteBlueprintFile(db, admin, id, file.id);
   assert.equal(await db.collection("blueprint_files").countDocuments(), 0);
+  // The blueprint is submitted right after the design is approved; no construction estimate is needed.
+  const kept = await uploadBlueprintFile(db, admin, id, { name: "plan.pdf", dataUrl: blueprintPdf });
+  await submitBlueprint(db, admin, id);
+  assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 1);
+  await assert.rejects(deleteBlueprintFile(db, admin, id, kept.id), isError(409));
 });
 
 test("design fees require completed work, remain separate from contracts, and have only one active invoice", async () => {

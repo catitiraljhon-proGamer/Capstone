@@ -24,7 +24,7 @@ function AcceptedEstimateSummary({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
-/** The construction part of a Dream House card; opens once the design is approved (or, for legacy designs, paid). */
+/** The optional construction part of a Dream House card; opens once the blueprint (or legacy design fee) is paid. */
 export function DreamHouseConstructionSection({ design, estimate, project, starting, onStart, onCancelStart, onSubmitted, onChanged }: {
   design: DesignRequestDto;
   estimate?: CostEstimateDto;
@@ -35,7 +35,8 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
   onSubmitted: (estimate: CostEstimateDto) => void;
   onChanged: (message?: string) => void;
 }) {
-  if (!canRequestEstimate(design)) {
+  // Estimates requested before the blueprint came first stay visible.
+  if (!canRequestEstimate(design) && !estimate) {
     // A declined request never reaches construction, so the hint would mislead.
     if (design.status === "Rejected") return null;
     return (
@@ -43,7 +44,7 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
         <p className="flex items-start gap-2 text-sm leading-6 text-stone-500">
           <LockKeyhole className="mt-1 h-4 w-4 shrink-0" />
           {design.workflow === "blueprint"
-            ? "Construction cost estimation opens after you approve your design and floor plan."
+            ? "Construction is optional. It opens after your blueprint fee is fully paid."
             : "Construction estimation opens after your design fee is fully paid."}
         </p>
       </section>
@@ -57,10 +58,10 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
       {!estimate && !starting && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-red-200 bg-rose-50/60 p-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-stone-950">Ready to build this design?</p>
-            <p className="mt-1 max-w-xl text-sm leading-6 text-stone-600">G4 Builders will prepare an itemized cost estimate with a payment schedule for you to review. Nothing is charged until you accept it.</p>
+            <p className="text-sm font-semibold text-stone-950">Want G4 Builders to build this design? (Optional)</p>
+            <p className="mt-1 max-w-xl text-sm leading-6 text-stone-600">Your blueprint is yours to keep either way. If you want us to build it, we will prepare an itemized cost estimate with a payment schedule for you to review. Nothing is charged until you accept it.</p>
           </div>
-          <Button className="min-h-11" onClick={onStart}><HardHat className="mr-2 h-4 w-4 shrink-0" />Proceed to Construction Cost Estimation</Button>
+          <Button className="min-h-11" onClick={onStart}><HardHat className="mr-2 h-4 w-4 shrink-0" />Proceed to Construction</Button>
         </div>
       )}
       {!estimate && starting && <ConstructionRequestForm design={design} showDesignFacts={false} onCancel={onCancelStart} onSubmitted={onSubmitted} />}

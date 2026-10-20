@@ -36,6 +36,9 @@ export type MeetingRequestDto = {
   status: MeetingRequestStatus;
   scheduledFor?: string;
   declineReason?: string;
+  /** Set when the customer asks to pick up a paid blueprint in person. */
+  purpose?: "blueprint-pickup";
+  designRequestId?: string;
   createdAt: string;
 };
 

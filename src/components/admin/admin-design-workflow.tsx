@@ -217,17 +217,17 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
     }
   };
 
-  const estimateAccepted = workflow.estimate?.status === "Accepted";
-  const estimateText = !workflow.estimate ? "The customer has not requested a cost estimate yet."
-    : estimateAccepted ? `Estimate ${workflow.estimate.reference} accepted.`
-      : `Estimate ${workflow.estimate.reference} is ${workflow.estimate.status.toLowerCase()}.`;
+  // Construction is optional and comes after the blueprint, so an estimate is shown only for reference.
+  const estimateText = workflow.estimate
+    ? `Construction estimate ${workflow.estimate.reference} is ${workflow.estimate.status.toLowerCase()}. `
+    : "";
 
   return (
     <div className="rounded-xl border border-stone-200 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Blueprint</p>
       <h3 className="mt-1 font-semibold">Blueprint Files</h3>
       <p className="mt-1 text-sm leading-6 text-stone-600">
-        {estimateText} Upload every blueprint file, then submit the blueprint so the Billing Clerk can bill its fee. The customer downloads these only after full payment is verified.
+        {estimateText}Upload every blueprint file, then submit the blueprint so the Billing Clerk can bill its fee. The customer downloads these, or picks up a printed copy, only after full payment is verified.
       </p>
       {workflow.blueprintInvoice && (
         <p className="mt-2 text-sm text-stone-700">
@@ -278,15 +278,12 @@ function BlueprintFiles({ workflow, onChanged }: { workflow: DesignWorkflowDto; 
               <input type="file" accept={blueprintAccept} disabled={busy} onChange={(event) => void upload(event)} className="sr-only" />
             </label>
             {workflow.blueprintFiles.length > 0 && (
-              <Button type="button" disabled={busy || !estimateAccepted} onClick={() => void submit()}>
+              <Button type="button" disabled={busy} onClick={() => void submit()}>
                 <Send className="mr-2 h-4 w-4" />Submit Blueprint to Billing Clerk
               </Button>
             )}
           </div>
           <p className="mt-2 text-xs text-stone-500">PDF, JPG, PNG, or WebP · one file at a time · 3 MB each · up to 10 files</p>
-          {workflow.blueprintFiles.length > 0 && !estimateAccepted && (
-            <p className="mt-1 text-xs text-stone-500">You can submit once the customer accepts the construction cost estimate.</p>
-          )}
         </>
       )}
     </div>

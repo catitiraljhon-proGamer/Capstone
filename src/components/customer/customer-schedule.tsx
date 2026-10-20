@@ -4,6 +4,7 @@ import { PaymentDueCard } from "@/components/billing/payment-due-card";
 import { Button } from "@/components/ui/button";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
 import { formatPeso } from "@/lib/house-design-data";
+import { officeHoursText } from "@/lib/office-hours";
 import {
   eventTypeClass,
   formatScheduleDateTime,
@@ -223,7 +224,7 @@ export function CustomerSchedule() {
 
             <fieldset className="md:col-span-2">
               <legend className="text-sm font-medium text-stone-700">Preferred Times</legend>
-              <p className="mt-1 text-xs text-stone-500">Monday to Saturday, 8:00 AM to 4:00 PM, from tomorrow up to 90 days ahead.</p>
+              <p className="mt-1 text-xs text-stone-500">Office hours: {officeHoursText}. From tomorrow up to 90 days ahead.</p>
               <div className="mt-2 grid gap-3 sm:grid-cols-3">
                 {form.preferredTimes.map((time, index) => (
                   <div key={index} className="flex items-end gap-2">

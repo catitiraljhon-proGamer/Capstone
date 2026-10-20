@@ -1,6 +1,6 @@
 import { ObjectId, MongoServerError, type ClientSession, type Db, type Filter } from "mongodb";
 import { z } from "zod";
-import { collections, type AuditLogDocument, type BlueprintFileDocument, type DesignRequestDocument, type EstimateDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type AuditLogDocument, type BlueprintFileDocument, type DesignRequestDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { insertNotifications } from "@/lib/server/notifications";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
@@ -175,7 +175,7 @@ async function validateInvoice(db: Db, session: ClientSession, input: z.infer<ty
 
 /**
  * Legacy requests bill a design fee after delivery. Blueprint requests bill the blueprint fee once the customer
- * approved the design, accepted the construction estimate, and the admin uploaded the blueprint files.
+ * approved the design and the admin submitted the blueprint files; construction is optional and comes after.
  */
 async function validateDesignInvoice(db: Db, session: ClientSession, id: ObjectId, exceptId?: ObjectId) {
   const design = await db.collection<DesignRequestDocument>(collections.designRequests).findOneAndUpdate(
@@ -188,8 +188,6 @@ async function validateDesignInvoice(db: Db, session: ClientSession, id: ObjectI
     }
   } else {
     if (design.status !== "Design approved") throw new BillingError("The customer must approve the design before the blueprint fee is billed.", 409);
-    const estimate = await db.collection<EstimateDocument>(collections.estimates).findOne({ designRequestId: design._id }, { session, projection: { status: 1 } });
-    if (estimate?.status !== "Accepted") throw new BillingError("The customer must accept the construction cost estimate before the blueprint fee is billed.", 409);
     if (!design.blueprintSubmittedAt || !(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }, { session }))) {
       throw new BillingError("The admin must submit the blueprint before the blueprint fee is billed.", 409);
     }
@@ -409,11 +407,14 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
     await insertNotifications(db, [{
       _id: new ObjectId(), userId: invoice.customerId, title: blueprint ? "Your blueprint is unlocked" : "Your house design is unlocked",
       body: blueprint
-        ? "Full payment of your blueprint fee was verified. Open Dream House to download your blueprint. Your downpayment invoice comes next."
+        ? "Full payment of your blueprint fee was verified. Open Dream House to download your blueprint, schedule a pickup of the printed copy, or proceed to construction."
         : "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
       href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
     }], session);
-    if (blueprint) {
+    // Customers who accepted an estimate before paying the blueprint already have a project waiting for its downpayment.
+    const waitingProject = blueprint && await db.collection<ProjectDocument>(collections.projects)
+      .countDocuments({ designRequestId: invoice.designRequestId, status: "Awaiting downpayment" }, { session });
+    if (waitingProject) {
       const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
       await insertNotifications(db, clerks.map((clerk) => ({
         _id: new ObjectId(), userId: clerk._id, title: "Downpayment invoice ready to issue",
@@ -482,7 +483,7 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
 
 /** Legacy delivered designs, plus approved designs whose blueprint the admin submitted. */
 async function billableDesignRequests(db: Db) {
-  // Blueprint requests appear once the admin submits the blueprint, which requires an accepted estimate.
+  // Blueprint requests appear once the admin submits the blueprint.
   return db.collection<DesignRequestDocument>(collections.designRequests)
     .find({ $or: [{ status: "Completed" }, { status: "Design approved", blueprintSubmittedAt: { $exists: true } }] }, { projection: { customerId: 1, floorArea: 1, rooms: 1, status: 1 } })
     .sort({ updatedAt: -1 }).toArray();

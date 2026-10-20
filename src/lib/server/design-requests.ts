@@ -1,11 +1,11 @@
 import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
-import { collections, type ApprovalDocument, type BlueprintFileDocument, type DesignRequestDocument, type DesignVersionDocument, type EstimateDocument, type InvoiceDocument, type PaymentDocument, type UserDocument } from "@/lib/database/collections";
+import { collections, type ApprovalDocument, type BlueprintFileDocument, type DesignRequestDocument, type DesignVersionDocument, type EstimateDocument, type InvoiceDocument, type MeetingRequestDocument, type PaymentDocument, type UserDocument } from "@/lib/database/collections";
 import { invoiceState, sumMoney, toCentavos } from "@/lib/billing";
 import { audit, BillingError, billingTransaction } from "@/lib/server/billing";
 import { embeddedImagesSchema } from "@/lib/server/embedded-images";
 import { insertNotifications } from "@/lib/server/notifications";
-import type { BlueprintFileDto, DesignRequestDto, DesignVersionDto, DesignWorkflow, DesignWorkflowDto } from "@/types/design-requests";
+import type { BlueprintFileDto, BlueprintPickupDto, DesignRequestDto, DesignVersionDto, DesignWorkflow, DesignWorkflowDto } from "@/types/design-requests";
 import type { SessionUser } from "@/types/domain";
 
 function requestId(value: string) {
@@ -49,7 +49,7 @@ async function blueprintFileDtos(db: Db, designRequestId: ObjectId): Promise<Blu
 }
 
 /** Verified payments against the request's fee invoice; the invoice unlocks the paid files once fully settled. */
-async function feeInvoiceState(db: Db, design: DesignRequestDocument) {
+export async function feeInvoiceState(db: Db, design: DesignRequestDocument) {
   const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOne({
     designRequestId: design._id, customerId: design.customerId,
     status: { $nin: ["Draft", "Ready", "Void"] },
@@ -68,13 +68,28 @@ async function feeInvoiceState(db: Db, design: DesignRequestDocument) {
   };
 }
 
+/** The customer's latest request to pick up the printed blueprint, ignoring cancelled ones. */
+async function latestPickup(db: Db, designRequestId: ObjectId): Promise<BlueprintPickupDto | null> {
+  const request = await db.collection<MeetingRequestDocument>(collections.meetingRequests).findOne(
+    { designRequestId, purpose: "blueprint-pickup", status: { $ne: "Cancelled" } }, { sort: { createdAt: -1 } },
+  );
+  if (!request) return null;
+  return {
+    requestId: request._id.toHexString(), status: request.status,
+    preferredTimes: request.preferredTimes.map((time) => time.toISOString()),
+    ...(request.scheduledFor ? { scheduledFor: request.scheduledFor.toISOString() } : {}),
+    ...(request.declineReason ? { declineReason: request.declineReason } : {}),
+  };
+}
+
 /** Never put image or file contents in list responses. */
 export async function customerDesignDto(db: Db, design: DesignRequestDocument): Promise<DesignRequestDto> {
   const workflow = designWorkflow(design);
-  const [{ unlocked, invoice }, versions, blueprintFiles] = await Promise.all([
+  const [{ unlocked, invoice }, versions, blueprintFiles, pickup] = await Promise.all([
     feeInvoiceState(db, design),
     workflow === "blueprint" ? versionDtos(db, design._id) : [],
     workflow === "blueprint" ? blueprintFileDtos(db, design._id) : [],
+    workflow === "blueprint" ? latestPickup(db, design._id) : null,
   ]);
   const ready = workflow === "legacy" ? design.status === "Completed" : design.status === "Design approved";
   return {
@@ -91,6 +106,7 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
     imageCount: imagesFor(design).length, versions, blueprintFiles,
     access: !ready ? "in-progress" : !invoice ? "awaiting-invoice" : unlocked ? "unlocked" : "payment-required",
     invoice,
+    pickup,
   };
 }
 
@@ -256,7 +272,7 @@ async function lockedForBlueprintChanges(db: Db, design: DesignRequestDocument) 
 }
 
 /**
- * The admin submits the finished blueprint once every file is uploaded and the customer accepted the estimate.
+ * The admin submits the finished blueprint once every file is uploaded; the customer approved the design already.
  * Only then is the Billing Clerk asked to bill the blueprint fee, and the files are locked.
  */
 export async function submitBlueprint(db: Db, actor: SessionUser, id: string) {
@@ -266,9 +282,7 @@ export async function submitBlueprint(db: Db, actor: SessionUser, id: string) {
   if (!(await db.collection<BlueprintFileDocument>(collections.blueprintFiles).countDocuments({ designRequestId: design._id }))) {
     throw new BillingError("Upload at least one blueprint file before submitting.", 409);
   }
-  const estimate = await db.collection<EstimateDocument>(collections.estimates)
-    .findOne({ designRequestId: design._id, status: "Accepted" }, { projection: { reference: 1 } });
-  if (!estimate) throw new BillingError("Submit the blueprint after the customer accepts the construction cost estimate.", 409);
+  const designName = design.selectedDesign?.name ?? `${design.floorArea.toLocaleString("en-PH")} sqm design`;
   return billingTransaction(db, async (session) => {
     const now = new Date();
     const submitted = await db.collection<DesignRequestDocument>(collections.designRequests).updateOne(
@@ -278,10 +292,10 @@ export async function submitBlueprint(db: Db, actor: SessionUser, id: string) {
     if (!submitted.matchedCount) throw new BillingError("The blueprint was already submitted.", 409);
     await insertNotifications(db, (await activeUserIds(db, "billing-clerk")).map((clerkId) => ({
       _id: new ObjectId(), userId: clerkId, title: "Blueprint ready for billing",
-      body: `The blueprint for ${estimate.reference} was submitted. Set the blueprint fee and issue its invoice.`,
+      body: `The blueprint for ${designName} was submitted. Set the blueprint fee and issue its invoice.`,
       href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: design._id, createdAt: now,
     })), session);
-    await audit(db, session, actor, "design-request.blueprint-submitted", "design_request", design._id, { estimateReference: estimate.reference });
+    await audit(db, session, actor, "design-request.blueprint-submitted", "design_request", design._id, { designName });
     return { submittedAt: now.toISOString() };
   });
 }

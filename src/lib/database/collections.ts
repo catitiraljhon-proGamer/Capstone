@@ -498,6 +498,9 @@ export type MeetingRequestDocument = {
   topic: string;
   details?: string;
   mode: MeetingMode;
+  /** Set when the customer asks to pick up a paid blueprint in person. */
+  purpose?: "blueprint-pickup";
+  designRequestId?: ObjectId;
   /** One to three times the customer can attend, in order of preference. */
   preferredTimes: Date[];
   status: MeetingRequestStatus;
