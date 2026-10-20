@@ -20,7 +20,6 @@ interface SignInPageProps {
   testimonials?: Testimonial[];
   onSignIn?: (event: FormEvent<HTMLFormElement>) => void;
   onGoogleSignIn?: () => void;
-  onResetPassword?: () => void;
   initialError?: string;
   googleLinkEmail?: string;
   initialRememberMe?: boolean;
@@ -74,7 +73,6 @@ export function SignInPage({
   testimonials = defaultTestimonials,
   onSignIn,
   onGoogleSignIn,
-  onResetPassword,
   initialError = "",
   googleLinkEmail,
   initialRememberMe = false,
@@ -237,13 +235,12 @@ export function SignInPage({
                     />
                     Keep me signed in
                   </label>
-                  <button
-                    type="button"
-                    onClick={onResetPassword}
+                  <Link
+                    href="/forgot-password"
                     className="font-medium text-red-800 transition hover:text-red-950 hover:underline"
                   >
                     Forgot password?
-                  </button>
+                  </Link>
                 </div>
 
                 <button

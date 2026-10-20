@@ -17,6 +17,7 @@
     "test:construction": "node --import tsx --test tests/construction-pricing.test.ts tests/construction.test.ts",
     "test:paymongo": "node --import tsx --test tests/paymongo.test.ts",
     "test:security": "node --import tsx --test tests/security.test.ts",
+    "test:password-reset": "node --import tsx --test tests/password-reset.test.ts",
     "test:schedules": "node --import tsx --test tests/schedules.test.ts",
     "test:reports": "node --import tsx --test tests/collections-report.test.ts",
     "test:maintenance": "node --import tsx --test tests/maintenance.test.ts tests/maintenance-mode.test.ts",

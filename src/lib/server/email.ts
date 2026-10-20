@@ -111,6 +111,48 @@ export function verificationCodeEmail(to: string, code: string, minutesValid: nu
   };
 }
 
+function buttonLink(href: string, label: string) {
+  return `<a href="${escapeHtml(href)}" style="display:inline-block;background:#b91c1c;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:12px 20px;border-radius:8px">${escapeHtml(label)}</a>`;
+}
+
+export function passwordResetEmail(
+  to: string,
+  recipientName: string,
+  token: string,
+  minutesValid: number,
+): EmailMessage {
+  const link = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+  return {
+    to,
+    subject: "Reset your G4 Builders password",
+    text: `Hi ${recipientName},\n\nWe received a request to reset your G4 Builders password. Open this link to set a new one:\n${link}\n\nThe link expires in ${minutesValid} minutes and works once. If you did not ask to reset your password, you can ignore this email.`,
+    html: layout(
+      "Reset your password",
+      `<p style="margin:0 0 8px;font-size:14px;line-height:22px;color:#57534e">Hi ${escapeHtml(recipientName)},</p>
+<p style="margin:0 0 20px;font-size:14px;line-height:22px;color:#57534e">We received a request to reset your G4 Builders password. Click the button below to set a new one.</p>
+${buttonLink(link, "Reset Password")}
+<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#78716c">The link expires in ${minutesValid} minutes and works once. If you did not ask to reset your password, you can ignore this email.</p>`,
+    ),
+  };
+}
+
+/** Sent instead of a reset link when the account has no password and signs in with Google. */
+export function googleSignInReminderEmail(to: string, recipientName: string): EmailMessage {
+  const link = appUrl("/login");
+  return {
+    to,
+    subject: "How to sign in to G4 Builders",
+    text: `Hi ${recipientName},\n\nWe received a request to reset your G4 Builders password, but your account signs in with Google and has no password. Go to ${link} and choose "Sign in with Google".\n\nIf you did not make this request, you can ignore this email.`,
+    html: layout(
+      "Your account uses Google sign-in",
+      `<p style="margin:0 0 8px;font-size:14px;line-height:22px;color:#57534e">Hi ${escapeHtml(recipientName)},</p>
+<p style="margin:0 0 20px;font-size:14px;line-height:22px;color:#57534e">We received a request to reset your G4 Builders password, but your account signs in with Google and has no password to reset. Open the sign-in page and choose <strong>Sign in with Google</strong>.</p>
+${buttonLink(link, "Go to Sign In")}
+<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#78716c">If you did not make this request, you can ignore this email.</p>`,
+    ),
+  };
+}
+
 export function notificationEmail(
   to: string,
   recipientName: string,

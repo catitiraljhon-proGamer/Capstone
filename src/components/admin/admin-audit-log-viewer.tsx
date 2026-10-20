@@ -70,6 +70,7 @@ const actionLabels: Record<string, string> = {
   "auth.logout": "Signed out",
   "auth.registered": "Registered an account",
   "auth.locked": "Sign-in locked after failed attempts",
+  "auth.password-reset": "Reset their password by email",
   "auth.two-factor-enabled": "Turned on two-factor authentication",
   "auth.two-factor-disabled": "Turned off two-factor authentication",
   "auth.recovery-codes-regenerated": "Generated new recovery codes",

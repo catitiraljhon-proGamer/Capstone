@@ -24,6 +24,10 @@ export const rateLimitPolicies = {
   verificationEmailIp: { maxAttempts: 10, windowMs: 60 * minute, lockMs: 60 * minute, maxLockMs: 24 * 60 * minute },
   /** Verification emails sent to one address, so nobody can flood an inbox. */
   verificationEmailAddress: { maxAttempts: 5, windowMs: 60 * minute, lockMs: 60 * minute, maxLockMs: 24 * 60 * minute },
+  /** Password reset emails requested from one network address. */
+  passwordResetIp: { maxAttempts: 10, windowMs: 60 * minute, lockMs: 60 * minute, maxLockMs: 24 * 60 * minute },
+  /** Password reset emails sent to one address. */
+  passwordResetAddress: { maxAttempts: 3, windowMs: 60 * minute, lockMs: 60 * minute, maxLockMs: 24 * 60 * minute },
 } satisfies Record<string, RateLimitPolicy>;
 
 /** Lock history is forgotten after a quiet day so old mistakes stop escalating. */
@@ -45,6 +49,8 @@ export const rateLimitKeys = {
   register: (ip: string) => `register:ip:${hashed(ip)}`,
   verificationEmailIp: (ip: string) => `verification-email:ip:${hashed(ip)}`,
   verificationEmailAddress: (email: string) => `verification-email:address:${hashed(email.trim().toLowerCase())}`,
+  passwordResetIp: (ip: string) => `password-reset:ip:${hashed(ip)}`,
+  passwordResetAddress: (email: string) => `password-reset:address:${hashed(email.trim().toLowerCase())}`,
 };
 
 /** Vercel overwrites x-forwarded-for with the real client address. */
