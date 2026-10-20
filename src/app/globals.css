@@ -28,6 +28,12 @@ body {
   }
 }
 
+/* Edge adds its own show-password eye; our password fields have their own toggle. */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
 /* Date and time pickers have a built-in minimum width that pushes them out of narrow grid columns. */
 input[type="date"],
 input[type="time"],
