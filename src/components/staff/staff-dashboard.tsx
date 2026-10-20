@@ -25,6 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 
@@ -308,6 +309,9 @@ function AdminOverviewCard({
 
 function AdminDashboardOverview() {
   const { summary, pendingApprovals, isLoading, error } = useAdminDashboardData();
+  const router = useRouter();
+  const openApproval = (reference: string) =>
+    router.push(`/admin/approvals?review=${encodeURIComponent(reference)}`);
 
   return (
     <div className="space-y-6">
@@ -386,14 +390,23 @@ function AdminDashboardOverview() {
                     <th className="border-b border-stone-200 px-3 py-3">
                       Status
                     </th>
-                    <th className="border-b border-stone-200 px-3 py-3 text-right">
-                      Action
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {pendingApprovals.map((approval) => (
-                    <tr key={approval.reference}>
+                    <tr
+                      key={approval.reference}
+                      tabIndex={0}
+                      aria-label={`Review ${approval.reference}`}
+                      onClick={() => openApproval(approval.reference)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openApproval(approval.reference);
+                        }
+                      }}
+                      className="cursor-pointer outline-none transition hover:bg-stone-50 focus-visible:bg-rose-50"
+                    >
                       <td className="border-b border-stone-100 px-3 py-4 font-semibold">
                         {approval.reference}
                       </td>
@@ -407,14 +420,6 @@ function AdminDashboardOverview() {
                         <span className="rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700">
                           {approval.status}
                         </span>
-                      </td>
-                      <td className="border-b border-stone-100 px-3 py-4 text-right">
-                        <Link
-                          href={approval.href}
-                          className="text-sm font-semibold text-red-700 hover:text-red-900"
-                        >
-                          View
-                        </Link>
                       </td>
                     </tr>
                   ))}

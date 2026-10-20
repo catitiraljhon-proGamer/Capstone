@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Eye,
   FileCheck2,
   LoaderCircle,
   RefreshCw,
@@ -490,6 +489,15 @@ export function AdminApprovalsManager() {
         setApprovals(payload.approvals);
         setSummary(payload.summary);
         setError(null);
+        // The dashboard links here with ?review=<reference> to open that record straight away.
+        const params = new URLSearchParams(window.location.search);
+        const requested = payload.approvals.find((approval) => approval.reference === params.get("review"));
+        if (requested) setSelectedApproval(requested);
+        if (params.has("review")) {
+          params.delete("review");
+          const query = params.toString();
+          window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+        }
       })
       .catch((loadError: unknown) => {
         if (!active) return;
@@ -695,12 +703,23 @@ export function AdminApprovalsManager() {
                   <th className="border-b border-stone-200 px-5 py-3">Record</th>
                   <th className="border-b border-stone-200 px-5 py-3">Submitted</th>
                   <th className="border-b border-stone-200 px-5 py-3">Status</th>
-                  <th className="border-b border-stone-200 px-5 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleApprovals.map((approval) => (
-                  <tr key={approval.id} className="hover:bg-stone-50">
+                  <tr
+                    key={approval.id}
+                    tabIndex={0}
+                    aria-label={`${approval.status === "Pending" ? "Review" : "View"} ${approval.reference}`}
+                    onClick={() => openReview(approval)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openReview(approval);
+                      }
+                    }}
+                    className="cursor-pointer outline-none transition hover:bg-stone-50 focus-visible:bg-rose-50"
+                  >
                     <td className="border-b border-stone-100 px-5 py-4 align-top">
                       <p className="font-semibold">{approval.reference}</p>
                       <p className="mt-1 text-xs text-stone-500">{approval.recordType}</p>
@@ -743,12 +762,6 @@ export function AdminApprovalsManager() {
                           {designStageLabel[approval.sourceStatus ?? ""] ?? "Design in progress"}
                         </p>
                       ) : null}
-                    </td>
-                    <td className="border-b border-stone-100 px-5 py-4 text-right align-top">
-                      <Button type="button" variant="outline" size="sm" onClick={() => openReview(approval)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        {approval.status === "Pending" ? "Review" : "View"}
-                      </Button>
                     </td>
                   </tr>
                 ))}
