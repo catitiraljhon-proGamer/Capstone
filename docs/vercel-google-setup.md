@@ -83,12 +83,6 @@ The remaining examples use `https://YOUR-APP.vercel.app`. Replace that placehold
 with the actual production domain assigned to your project. Do not use a changing
 deployment-specific preview URL.
 
-The live production domain is `https://www.g4builders.online`. The bare
-`g4builders.online` redirects to it. The domain is registered at Hostinger, which
-keeps the DNS, with `A @ 216.198.79.1`, `A @ 64.29.17.1`, and
-`CNAME www aedccde6b9e0d971.vercel-dns-017.com`. Set `APP_URL` to
-`https://www.g4builders.online` in Vercel.
-
 See [Vercel's GitHub integration](https://vercel.com/docs/git/vercel-for-github)
 and [supported Node.js versions](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
 
@@ -96,11 +90,6 @@ and [supported Node.js versions](https://vercel.com/docs/functions/runtimes/node
 
 If you already have a Google OAuth **Web application** client, you can add the
 production callback to that client and reuse its client ID and secret.
-
-The production client is `G4 Builders Web`, in the Google Cloud project
-`g4-builders-inc` owned by `gbuildersincorporated@gmail.com`. It allows the
-callback on `g4builders.online`, `www.g4builders.online`,
-`capstone-eight-beta.vercel.app`, and `localhost:3000`.
 
 1. Open [Google Auth Platform](https://console.cloud.google.com/auth/overview) and select or create a Google Cloud project.
 2. Complete the branding setup with your app name, support email, and developer contact email. Use `G4 Builders Inc` as the app name.
@@ -172,7 +161,7 @@ verified after the production configuration is complete.
 | Google sign-in is not available yet | All three `GOOGLE_*` values exist in the Production environment, and the app was redeployed. |
 | `redirect_uri_mismatch` | The Google client's authorized callback exactly matches `GOOGLE_REDIRECT_URI`. |
 | Returns to localhost or a different domain | Vercel still has the local callback or an old domain; update it and redeploy. |
-| Google seems to succeed but you are not signed in | Google always finishes on the domain in `GOOGLE_REDIRECT_URI`, and the session is saved there. Open the app from that same production domain (currently `https://www.g4builders.online`), not a team or deployment URL such as `capstone-team-les1.vercel.app`. |
+| Google seems to succeed but you are not signed in | Google always finishes on the domain in `GOOGLE_REDIRECT_URI`, and the session is saved there. Open the app from that same production domain (currently `https://capstone-eight-beta.vercel.app`), not a team or deployment URL such as `capstone-team-les1.vercel.app`. |
 | Customers see "Log in to Vercel" | That URL is covered by Vercel Deployment Protection. Share the public production domain instead, or adjust **Settings > Deployment Protection** in Vercel. |
 | Google succeeds but the application cannot finish login | Check Atlas database credentials, network access, database permissions, and Vercel runtime logs. |
 | Sign-in is temporarily unavailable because of a database problem | Open `/api/public/stats` on the production domain. A server error there confirms the database problem also affects other routes. Check Atlas Network Access for the Vercel server, not just your computer. |
