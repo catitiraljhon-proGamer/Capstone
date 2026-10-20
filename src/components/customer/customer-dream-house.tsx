@@ -49,8 +49,7 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p>
               <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.rooms}`}</h2>
-              {design.selectedDesign && <p className="mt-1 text-sm text-stone-600">{design.floorArea} sqm · {design.rooms}</p>}
-              <p className="mt-1 break-words text-sm text-stone-600">{design.rooms}</p>
+              {design.selectedDesign && <p className="mt-1 break-words text-sm text-stone-600">{design.floorArea} sqm · {design.rooms}</p>}
             </div>
           </div>
           <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">{journeyStageText(design, estimate, project)}</span>
@@ -167,7 +166,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
       {loading && !data && <p role="status" className="text-sm text-stone-500">Loading your dream house…</p>}
       {designNotEligible && (
         <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
-          That design is not available for construction yet. Construction estimation opens after you approve your design and floor plan.
+          That design is not available for construction yet. Construction opens after your blueprint fee is fully paid.
         </p>
       )}
 
@@ -176,7 +175,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
           <HardHat className="mx-auto h-10 w-10 text-stone-400" />
           <h2 className="mt-4 text-lg font-semibold">No Dream House Yet</h2>
           <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-stone-600">
-            Your journey starts with a design. Explore finished designs for inspiration, or send your own requirements in Design Requests. Once you approve your design, you can ask G4 Builders to estimate construction right here.
+            Your journey starts with a design. Explore finished designs for inspiration, or send your own requirements in Design Requests. Once you approve your design and pay for the blueprint, you can download it, pick up a printed copy, or ask G4 Builders to build it.
           </p>
           <div className="mt-5 flex flex-col justify-center gap-3 sm:flex-row">
             <Button asChild variant="outline" className="min-h-11"><Link href="/customer/finished-designs">Explore Finished Designs</Link></Button>
