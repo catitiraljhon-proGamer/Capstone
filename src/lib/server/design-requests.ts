@@ -79,7 +79,9 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
   const ready = workflow === "legacy" ? design.status === "Completed" : design.status === "Design approved";
   return {
     id: design._id.toHexString(), workflow, floorArea: design.floorArea, bedrooms: design.bedrooms, bathrooms: design.bathrooms,
-    selectedDesign: design.selectedDesign, houseType: design.houseType, finish: design.finish,
+    selectedDesign: design.selectedDesign, houseType: design.houseType,
+    // Only custom requests carry a finish; older published-design requests may still hold one.
+    finish: design.selectedDesign ? undefined : design.finish,
     rooms: design.rooms, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
     ...(design.preferredDate ? { preferredDate: design.preferredDate.toISOString().slice(0, 10) } : {}),

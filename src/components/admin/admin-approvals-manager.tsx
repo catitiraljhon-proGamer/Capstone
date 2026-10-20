@@ -264,8 +264,8 @@ function ApprovalReviewDialog({
           </div>
 
           {approval.recordType === "Design request" ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg bg-stone-50 p-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="min-w-0 rounded-lg bg-stone-50 p-3 sm:p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                   Preferred Date
                 </p>
@@ -273,7 +273,7 @@ function ApprovalReviewDialog({
                   {approval.preferredDate ? formatDay(approval.preferredDate) : "Not specified"}
                 </p>
               </div>
-              <div className="rounded-lg bg-stone-50 p-4">
+              <div className="min-w-0 rounded-lg bg-stone-50 p-3 sm:p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                   Needed By
                 </p>
@@ -291,7 +291,7 @@ function ApprovalReviewDialog({
 
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
-              Request Details
+              {approval.selectedDesign ? "Client Notes" : "Request Details"}
             </p>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-stone-700">
               {approval.description}

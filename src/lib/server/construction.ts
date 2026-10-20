@@ -145,7 +145,8 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
       designRequestId: estimate.designRequestId?.toHexString() ?? null,
       designLabel: designLabelOf(design as DesignRequestDocument | undefined),
       floorArea: design?.floorArea ?? null,
-      finish: design?.finish ?? null,
+      // Published-design requests from before finishes were removed may still carry one; it does not apply.
+      finish: design && !design.selectedDesign ? design.finish ?? null : null,
       preferredStartDate: isoDate(estimate.preferredStartDate), neededBy: isoDate(estimate.neededBy),
       siteAddress: estimate.siteAddress ?? "", siteAddressDetails: estimate.siteAddressDetails ?? null,
       customerNotes: estimate.customerNotes ?? "",

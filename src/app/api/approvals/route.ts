@@ -127,7 +127,10 @@ export async function GET() {
         subject: source.selectedDesign
           ? `${source.selectedDesign.name} — design request`
           : `${source.floorArea.toLocaleString("en-PH")} sqm ${source.houseType ? `${source.houseType} ` : ""}design request`,
-        description: `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.finish ? `${source.finish} finish · ` : ""}${source.rooms} — ${source.notes}`,
+        // A published design already shows its size and rooms, so only the client's note is added.
+        description: source.selectedDesign
+          ? source.notes
+          : `${source.floorArea.toLocaleString("en-PH")} sqm · ${source.finish ? `${source.finish} finish · ` : ""}${source.rooms} — ${source.notes}`,
         sourceStatus: source.status,
         sourceAvailable: true,
         selectedDesign: source.selectedDesign,
