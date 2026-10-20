@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { MongoServerError } from "mongodb";
+import { MongoNetworkError, MongoServerError, MongoServerSelectionError } from "mongodb";
 import { ZodError } from "zod";
 import { PasswordPolicyError } from "@/lib/system-settings";
 
@@ -34,6 +34,15 @@ export function apiError(error: unknown) {
     return NextResponse.json(
       { error: "A record with the same unique value already exists." },
       { status: 409 },
+    );
+  }
+
+  // A brief database outage (network, TLS, or failover) should read as "try again", not as a bug.
+  if (error instanceof MongoNetworkError || error instanceof MongoServerSelectionError) {
+    console.error("Database unavailable", { errorType: error.name });
+    return NextResponse.json(
+      { error: "The system can't reach its database right now. Try again in a minute." },
+      { status: 503, headers: { "Retry-After": "60" } },
     );
   }
 
