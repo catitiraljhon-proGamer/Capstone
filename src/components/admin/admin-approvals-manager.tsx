@@ -198,18 +198,19 @@ function ApprovalReviewDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-stone-950/45 p-4"
+      className="fixed inset-0 z-50 flex overflow-y-auto bg-stone-950/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="approval-dialog-title"
     >
       <button
         type="button"
-        className="absolute inset-0 cursor-default"
+        className="fixed inset-0 cursor-default"
         aria-label="Close approval review"
         onClick={onClose}
       />
-      <section className="relative my-6 w-full max-w-3xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xl">
+      {/* Auto margins center a short popup and let a tall one start at the top, so it can scroll fully. */}
+      <section className="relative m-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-stone-200 p-5 sm:p-6">
           <div>
             <div className="flex flex-wrap items-center gap-2">

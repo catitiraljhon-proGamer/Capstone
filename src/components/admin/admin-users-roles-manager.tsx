@@ -355,18 +355,18 @@ export function AdminUsersRolesManager() {
 
       {isFormOpen ? (
         <div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-stone-950/45 p-4"
+          className="fixed inset-0 z-50 flex overflow-y-auto bg-stone-950/45 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="user-form-title"
         >
           <button
             type="button"
-            className="absolute inset-0 cursor-default"
+            className="fixed inset-0 cursor-default"
             aria-label="Close account form"
             onClick={closeForm}
           />
-        <section className="relative my-6 w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
+        <section className="relative m-auto w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
