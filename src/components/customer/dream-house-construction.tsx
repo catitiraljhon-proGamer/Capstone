@@ -35,25 +35,13 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
   onSubmitted: (estimate: CostEstimateDto) => void;
   onChanged: (message?: string) => void;
 }) {
+  // Hidden until the blueprint (or design fee) is paid; the progress bar already marks it optional.
   // Estimates requested before the blueprint came first stay visible.
-  if (!canRequestEstimate(design) && !estimate) {
-    // A declined request never reaches construction, so the hint would mislead.
-    if (design.status === "Rejected") return null;
-    return (
-      <section aria-label="Construction" className="p-5">
-        <p className="flex items-start gap-2 text-sm leading-6 text-stone-500">
-          <LockKeyhole className="mt-1 h-4 w-4 shrink-0" />
-          {design.workflow === "blueprint"
-            ? "Construction is optional. It opens after your blueprint fee is fully paid."
-            : "Construction estimation opens after your design fee is fully paid."}
-        </p>
-      </section>
-    );
-  }
+  if (!canRequestEstimate(design) && !estimate) return null;
   const blueprintPending = design.workflow === "blueprint" && design.access !== "unlocked";
 
   return (
-    <section aria-label="Construction" className="space-y-4 p-5">
+    <section id={`construction-${design.id}`} aria-label="Construction" className="scroll-mt-28 space-y-4 p-5">
       <Eyebrow>Construction</Eyebrow>
       {!estimate && !starting && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-red-200 bg-rose-50/60 p-4">

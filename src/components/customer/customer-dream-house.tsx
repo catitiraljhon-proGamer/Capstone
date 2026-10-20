@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileImage, HardHat, LockKeyhole, RefreshCw } from "lucide-react";
+import { HardHat, RefreshCw } from "lucide-react";
 import { BillingErrorMessage, billingJson } from "@/components/billing/billing-primitives";
 import { ConstructionEstimateCard } from "@/components/customer/construction-estimate-card";
 import { ConstructionProjectCard } from "@/components/customer/construction-project-card";
 import { DreamHouseConstructionSection } from "@/components/customer/dream-house-construction";
 import { DreamHouseDesignReview } from "@/components/customer/dream-house-design-review";
 import { DreamHouseDesignSection } from "@/components/customer/dream-house-design-section";
-import { canRequestEstimate, journeyProgress, JourneyStepper, journeyStageText, journeySteps } from "@/components/customer/dream-house-journey";
+import { canRequestEstimate, dreamHouseName, isDreamHouse, journeyProgress, journeyStages, JourneyStepper, nextStep } from "@/components/customer/dream-house-journey";
+import { DreamHouseNextStep } from "@/components/customer/dream-house-next-step";
 import { Button } from "@/components/ui/button";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
@@ -35,30 +36,21 @@ function DreamHouseCard({ design, estimate, project, highlighted, starting, onSt
   onSubmitted: (estimate: CostEstimateDto) => void;
   onChanged: (message?: string) => void;
 }) {
-  const progress = journeyProgress(design, estimate, project);
-  const unlocked = design.workflow === "blueprint" ? design.status === "Design approved" : design.access === "unlocked";
-  const locked = design.workflow === "legacy" && design.status === "Completed";
+  const specs = [`${design.floorArea.toLocaleString("en-PH")} sqm`, design.rooms, design.finish ? `${design.finish} finish` : null].filter(Boolean).join(" · ");
   return (
     <article id={`dream-${design.id}`} className={`scroll-mt-28 overflow-hidden rounded-xl border bg-white shadow-sm ${highlighted ? "border-red-300 ring-2 ring-red-600/20" : "border-stone-200"}`}>
       <div className="space-y-5 border-b border-stone-200 bg-stone-50 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-4">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white ring-1 ring-stone-200">
-              {unlocked ? <CheckCircle2 className="h-7 w-7 text-red-700" /> : locked ? <LockKeyhole className="h-7 w-7 text-stone-500" /> : <FileImage className="h-7 w-7 text-stone-400" />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Request {design.id.slice(-8).toUpperCase()}</p>
-              <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.rooms}`}</h2>
-              {design.selectedDesign && <p className="mt-1 break-words text-sm text-stone-600">{design.floorArea} sqm · {design.rooms}</p>}
-            </div>
-          </div>
-          <span className="inline-flex rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-red-800 ring-1 ring-inset ring-rose-200">{journeyStageText(design, estimate, project)}</span>
+        <div className="min-w-0">
+          <h2 className="break-words text-xl font-semibold tracking-tight">{dreamHouseName(design)}</h2>
+          <p className="mt-1 break-words text-sm text-stone-600">{specs}</p>
+          <p className="mt-1 text-xs text-stone-400">Request {design.id.slice(-8).toUpperCase()}</p>
         </div>
-        <JourneyStepper steps={journeySteps(design)} current={progress} />
+        <JourneyStepper stages={journeyStages(design)} current={journeyProgress(design, estimate, project)} />
+        <DreamHouseNextStep step={nextStep(design, estimate, project)} />
       </div>
       <div className="divide-y divide-stone-200">
         {design.workflow === "blueprint"
-          ? <DreamHouseDesignReview design={design} onChanged={onChanged} />
+          ? <DreamHouseDesignReview design={design} collapseBlueprint={Boolean(estimate)} onChanged={onChanged} />
           : <DreamHouseDesignSection design={design} />}
         <DreamHouseConstructionSection
           design={design} estimate={estimate} project={project} starting={starting}
@@ -101,7 +93,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
     return () => { controller.abort(); window.removeEventListener("focus", onFocus); };
   }, [load]);
 
-  const { designs, estimates, orphanEstimates, orphanProjects } = useMemo(() => {
+  const { designs, waitingForReview, estimates, orphanEstimates, orphanProjects } = useMemo(() => {
     const allDesigns = data?.designs ?? [];
     const allEstimates = data?.estimates ?? [];
     const allProjects = data?.projects ?? [];
@@ -109,7 +101,8 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
     const owned = allEstimates.filter((estimate) => estimate.designRequestId && designIds.has(estimate.designRequestId));
     const ownedIds = new Set(owned.map((estimate) => estimate.id));
     return {
-      designs: allDesigns,
+      designs: allDesigns.filter(isDreamHouse),
+      waitingForReview: allDesigns.filter((design) => design.status === "Pending" || design.status === "In review").length,
       estimates: owned,
       orphanEstimates: allEstimates.filter((estimate) => !ownedIds.has(estimate.id)),
       orphanProjects: allProjects.filter((project) => !project.estimateId || !ownedIds.has(project.estimateId)),
@@ -143,7 +136,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
   };
 
   const hasOther = orphanEstimates.length > 0 || orphanProjects.length > 0;
-  const nothingYet = Boolean(data) && !designs.length && !hasOther;
+  const nothingYet = Boolean(data) && !designs.length && !hasOther && !waitingForReview;
 
   return (
     <div className="min-w-0 space-y-6">
@@ -167,6 +160,13 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
       {designNotEligible && (
         <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
           That design is not available for construction yet. Construction opens after your blueprint fee is fully paid.
+        </p>
+      )}
+
+      {waitingForReview > 0 && (
+        <p role="status" className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm leading-6 text-stone-700">
+          {waitingForReview === 1 ? "1 design request is" : `${waitingForReview} design requests are`} waiting for G4 Builders to review. It appears here once approved.{" "}
+          <Link href="/customer/design-requests" className="font-semibold text-red-700 hover:underline">View in Design Requests</Link>
         </p>
       )}
 
@@ -207,7 +207,10 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
 
       {hasOther && (
         <section aria-labelledby="other-projects-heading" className="space-y-4">
-          <h2 id="other-projects-heading" className="text-lg font-semibold tracking-tight">Other Projects</h2>
+          <div>
+            <h2 id="other-projects-heading" className="text-lg font-semibold tracking-tight">Other Projects</h2>
+            <p className="mt-1 text-sm text-stone-600">Estimates and projects set up directly with G4 Builders, without a design request in this portal.</p>
+          </div>
           {orphanEstimates.map((estimate) => (
             <ConstructionEstimateCard key={estimate.id} estimate={estimate} highlighted={estimate.id === focusOrphanEstimateId} onChanged={refresh} />
           ))}

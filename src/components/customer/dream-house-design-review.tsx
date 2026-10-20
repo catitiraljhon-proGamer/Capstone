@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { CheckCircle2, Download, FileText, LockKeyhole, MessageSquareText, Send } from "lucide-react";
+import { CheckCircle2, ChevronDown, Download, FileText, LockKeyhole, MessageSquareText, Send } from "lucide-react";
 import { BillingErrorMessage, billingDate, billingJson } from "@/components/billing/billing-primitives";
 import { constructionFieldClass, Eyebrow } from "@/components/customer/construction-shared";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
@@ -147,15 +147,31 @@ function BlueprintSection({ design, onChanged }: { design: DesignRequestDto; onC
   );
 }
 
-/** Blueprint workflow: free design and floor plan review, then the paid blueprint. */
-export function DreamHouseDesignReview({ design, onChanged }: {
+/** A finished stage folded into one line that opens on click. */
+function DoneStage({ id, summary, children }: { id: string; summary: string; children: ReactNode }) {
+  return (
+    <details id={id} className="scroll-mt-28 rounded-lg border border-stone-200">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-stone-950 [&::-webkit-details-marker]:hidden">
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
+        <span className="min-w-0 flex-1 break-words">{summary}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-stone-500" aria-hidden="true" />
+      </summary>
+      <div className="space-y-4 border-t border-stone-200 p-4">{children}</div>
+    </details>
+  );
+}
+
+/** Blueprint workflow: free design and floor plan review, then the paid blueprint. Finished stages fold away. */
+export function DreamHouseDesignReview({ design, collapseBlueprint, onChanged }: {
   design: DesignRequestDto;
+  /** True once the customer moved on to construction, so a paid blueprint folds away. */
+  collapseBlueprint: boolean;
   onChanged: (message?: string) => void;
 }) {
   const latest = design.versions.at(-1);
-  return (
-    <section aria-label="Design" className="space-y-4 p-5">
-      <Eyebrow>Design and Floor Plan</Eyebrow>
+  const approved = design.status === "Design approved";
+  const designDetails = (
+    <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
         <span>Requested {billingDate(design.createdAt)}</span>
         {latest && <span>Version {latest.version} shared {billingDate(latest.createdAt)}</span>}
@@ -163,11 +179,7 @@ export function DreamHouseDesignReview({ design, onChanged }: {
       {design.notes && <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm leading-6 text-stone-600">{design.notes}</p>}
       {!latest && (
         <p className="rounded-lg bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-          {design.status === "Rejected"
-            ? "Review your request or contact the admin before submitting a new one."
-            : design.status === "Approved"
-              ? "Your request is feasible. The admin is preparing your design and floor plan. You will review them here for free."
-              : "Your design and floor plan will appear here after the admin approves your request. Nothing is charged at this stage."}
+          Your design and floor plan will appear here. Reviewing them is free.
         </p>
       )}
       {latest && (
@@ -177,20 +189,31 @@ export function DreamHouseDesignReview({ design, onChanged }: {
           {latest.adminNote && <p className="whitespace-pre-wrap break-words rounded-lg bg-stone-50 p-4 text-sm leading-6 text-stone-700"><span className="font-semibold">Note from G4 Builders:</span> {latest.adminNote}</p>}
         </>
       )}
-      {design.status === "In customer review" && <ReviewActions design={design} onChanged={onChanged} />}
-      {design.status === "Changes requested" && (
-        <p className="rounded-lg bg-rose-50 p-4 text-sm leading-6 text-red-900">Your requested changes were sent. The admin will share a revised version here.</p>
-      )}
-      {design.status === "Design approved" && (
-        <>
-          <p className="flex items-start gap-2 rounded-lg bg-rose-50 p-4 text-sm leading-6 text-red-900">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-            You approved this design{design.designApprovedAt ? ` on ${billingDate(design.designApprovedAt)}` : ""}.
-          </p>
-          <BlueprintSection design={design} onChanged={onChanged} />
-        </>
-      )}
       <VersionHistory versions={design.versions} />
+    </>
+  );
+  const blueprintDone = collapseBlueprint && design.access === "unlocked";
+
+  return (
+    <section aria-label="Design and blueprint" className="space-y-4 p-5">
+      {approved ? (
+        <DoneStage id={`design-${design.id}`} summary={`Design approved${design.designApprovedAt ? ` ${billingDate(design.designApprovedAt)}` : ""} · View design and floor plan`}>
+          {designDetails}
+        </DoneStage>
+      ) : (
+        <div id={`design-${design.id}`} className="scroll-mt-28 space-y-4">
+          <Eyebrow>Design and Floor Plan</Eyebrow>
+          {designDetails}
+          {design.status === "In customer review" && <ReviewActions design={design} onChanged={onChanged} />}
+        </div>
+      )}
+      {approved && (blueprintDone ? (
+        <DoneStage id={`blueprint-${design.id}`} summary="Blueprint paid · Download or pick up">
+          <BlueprintSection design={design} onChanged={onChanged} />
+        </DoneStage>
+      ) : (
+        <div id={`blueprint-${design.id}`} className="scroll-mt-28"><BlueprintSection design={design} onChanged={onChanged} /></div>
+      ))}
     </section>
   );
 }
