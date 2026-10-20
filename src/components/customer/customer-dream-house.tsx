@@ -154,7 +154,7 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
         <p className="mt-3 max-w-2xl text-sm leading-6 text-rose-100">
           Review your design and floor plan for free and request changes until it is right. Once you approve it, get a free construction cost estimate. After you accept the estimate, pay for the blueprint, then pay by stage as the house goes up.
         </p>
-        <Button asChild variant="outline" className="mt-5 min-h-11 w-full sm:w-auto"><Link href="/customer/design-requests">New Design Request</Link></Button>
+        <Button asChild variant="outline" className="mt-5 min-h-11"><Link href="/customer/design-requests">New Design Request</Link></Button>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

@@ -160,7 +160,7 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         <div><label className="text-sm font-medium">Due Date<input required type="date" className={invalidField} {...fields.props("dueDate", messages.dueDate)} value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label>{fields.error("dueDate", messages.dueDate)}</div>
       </div>
       <p className="text-xs leading-5 text-stone-500">Use the agreed fee or approved contract as your basis. Review the saved draft before issuing it to the customer.</p>
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : "Save Draft"}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : "Save Draft"}</Button></div>
     </form>
   </BillingDialog>;
 }
@@ -228,7 +228,7 @@ export function PaymentForm({ invoices, selectedInvoice, customer, mutate, onClo
       {form.proofImage && <p className="text-xs text-stone-600">Payment proof attached.</p>}
       <label className="block text-sm font-medium">Notes (optional)<textarea rows={2} maxLength={1000} value={form.notes} className={field} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
       <p className="text-xs leading-5 text-stone-500">This records a payment made through the selected method. The Billing Clerk will verify the actual transaction before the balance changes and a receipt becomes available.</p>
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy || uploading} onClick={onClose}>Cancel</Button><Button disabled={busy || uploading}>{busy ? "Submitting…" : uploading ? "Attaching…" : "Submit for Verification"}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy || uploading} onClick={onClose}>Cancel</Button><Button disabled={busy || uploading}>{busy ? "Submitting…" : uploading ? "Attaching…" : "Submit for Verification"}</Button></div>
     </form>
   </BillingDialog>;
 }
@@ -298,7 +298,7 @@ export function InvoiceActionDialog({ invoice, action, mutate, onClose }: {
       <p className="text-sm text-stone-600">{invoice.label} · {formatPeso(invoice.amount)} · Due {billingDate(invoice.dueDate)}</p>
       <p className="text-sm leading-6 text-stone-600">{action === "issue" ? "The customer will receive this invoice in their Billing page. Check the billing basis, amount, and due date before releasing it. Issued invoices cannot be edited." : action === "void" ? "This record will remain in the history as void. Pending and verified payments must be resolved first." : "Send an in-app reminder to this customer. Only one reminder per invoice is allowed every 24 hours."}</p>
       {action === "void" && <div><label className="block text-sm font-medium">Reason<textarea required maxLength={1000} rows={3} className={invalidField} {...fields.props("reason", reasonMessage)} value={reason} onChange={(event) => setReason(event.target.value)} /></label>{fields.error("reason", reasonMessage)}</div>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : label}</Button></div>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : label}</Button></div>
     </form>
   </BillingDialog>;
 }
@@ -336,7 +336,7 @@ export function PaymentReview({ payment, customer, mutate, onClose }: {
         {payment.status === "Pending" && <label className="block text-sm font-medium">Decision<select className={field} value={action} onChange={(event) => { setAction(event.target.value as "verify" | "reject"); setConfirmed(false); }}><option value="verify">Verify payment and issue receipt</option><option value="reject">Reject payment</option></select></label>}
         {action !== "verify" ? <div><label className="block text-sm font-medium">{action === "reverse" ? "Reason for Reversal" : "Reason for Rejection"}<textarea required maxLength={1000} className={invalidField} {...fields.props("reason", reasonMessage)} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} /></label>{fields.error("reason", reasonMessage)}</div> : null}
         <div><label className="flex items-start gap-3 rounded-lg border border-stone-200 p-3 text-sm leading-6"><input required type="checkbox" className="mt-1 accent-red-700" {...fields.props("confirmed", confirmMessage)} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span>{action === "verify" ? "I have confirmed the actual payment, amount, and transaction reference. A screenshot alone is not confirmation." : action === "reverse" ? "Reverse this verified payment, restore the invoice balance, and mark its receipt void. The original receipt and history will be retained." : "I have reviewed this submission and recorded the reason for rejection."}</span></label>{fields.error("confirmed", confirmMessage)}</div>
-        <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : action === "verify" ? "Verify & Issue Receipt" : action === "reject" ? "Reject Payment" : "Reverse Payment"}</Button></div>
+        <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : action === "verify" ? "Verify & Issue Receipt" : action === "reject" ? "Reject Payment" : "Reverse Payment"}</Button></div>
       </>}
     </form>
   </BillingDialog>;

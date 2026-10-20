@@ -28,6 +28,15 @@ body {
   }
 }
 
+/* Date and time pickers have a built-in minimum width that pushes them out of narrow grid columns. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
 @keyframes fadeSlideIn {
   to {
     opacity: 1;

@@ -125,7 +125,7 @@ function CompleteProjectDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/50 p-4">
       <form
         role="dialog"
         aria-modal="true"
@@ -133,7 +133,7 @@ function CompleteProjectDialog({
         aria-describedby={`complete-${project.id}-description`}
         onSubmit={(event) => void submit(event)}
         noValidate
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl sm:p-6"
       >
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700">
           <Building2 className="h-4 w-4" aria-hidden="true" />
@@ -188,7 +188,7 @@ function CompleteProjectDialog({
 
         {error ? <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button type="button" variant="outline" disabled={isSaving} onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : "Complete and Save"}</Button>
         </div>

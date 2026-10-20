@@ -257,14 +257,14 @@ function RestoreDialog({ record, onClose }: { record: BackupRecord; onClose: () 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-stone-950/50 p-4">
       <form
         role="dialog"
         aria-modal="true"
         aria-labelledby="restore-title"
         onSubmit={(event) => void submit(event)}
         noValidate
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl sm:p-6"
       >
         <h2 id="restore-title" className="flex items-start gap-2 text-lg font-semibold tracking-tight">
           <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-red-700" aria-hidden="true" />
@@ -290,7 +290,7 @@ function RestoreDialog({ record, onClose }: { record: BackupRecord; onClose: () 
         />
         {error ? <p id="restore-error" role="alert" className="mt-2 text-sm text-red-700">{error}</p> : null}
         {isRestoring ? <p role="status" className="mt-2 text-sm text-stone-600">Restoring… This can take a minute. Keep this page open.</p> : null}
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button type="button" variant="outline" disabled={isRestoring} onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={isRestoring}>{isRestoring ? "Restoring…" : "Restore backup"}</Button>
         </div>

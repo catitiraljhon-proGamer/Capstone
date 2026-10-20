@@ -365,11 +365,11 @@ export function AdminUsersRolesManager() {
           />
         <section className="relative my-6 w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-5 shadow-xl sm:p-6">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
                 {editingUser ? "Account Settings" : "New Access"}
               </p>
-              <h2 id="user-form-title" className="mt-1 text-xl font-semibold tracking-tight">
+              <h2 id="user-form-title" className="mt-1 break-words text-xl font-semibold tracking-tight">
                 {editingUser ? `Edit ${editingUser.name}` : "Create User Account"}
               </h2>
               <p className="mt-1 text-sm text-stone-600">
@@ -381,7 +381,7 @@ export function AdminUsersRolesManager() {
             <button
               type="button"
               onClick={closeForm}
-              className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-stone-500 hover:bg-stone-100"
               aria-label="Close account form"
             >
               <X className="h-5 w-5" />
@@ -449,6 +449,24 @@ export function AdminUsersRolesManager() {
             </label>
 
             <label className="text-sm font-medium text-stone-700">
+              Account Status
+              <select
+                value={form.status}
+                disabled={isEditingCurrentUser}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: event.target.value as UserStatus,
+                  }))
+                }
+                className={fieldClass}
+              >
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               {editingUser ? "New Temporary Password (optional)" : "Temporary Password"}
               <span className="relative block">
                 <KeyRound className="pointer-events-none absolute left-3 top-4 h-4 w-4 text-stone-400" />
@@ -472,25 +490,8 @@ export function AdminUsersRolesManager() {
               </span>
             </label>
 
-            <label className="text-sm font-medium text-stone-700">
-              Account Status
-              <select
-                value={form.status}
-                disabled={isEditingCurrentUser}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    status: event.target.value as UserStatus,
-                  }))
-                }
-                className={fieldClass}
-              >
-                <option value="active">Active</option>
-                <option value="disabled">Disabled</option>
-              </select>
-            </label>
 
-            <div className="flex items-end justify-end gap-3 sm:col-span-2">
+            <div className="flex flex-wrap justify-end gap-3 pt-1 sm:col-span-2">
               <Button type="submit" disabled={isSaving} className="min-w-32">
                 {isSaving ? (
                   <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
