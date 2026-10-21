@@ -109,9 +109,9 @@ export function AdminMaintenanceContact({ onError, onSuccess }: {
       if (!response.ok || !payload.contact) throw new Error(payload.issues?.[0]?.message ?? payload.error ?? "Unable to save the contact details.");
       setView(payload);
       setDraft(payload.contact);
-      // Contact Us on this page shows the new details right away.
+      // Contact Us shows the new details right away wherever it is open.
       refreshContactDetails();
-      onSuccess("Contact details saved. Contact Us now shows them on every page.");
+      onSuccess("Contact details saved. Contact Us now shows them to customers and visitors.");
     } catch (saveError) {
       onError(saveError instanceof Error ? saveError.message : "Unable to save the contact details.");
     } finally {
@@ -123,7 +123,7 @@ export function AdminMaintenanceContact({ onError, onSuccess }: {
     <form onSubmit={(event) => void save(event)} noValidate className={panel}>
       <h2 className="text-base font-semibold tracking-tight">Contact Us Details</h2>
       <p className="mt-1 text-sm text-stone-600">
-        Shown when anyone opens the Contact Us button, on every page and during maintenance mode.
+        Shown when customers or visitors open the Contact Us button, including during maintenance mode.
       </p>
       <div className="mt-3 divide-y divide-stone-200 border-t border-stone-200">
         {contactFields.map((name) => {
@@ -162,7 +162,6 @@ export function AdminMaintenanceContact({ onError, onSuccess }: {
           );
         })}
       </div>
-      {/* Left-aligned so the floating Contact Us button never covers Save. */}
       <div className="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4">
         <Button type="submit" disabled={isSaving || !changed.length}>
           {isSaving ? "Saving…" : "Save Changes"}

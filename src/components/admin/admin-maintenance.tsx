@@ -189,8 +189,7 @@ export function AdminMaintenance() {
         {section === "backup" ? <AdminMaintenanceBackups onError={setError} onSuccess={setSuccess} /> : null}
 
         {changedKeys.length ? (
-          // Sits above the floating Contact Us button.
-          <div className="sticky bottom-20 z-10 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
+          <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
             <p className="mr-auto text-sm text-stone-600" role="status">
               {changedKeys.length === 1 ? "1 unsaved change" : `${changedKeys.length} unsaved changes`}
             </p>

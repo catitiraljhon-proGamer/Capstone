@@ -3,6 +3,7 @@
 import { mapsHref, phoneHref, type ContactDetails as ContactInfo } from "@/lib/contact-details";
 import { useContactDetails } from "@/lib/use-contact-details";
 import { ExternalLink, Mail, MapPin, Phone, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 /** The office details the Admin keeps in Maintenance > Contact Us. */
@@ -44,12 +45,17 @@ export function ContactDetails({ contact }: { contact: ContactInfo | null }) {
   );
 }
 
+const staffAreas = ["/admin", "/billing-clerk"];
+
 export function ContactUs() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const descriptionId = useId();
   const contact = useContactDetails(open);
+  // Staff are the office, so Contact Us is only for customers and visitors.
+  const staffArea = staffAreas.some((area) => pathname === area || pathname.startsWith(`${area}/`));
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -64,6 +70,8 @@ export function ContactUs() {
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
+
+  if (staffArea) return null;
 
   return (
     <div className="h-24 shrink-0 print:hidden">
