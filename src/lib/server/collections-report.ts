@@ -6,7 +6,7 @@ import { promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { normalizePaymentMethod } from "@/types/billing";
 import type { CollectionsReport } from "@/types/collections-report";
 
-const unissued = ["Draft", "Ready", "Void"];
+const unissued = ["Draft", "Void"];
 
 /** Billing totals for the Billing Clerk's Reports: per-project positions plus dated invoice and payment entries. */
 export async function getCollectionsReport(db: Db): Promise<CollectionsReport> {

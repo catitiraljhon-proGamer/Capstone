@@ -52,7 +52,7 @@ async function blueprintFileDtos(db: Db, designRequestId: ObjectId): Promise<Blu
 export async function feeInvoiceState(db: Db, design: DesignRequestDocument) {
   const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOne({
     designRequestId: design._id, customerId: design.customerId,
-    status: { $nin: ["Draft", "Ready", "Void"] },
+    status: { $nin: ["Draft", "Void"] },
   });
   const payments = invoice ? await db.collection<PaymentDocument>(collections.payments).find({
     invoiceId: invoice._id, customerId: design.customerId, status: { $in: ["Verified", "Pending"] },

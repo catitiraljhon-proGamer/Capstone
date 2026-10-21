@@ -54,7 +54,7 @@ export async function loadProjectBilling(db: Db, projectIds: ObjectId[], session
 export function milestoneDtos(project: Pick<ProjectDocument, "paymentSchedule">, billing: ProjectBilling, hideUnreleased = false): PaymentMilestoneDto[] {
   return (project.paymentSchedule ?? []).map((milestone) => {
     let invoice = milestone.invoiceId ? billing.invoices.get(milestone.invoiceId.toHexString()) : undefined;
-    if (invoice && hideUnreleased && ["Draft", "Ready"].includes(invoice.status)) invoice = undefined;
+    if (invoice && hideUnreleased && invoice.status === "Draft") invoice = undefined;
     const paid = invoice ? billing.paidByInvoice.get(invoice._id.toHexString()) ?? 0 : 0;
     const state = invoice ? invoiceState(invoice, paid) : null;
     return {

@@ -15,7 +15,7 @@ export function BillingBadge({ status }: { status: string }) {
   const tone = ["Overdue", "Rejected", "Reversed", "Void"].includes(status)
     ? "bg-red-50 text-red-800 ring-red-200"
     : ["Paid", "Verified"].includes(status) ? "bg-stone-900 text-white ring-stone-900"
-    : ["Draft", "Ready"].includes(status) ? "bg-stone-100 text-stone-600 ring-stone-200"
+    : status === "Draft" ? "bg-stone-100 text-stone-600 ring-stone-200"
     : "bg-rose-50 text-red-700 ring-rose-200";
   return <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${tone}`}>{status === "Sent" ? "Issued" : status}</span>;
 }

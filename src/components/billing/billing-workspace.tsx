@@ -151,7 +151,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const query = search.trim().toLowerCase();
   const matches = (values: string[]) => !query || values.join(" ").toLowerCase().includes(query);
   const milestoneLabels = Object.fromEntries(data.projects.flatMap((project) => project.milestones.map((milestone) => [milestone.id, milestone.label])));
-  const issued = data.invoices.filter((invoice) => !["Draft", "Ready", "Void"].includes(invoice.status));
+  const issued = data.invoices.filter((invoice) => !["Draft", "Void"].includes(invoice.status));
   const unpaid = issued.filter((invoice) => invoice.balance > 0);
   const overdue = unpaid.filter((invoice) => invoice.overdue);
   const pending = data.payments.filter((payment) => payment.status === "Pending");
@@ -161,7 +161,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const filteredInvoices = data.invoices.filter((invoice) =>
     (!projectId || invoice.projectId === projectId) && (!status || (status === "Overdue" ? invoice.overdue : invoice.status === status)) &&
     matches([invoice.invoiceNumber, invoice.customerName, invoice.projectName, invoice.label]) &&
-    (section !== "Invoices" || !["Draft", "Ready"].includes(invoice.status)),
+    (section !== "Invoices" || invoice.status !== "Draft"),
   );
   const filteredPayments = data.payments.filter((payment) =>
     (!projectId || payment.projectId === projectId) && (!status || payment.status === status) &&
@@ -193,7 +193,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
     : section === "Payments" ? "Confirm actual transactions before issuing a receipt."
     : section === "Customer Accounts" ? "View each customer's projects, billings, and payment history."
     : "Review verified collections and outstanding invoices by project and date.";
-  const invoiceStatuses = ["Draft", "Ready", "Sent", "Partially Paid", "Paid", "Overdue", "Void"];
+  const invoiceStatuses = ["Draft", "Sent", "Partially Paid", "Paid", "Overdue", "Void"];
   const paymentStatuses = ["Pending", "Verified", "Rejected", "Reversed"];
 
   // Reports sits inside the Reports tabs, which have their own heading and totals.
@@ -234,7 +234,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
           <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your Billing Workflow</p>
           <h2 className="mt-3 text-xl font-semibold tracking-tight">From approved work to a verified payment.</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-rose-100">Prepare the billing, review and issue the invoice, then verify each payment. Every verified payment gets its own receipt.</p>
-          <div className="mt-5 flex flex-wrap gap-3"><Link href="/billing-clerk/progress-billings" className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-red-900">Review drafts ({data.invoices.filter((invoice) => ["Draft", "Ready"].includes(invoice.status)).length})</Link><Link href="/billing-clerk/payments" className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold">Verify payments <ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="mt-5 flex flex-wrap gap-3"><Link href="/billing-clerk/progress-billings" className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-red-900">Review drafts ({data.invoices.filter((invoice) => invoice.status === "Draft").length})</Link><Link href="/billing-clerk/payments" className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold">Verify payments <ArrowRight className="h-4 w-4" /></Link></div>
         </section>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Payments Awaiting Verification</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/payments">View Payments</Link></div><PaymentTable payments={pending.slice(0, 5)} customer={false} onView={viewPayment} /></BillingPanel>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Invoices Needing Follow-Up</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/invoices">View Invoices</Link></div><InvoiceTable invoices={[...unpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5)} onView={viewInvoice} /></BillingPanel>
@@ -243,7 +243,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
           <div className="grid items-end gap-3 md:grid-cols-3">
             {section !== "Reports" && <label className="text-xs font-semibold text-stone-600"><span className="flex items-center gap-1"><Search className="h-3.5 w-3.5" />Search records</span><input type="search" className={field} placeholder="Customer, project or reference…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>}
             <label className="text-xs font-semibold text-stone-600">Project<select className={field} value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All Projects</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}</select></label>
-            {!customer && ["Progress Billings", "Invoices", "Payments"].includes(section) && <label className="text-xs font-semibold text-stone-600">Status<select className={field} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{(section === "Payments" ? paymentStatuses : invoiceStatuses.filter((value) => section !== "Invoices" || !["Draft", "Ready"].includes(value))).map((value) => <option key={value} value={value}>{value === "Sent" ? "Issued" : value}</option>)}</select></label>}
+            {!customer && ["Progress Billings", "Invoices", "Payments"].includes(section) && <label className="text-xs font-semibold text-stone-600">Status<select className={field} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{(section === "Payments" ? paymentStatuses : invoiceStatuses.filter((value) => section !== "Invoices" || value !== "Draft")).map((value) => <option key={value} value={value}>{value === "Sent" ? "Issued" : value}</option>)}</select></label>}
             {section === "Reports" && <><label className="text-xs font-semibold text-stone-600">From<input type="date" className={field} max={to || undefined} value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className="text-xs font-semibold text-stone-600">To<input type="date" className={field} min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} /></label></>}
           </div>
         </BillingPanel>
@@ -274,8 +274,8 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         <div className="flex flex-wrap gap-2">
           {customer && dialog.invoice.designRequestId && <Button asChild><Link href={`/customer/dream-house?design=${encodeURIComponent(dialog.invoice.designRequestId)}`}>Open Dream House</Link></Button>}
           <Button variant="outline" asChild><a target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/invoices/${dialog.invoice.id}`}>Print / Download Invoice</a></Button>
-          {!customer && ["Draft", "Ready"].includes(dialog.invoice.status) && <><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", invoice: dialog.invoice })}>Edit draft</Button><Button onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "issue" })}>Issue invoice</Button></>}
-          {!["Draft", "Ready", "Void"].includes(dialog.invoice.status) && dialog.invoice.balance > 0 && <>{customer && <Button onClick={() => setDialog({ type: "pay-online", invoice: dialog.invoice })}><Smartphone className="mr-2 h-4 w-4" />Pay online</Button>}<Button variant={customer ? "outline" : "default"} onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>{customer ? "Submit payment" : "Record payment"}</Button>{!customer && <Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button>}</>}
+          {!customer && dialog.invoice.status === "Draft" && <><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", invoice: dialog.invoice })}>Edit draft</Button><Button onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "issue" })}>Issue invoice</Button></>}
+          {!["Draft", "Void"].includes(dialog.invoice.status) && dialog.invoice.balance > 0 && <>{customer && <Button onClick={() => setDialog({ type: "pay-online", invoice: dialog.invoice })}><Smartphone className="mr-2 h-4 w-4" />Pay online</Button>}<Button variant={customer ? "outline" : "default"} onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>{customer ? "Submit payment" : "Record payment"}</Button>{!customer && <Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button>}</>}
           {!customer && dialog.invoice.status !== "Void" && <Button variant="ghost" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "void" })}>Void invoice</Button>}
         </div>
         <div className="border-t border-stone-200 pt-4"><h3 className="mb-4 font-semibold">Payments for This Invoice</h3><div className="px-5"><PaymentTable payments={data.payments.filter((payment) => payment.invoiceId === dialog.invoice.id)} customer={customer} onView={viewPayment} /></div></div>

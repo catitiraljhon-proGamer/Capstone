@@ -138,7 +138,7 @@ async function assertBlueprintPaid(db: Db, session: ClientSession, project: Proj
   const design = await db.collection<DesignRequestDocument>(collections.designRequests).findOne({ _id: project.designRequestId }, { session, projection: { status: 1 } });
   if (!design || design.status === "Completed") return;
   const fee = await db.collection<InvoiceDocument>(collections.invoices).findOne({ designRequestId: project.designRequestId, status: { $ne: "Void" } }, { session });
-  if (!fee || ["Draft", "Ready"].includes(fee.status) || toCentavos(await paidForInvoice(db, session, fee._id)) < toCentavos(fee.amount)) {
+  if (!fee || fee.status === "Draft" || toCentavos(await paidForInvoice(db, session, fee._id)) < toCentavos(fee.amount)) {
     throw new BillingError("The blueprint fee must be fully paid and verified before construction invoices can be prepared or issued.", 409);
   }
 }
@@ -244,7 +244,7 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
     const now = new Date();
     const invoices = db.collection<InvoiceDocument>(collections.invoices);
     if (input.action === "edit") {
-      if (!["Draft", "Ready"].includes(invoice.status)) throw new BillingError("Only unreleased invoices can be edited.", 409);
+      if (invoice.status !== "Draft") throw new BillingError("Only unreleased invoices can be edited.", 409);
       if (input.invoice.projectId !== invoice.projectId?.toHexString() || input.invoice.designRequestId !== invoice.designRequestId?.toHexString()) throw new BillingError("A billing record cannot be moved to another project or design request.");
       if (input.invoice.milestoneId !== invoice.milestoneId) throw new BillingError("The payment milestone of an invoice cannot be changed.");
       if (invoice.designRequestId) await validateDesignInvoice(db, session, invoice.designRequestId, invoice._id);
@@ -255,7 +255,7 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
         amount: input.invoice.amount, dueDate: new Date(`${input.invoice.dueDate}T00:00:00.000Z`), updatedAt: now,
       } }, { session });
     } else if (input.action === "issue") {
-      if (!["Draft", "Ready"].includes(invoice.status)) throw new BillingError("This invoice has already been released or voided.", 409);
+      if (invoice.status !== "Draft") throw new BillingError("This invoice has already been released or voided.", 409);
       if (invoice.designRequestId) {
         await validateDesignInvoice(db, session, invoice.designRequestId, invoice._id);
         moneySchema.parse(invoice.amount);
@@ -279,12 +279,12 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
           { _id: project._id, "paymentSchedule.id": invoice.milestoneId }, { $unset: { "paymentSchedule.$.invoiceId": "" } }, { session },
         );
       }
-      if (invoice.issuedAt || !["Draft", "Ready"].includes(invoice.status)) {
+      if (invoice.issuedAt || invoice.status !== "Draft") {
         await notifyCustomer(db, session, invoice.customerId, "Invoice voided", `${invoice.invoiceNumber}: ${input.reason}`, invoice._id);
       }
     } else {
       const paid = await paidForInvoice(db, session, invoice._id);
-      if (["Draft", "Ready", "Void"].includes(invoice.status) || invoiceState(invoice, paid).balance === 0) throw new BillingError("Only unpaid, issued invoices can receive reminders.");
+      if (["Draft", "Void"].includes(invoice.status) || invoiceState(invoice, paid).balance === 0) throw new BillingError("Only unpaid, issued invoices can receive reminders.");
       if (invoice.lastReminderAt && now.getTime() - invoice.lastReminderAt.getTime() < 86_400_000) throw new BillingError("A reminder was already sent for this invoice in the last 24 hours.", 409);
       await invoices.updateOne({ _id: invoice._id }, { $set: { lastReminderAt: now } }, { session });
       await notifyCustomer(db, session, invoice.customerId, "Payment reminder", `Please review the remaining balance on ${invoice.invoiceNumber}, due ${invoice.dueDate.toISOString().slice(0, 10)}.`, invoice._id);
@@ -310,7 +310,7 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
       }
       return existing._id.toHexString();
     }
-    if (["Draft", "Ready", "Void"].includes(invoice.status)) throw new BillingError("Payments can only be submitted against issued invoices.");
+    if (["Draft", "Void"].includes(invoice.status)) throw new BillingError("Payments can only be submitted against issued invoices.");
     const paid = await paidForInvoice(db, session, invoice._id);
     if (toCentavos(input.amount) > toCentavos(invoiceState(invoice, paid).balance)) throw new BillingError("The payment exceeds this invoice's outstanding balance.");
     const now = new Date();
@@ -382,7 +382,7 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
 }) {
   if (payment.status !== "Pending") throw new BillingError("Only pending payments can be verified.", 409);
   moneySchema.parse(payment.amount);
-  if (["Draft", "Ready", "Void"].includes(invoice.status)) throw new BillingError("The linked invoice is not payable.", 409);
+  if (["Draft", "Void"].includes(invoice.status)) throw new BillingError("The linked invoice is not payable.", 409);
   const paid = await paidForInvoice(db, session, invoice._id);
   if (toCentavos(payment.amount) > toCentavos(invoiceState(invoice, paid).balance)) throw new BillingError("This payment exceeds the current balance. Review it before verification.", 409);
   const customer = await db.collection<UserDocument>(collections.users).findOne({ _id: invoice.customerId }, { session });
@@ -495,7 +495,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
   const owner = clerk ? {} : { customerId: recordId(actor.id) };
   await promoteScheduledProjects(db);
   const invoiceFilter: Filter<InvoiceDocument> = clerk ? {} : {
-    ...owner, status: { $nin: ["Draft", "Ready"] },
+    ...owner, status: { $ne: "Draft" },
     $or: [{ status: { $ne: "Void" } }, { issuedAt: { $exists: true } }],
   };
   const [projects, invoices, payments, users, designs] = await Promise.all([
@@ -532,7 +532,7 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     })),
     projects: projects.map((project) => {
       const projectInvoices = invoiceDtos.filter((invoice) => invoice.projectId === project._id.toHexString() && invoice.status !== "Void");
-      const issued = projectInvoices.filter((invoice) => !["Draft", "Ready"].includes(invoice.status));
+      const issued = projectInvoices.filter((invoice) => invoice.status !== "Draft");
       return {
         id: project._id.toHexString(), reference: project.reference, name: project.name, status: project.status,
         customerId: project.customerId.toHexString(), customerName: customerNames.get(project.customerId.toHexString()) ?? "Unknown customer",

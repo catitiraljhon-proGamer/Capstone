@@ -30,7 +30,7 @@ async function removeVatFromUnbilledProject(db: Db, estimateId: ObjectId) {
     if (!project?.paymentSchedule?.length) return;
     const invoices = await db.collection<InvoiceDocument>(collections.invoices)
       .find({ projectId: project._id, status: { $ne: "Void" } }, { session }).toArray();
-    if (invoices.some((invoice) => !["Draft", "Ready"].includes(invoice.status))) return;
+    if (invoices.some((invoice) => invoice.status !== "Draft")) return;
     if (await db.collection<PaymentDocument>(collections.payments).countDocuments({ projectId: project._id, status: { $in: ["Pending", "Verified"] } }, { session })) return;
 
     const total = estimate.subtotal ?? 0;
@@ -44,7 +44,7 @@ async function removeVatFromUnbilledProject(db: Db, estimateId: ObjectId) {
     }, { session });
     for (const milestone of schedule) {
       await db.collection<InvoiceDocument>(collections.invoices).updateMany(
-        { projectId: project._id, milestoneId: milestone.id, status: { $in: ["Draft", "Ready"] } },
+        { projectId: project._id, milestoneId: milestone.id, status: "Draft" },
         { $set: { amount: milestone.amount, updatedAt: now } }, { session },
       );
       await db.collection<ScheduleDocument>(collections.schedules).updateMany(

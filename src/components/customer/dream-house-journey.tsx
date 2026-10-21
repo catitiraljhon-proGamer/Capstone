@@ -53,7 +53,7 @@ function constructionStep(design: DesignRequestDto, estimate?: CostEstimateDto, 
     if (project.status === "Completed") {
       return { tone: "done", title: "Your house is complete", detail: "Thank you for building with G4 Builders Inc. Your billing history stays in Billing Status." };
     }
-    const due = project.milestones.find((milestone) => milestone.invoice && !["Draft", "Ready", "Void"].includes(milestone.invoice.status) && milestone.invoice.balance > 0);
+    const due = project.milestones.find((milestone) => milestone.invoice && !["Draft", "Void"].includes(milestone.invoice.status) && milestone.invoice.balance > 0);
     if (due?.invoice) {
       return {
         tone: "action", title: `Payment due: ${due.label}`,

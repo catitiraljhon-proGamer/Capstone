@@ -337,7 +337,7 @@ export type ApprovalDocument = {
   reviewNote?: string;
 };
 
-export type InvoiceStatus = "Draft" | "Ready" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Void";
+export type InvoiceStatus = "Draft" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Void";
 
 export type InvoiceDocument = {
   _id: ObjectId;

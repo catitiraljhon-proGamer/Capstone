@@ -100,7 +100,7 @@ export async function createCheckout(db: Db, actor: SessionUser, raw: unknown): 
   const input = checkoutInputSchema.parse(raw);
   const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOne({ _id: new ObjectId(input.invoiceId), customerId: new ObjectId(actor.id) });
   if (!invoice) throw new BillingError("Invoice not found.", 404);
-  if (["Draft", "Ready", "Void"].includes(invoice.status)) throw new BillingError("Only issued invoices can be paid online.", 409);
+  if (["Draft", "Void"].includes(invoice.status)) throw new BillingError("Only issued invoices can be paid online.", 409);
   const paid = await verifiedTotal(db, invoice._id);
   const { balance } = invoiceState(invoice, paid);
   if (balance <= 0) throw new BillingError("This invoice has no remaining balance.", 409);
@@ -294,7 +294,7 @@ export async function handlePaymongoWebhook(db: Db, rawBody: string, signatureHe
     };
     await payments.insertOne(doc, { session });
     const paid = await verifiedTotal(db, invoice._id, session);
-    const payable = !["Draft", "Ready", "Void"].includes(invoice.status) && toCentavos(amount) <= toCentavos(invoiceState(invoice, paid).balance);
+    const payable = !["Draft", "Void"].includes(invoice.status) && toCentavos(amount) <= toCentavos(invoiceState(invoice, paid).balance);
     if (payable) {
       await verifyPaymentInSession(db, session, { payment: doc, invoice, verifier: { id: invoice.customerId.toHexString(), ...SIMULATED_ACTOR }, now });
     } else {

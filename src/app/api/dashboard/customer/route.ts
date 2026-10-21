@@ -56,7 +56,7 @@ export async function GET() {
       pendingRequests,
       totalContractPrice,
       totalPaid,
-      balanceDue: sumMoney(billing.invoices.filter((item) => !["Draft", "Ready", "Void"].includes(item.status)).map((item) => item.balance)),
+      balanceDue: sumMoney(billing.invoices.filter((item) => !["Draft", "Void"].includes(item.status)).map((item) => item.balance)),
       billingStages: billing.invoices.map((invoice) => ({
         id: invoice.id,
         label: invoice.label,

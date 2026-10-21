@@ -178,7 +178,7 @@ export function PaymentForm({ invoices, selectedInvoice, customer, mutate, onClo
   const [error, setError] = useState<string | null>(null);
   const [proofError, setProofError] = useState<string | null>(null);
   const fields = useFieldMessages();
-  const payable = invoices.filter((invoice) => !["Draft", "Ready", "Void"].includes(invoice.status) && invoice.balance > 0);
+  const payable = invoices.filter((invoice) => !["Draft", "Void"].includes(invoice.status) && invoice.balance > 0);
   const invoice = payable.find((item) => item.id === form.invoiceId);
   const cash = form.method === "Cash";
   const messages = {

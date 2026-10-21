@@ -13,7 +13,7 @@ export async function listPaymentDues(db: Db, { customerId, now = new Date() }: 
   const owner = customerId ? { customerId } : {};
   const [invoices, projects] = await Promise.all([
     db.collection<InvoiceDocument>(collections.invoices)
-      .find({ ...owner, status: { $nin: ["Draft", "Ready", "Void"] } }).sort({ dueDate: 1 }).limit(2_000).toArray(),
+      .find({ ...owner, status: { $nin: ["Draft", "Void"] } }).sort({ dueDate: 1 }).limit(2_000).toArray(),
     db.collection<ProjectDocument>(collections.projects)
       .find({ ...owner, status: { $ne: "Completed" }, "paymentSchedule.0": { $exists: true } }).limit(1_000).toArray(),
   ]);

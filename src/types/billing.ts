@@ -49,7 +49,7 @@ export type BillingInvoice = {
   paid: number;
   balance: number;
   dueDate: string;
-  status: "Draft" | "Ready" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Void";
+  status: "Draft" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Void";
   overdue: boolean;
   issuedAt?: string;
   voidReason?: string;
