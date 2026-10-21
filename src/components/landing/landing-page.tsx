@@ -10,8 +10,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import { AccountTermsDialog } from "@/components/auth/account-terms";
+import { PublicHeader } from "@/components/landing/public-header";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { useHouseDesigns } from "@/lib/house-design-store";
 
@@ -134,16 +135,6 @@ function SwappingHouseShowcase() {
   );
 }
 
-const navLinkClass =
-  "rounded-lg px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700";
-
-/** Home is this page, so the link scrolls back to the top instead of reloading. */
-function backToTop(event: MouseEvent<HTMLAnchorElement>) {
-  event.preventDefault();
-  window.history.replaceState(null, "", "/");
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
 /** Footer with the brand and a working link to the Terms and Conditions; the site has no other public pages. */
 function LandingFooter() {
   const [readingTerms, setReadingTerms] = useState(false);
@@ -193,32 +184,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full bg-white text-stone-950">
-      <header className="sticky top-0 z-50 border-b border-stone-200/70 bg-white/90 backdrop-blur">
-        <nav aria-label="Main navigation" className="mx-auto flex w-full max-w-[1244px] flex-col items-center gap-3 px-4 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-6 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="G4 Builders home" className="min-w-0 sm:justify-self-start">
-            <BrandLogo />
-          </Link>
-          <div className="flex items-center gap-1">
-            <Link href="/" onClick={backToTop} className={navLinkClass}>Home</Link>
-            <Link href="/about" className={navLinkClass}>About Us</Link>
-            <Link href="/faq" className={navLinkClass}>FAQ</Link>
-          </div>
-          <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:justify-self-end">
-            <Link
-              href="/login"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            >
-              Log In
-            </Link>
-            <Link
-              href="/register"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            >
-              Register
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <PublicHeader />
 
       <main className="mx-auto grid w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-2 lg:gap-10 lg:px-8">
         <section className="flex min-w-0 flex-col justify-center space-y-6 sm:space-y-8">

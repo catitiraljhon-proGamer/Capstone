@@ -1,7 +1,5 @@
-import { BackButton } from "@/components/ui/back-button";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { PublicHeader } from "@/components/landing/public-header";
 import { Calculator, FileText, HardHat, House, type LucideIcon } from "lucide-react";
-import Link from "next/link";
 
 const services: { icon: LucideIcon; title: string; text: string }[] = [
   { icon: House, title: "House Design", text: "Custom house designs and floor plans based on your requirements, or one of our published designs." },
@@ -13,14 +11,7 @@ const services: { icon: LucideIcon; title: string; text: string }[] = [
 export function AboutUsPage() {
   return (
     <div className="min-h-screen bg-white text-stone-950">
-      <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-white/90 backdrop-blur">
-        <nav aria-label="Account navigation" className="mx-auto flex min-h-20 w-full max-w-[1244px] items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 lg:px-8">
-          <Link href="/" aria-label="G4 Builders home" className="min-w-0">
-            <BrandLogo />
-          </Link>
-          <BackButton href="/" />
-        </nav>
-      </header>
+      <PublicHeader />
 
       <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Architects · Engineers · Designers · Contractor</p>
