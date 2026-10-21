@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CircleCheck, CircleX, Download, FileText, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
+import { CircleCheck, CircleX, Download, FileText, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
@@ -161,7 +161,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const filteredInvoices = data.invoices.filter((invoice) =>
     (!projectId || invoice.projectId === projectId) && (!status || (status === "Overdue" ? invoice.overdue : invoice.status === status)) &&
     matches([invoice.invoiceNumber, invoice.customerName, invoice.projectName, invoice.label]) &&
-    (section !== "Invoices" || invoice.status !== "Draft"),
+    (section === "Progress Billings" ? invoice.status === "Draft" : section !== "Invoices" || invoice.status !== "Draft"),
   );
   const filteredPayments = data.payments.filter((payment) =>
     (!projectId || payment.projectId === projectId) && (!status || payment.status === status) &&
@@ -185,25 +185,19 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const close = () => setDialog(null);
   const viewInvoice = (invoice: BillingInvoice) => setDialog({ type: "invoice", invoice });
   const viewPayment = (payment: BillingPayment) => setDialog({ type: "payment", payment });
-  const title = customer ? "Your Invoices & Payments" : section === "Dashboard" ? "Collections Overview" : section === "Payments" ? "Payments & Receipts" : section;
-  const description = customer ? "Review your bills, submit payment details, and access receipts for verified payments."
-    : section === "Dashboard" ? "Prepare billings, review incoming payments, and keep every customer balance up to date."
-    : section === "Progress Billings" ? "Prepare drafts from agreed contract milestones and approved work."
-    : section === "Invoices" ? "Track issued invoices, partial payments, due dates, and follow-ups."
-    : section === "Payments" ? "Confirm actual transactions before issuing a receipt."
-    : section === "Customer Accounts" ? "View each customer's projects, billings, and payment history."
-    : "Review verified collections and outstanding invoices by project and date.";
-  const invoiceStatuses = ["Draft", "Sent", "Partially Paid", "Paid", "Overdue", "Void"];
+  // Issued invoices only; drafts stay on Progress Billings until they are issued.
+  const invoiceStatuses = ["Sent", "Partially Paid", "Paid", "Overdue", "Void"];
   const paymentStatuses = ["Pending", "Verified", "Rejected", "Reversed"];
 
   // Reports sits inside the Reports tabs, which have their own heading and totals.
   const inReportTab = section === "Reports";
   return <div className="space-y-6">
-    {!inReportTab && <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">{customer ? "Customer Billing" : "Billing Clerk"}</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">{description}</p></div>
+    {!inReportTab && <div className={`flex flex-wrap items-start gap-4 ${customer ? "justify-between" : "justify-end"}`}>
+      {/* Staff pages already show the section title and description in the top bar. */}
+      {customer && <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">Customer Billing</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Your Invoices & Payments</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Review your bills, submit payment details, and access receipts for verified payments.</p></div>}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={loading} onClick={() => { setSuccess(null); setLoading(true); void load(); }}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-        {!customer && ["Dashboard", "Progress Billings", "Invoices"].includes(section) && <Button disabled={loading || Boolean(error)} onClick={() => setDialog({ type: "invoice-form" })}><Plus className="mr-2 h-4 w-4" />Prepare billing</Button>}
+        {!customer && ["Dashboard", "Progress Billings"].includes(section) && <Button disabled={loading || Boolean(error)} onClick={() => setDialog({ type: "invoice-form" })}><Plus className="mr-2 h-4 w-4" />Prepare billing</Button>}
         {(customer || section === "Payments") && <Button disabled={loading || Boolean(error) || !unpaid.length} onClick={() => setDialog({ type: "payment-form" })}><Plus className="mr-2 h-4 w-4" />{customer ? "Submit Payment" : "Record Payment"}</Button>}
       </div>
     </div>}
@@ -230,12 +224,6 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         ]).map((metric) => <BillingPanel key={metric.label}><div className="flex items-start justify-between gap-2"><p className="text-sm text-stone-600">{metric.label}</p><metric.icon className="h-5 w-5 shrink-0 text-red-700" /></div><p className="mt-3 break-words text-2xl font-semibold tracking-tight">{metric.value}</p><p className="mt-2 text-xs text-stone-500">{metric.note}</p></BillingPanel>)}
       </div>}
       {!customer && section === "Dashboard" ? <>
-        <section className="rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-6 text-white">
-          <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your Billing Workflow</p>
-          <h2 className="mt-3 text-xl font-semibold tracking-tight">From approved work to a verified payment.</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-rose-100">Prepare the billing, review and issue the invoice, then verify each payment. Every verified payment gets its own receipt.</p>
-          <div className="mt-5 flex flex-wrap gap-3"><Link href="/billing-clerk/progress-billings" className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-red-900">Review drafts ({data.invoices.filter((invoice) => invoice.status === "Draft").length})</Link><Link href="/billing-clerk/payments" className="flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold">Verify payments <ArrowRight className="h-4 w-4" /></Link></div>
-        </section>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Payments Awaiting Verification</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/payments">View Payments</Link></div><PaymentTable payments={pending.slice(0, 5)} customer={false} onView={viewPayment} /></BillingPanel>
         <BillingPanel><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold tracking-tight">Invoices Needing Follow-Up</h2><Link className="text-sm font-semibold text-red-700" href="/billing-clerk/invoices">View Invoices</Link></div><InvoiceTable invoices={[...unpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 5)} onView={viewInvoice} /></BillingPanel>
       </> : <>
@@ -243,11 +231,11 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
           <div className="grid items-end gap-3 md:grid-cols-3">
             {section !== "Reports" && <label className="text-xs font-semibold text-stone-600"><span className="flex items-center gap-1"><Search className="h-3.5 w-3.5" />Search records</span><input type="search" className={field} placeholder="Customer, project or reference…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>}
             <label className="text-xs font-semibold text-stone-600">Project<select className={field} value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All Projects</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}</select></label>
-            {!customer && ["Progress Billings", "Invoices", "Payments"].includes(section) && <label className="text-xs font-semibold text-stone-600">Status<select className={field} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{(section === "Payments" ? paymentStatuses : invoiceStatuses.filter((value) => section !== "Invoices" || value !== "Draft")).map((value) => <option key={value} value={value}>{value === "Sent" ? "Issued" : value}</option>)}</select></label>}
+            {!customer && ["Invoices", "Payments"].includes(section) && <label className="text-xs font-semibold text-stone-600">Status<select className={field} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{(section === "Payments" ? paymentStatuses : invoiceStatuses).map((value) => <option key={value} value={value}>{value === "Sent" ? "Issued" : value}</option>)}</select></label>}
             {section === "Reports" && <><label className="text-xs font-semibold text-stone-600">From<input type="date" className={field} max={to || undefined} value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className="text-xs font-semibold text-stone-600">To<input type="date" className={field} min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} /></label></>}
           </div>
         </BillingPanel>
-        {(customer || ["Progress Billings", "Invoices"].includes(section)) && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">{section === "Progress Billings" && !customer ? "Drafts & progress billings" : "Invoices"}</h2><InvoiceTable key={search + projectId + status} invoices={filteredInvoices} milestoneLabels={milestoneLabels} onView={viewInvoice} />{!data.projects.length && !data.invoices.length && !data.designRequests.length && <p className="mt-4 text-sm text-stone-600">{customer ? "Your project and invoices will appear here when they are ready." : "Prepare billing for an agreed construction contract or an admin-delivered design request."}</p>}</BillingPanel>}
+        {(customer || ["Progress Billings", "Invoices"].includes(section)) && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">{section === "Progress Billings" && !customer ? "Drafts to issue" : "Invoices"}</h2><InvoiceTable key={search + projectId + status} invoices={filteredInvoices} milestoneLabels={milestoneLabels} onView={viewInvoice} />{!data.projects.length && !data.invoices.length && !data.designRequests.length && <p className="mt-4 text-sm text-stone-600">{customer ? "Your project and invoices will appear here when they are ready." : "Prepare billing for an agreed construction contract or an admin-delivered design request."}</p>}</BillingPanel>}
         {(customer || section === "Payments") && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Payment History & Receipts</h2><PaymentTable key={search + projectId + status} payments={filteredPayments} customer={customer} onView={viewPayment} /></BillingPanel>}
         {section === "Customer Accounts" && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Customer Balances</h2>{!accounts.length ? <BillingEmpty /> : <div className="divide-y divide-stone-200">{accounts.map((account) => <div key={account.id} className="flex flex-wrap items-center justify-between gap-4 py-5"><div><p className="font-semibold">{account.name}</p><p className="mt-1 text-xs text-stone-500">{account.projects.length} projects · {formatPeso(account.billed)} invoiced · {formatPeso(account.paid)} paid</p></div><div className="flex items-center gap-4"><div className="text-right"><p className="font-semibold text-red-700">{formatPeso(account.outstanding)}</p><p className="text-xs text-stone-500">Outstanding</p></div><Button variant="outline" onClick={() => setDialog({ type: "account", customerId: account.id, customerName: account.name })}>View Account</Button></div></div>)}</div>}</BillingPanel>}
         {section === "Reports" && <>
