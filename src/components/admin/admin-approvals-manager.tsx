@@ -20,7 +20,6 @@ import {
   Clock,
   FileCheck2,
   LoaderCircle,
-  RefreshCw,
   Search,
   ShieldCheck,
   UserRound,
@@ -457,15 +456,13 @@ export function AdminApprovalsManager() {
   const [page, setPage] = useState(1);
   const [selectedApproval, setSelectedApproval] = useState<ApprovalDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadApprovals = useCallback(async (refresh = false) => {
-    if (refresh) setIsRefreshing(true);
-    else setIsLoading(true);
+    if (!refresh) setIsLoading(true);
 
     try {
       const response = await fetch("/api/approvals", { cache: "no-store" });
@@ -481,7 +478,6 @@ export function AdminApprovalsManager() {
       );
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -633,15 +629,6 @@ export function AdminApprovalsManager() {
               Review connected design, estimate, billing, and document records.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isRefreshing}
-            onClick={() => void loadApprovals(true)}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
         </div>
 
         <div className="grid gap-3 border-b border-stone-200 bg-stone-50 p-4 md:grid-cols-[minmax(0,1fr)_220px_180px]">

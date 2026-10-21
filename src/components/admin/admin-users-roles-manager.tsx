@@ -15,7 +15,6 @@ import {
   LoaderCircle,
   Pencil,
   ReceiptText,
-  RefreshCw,
   Search,
   ShieldCheck,
   UserCheck,
@@ -129,7 +128,6 @@ export function AdminUsersRolesManager() {
   const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [form, setForm] = useState<AccountForm>(emptyForm);
@@ -138,8 +136,7 @@ export function AdminUsersRolesManager() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadUsers = useCallback(async (refresh = false) => {
-    if (refresh) setIsRefreshing(true);
-    else setIsLoading(true);
+    if (!refresh) setIsLoading(true);
 
     try {
       const response = await fetch("/api/users", { cache: "no-store" });
@@ -156,7 +153,6 @@ export function AdminUsersRolesManager() {
       );
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -563,15 +559,6 @@ export function AdminUsersRolesManager() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void loadUsers(true)}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
             <Button type="button" onClick={openCreateForm}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add User

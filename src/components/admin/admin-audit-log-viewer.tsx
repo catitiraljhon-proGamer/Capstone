@@ -9,7 +9,6 @@ import {
   ChevronRight,
   FilterX,
   ListFilter,
-  RefreshCw,
   Search,
   ShieldCheck,
   Users,
@@ -135,9 +134,7 @@ export function AdminAuditLogViewer() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -168,7 +165,6 @@ export function AdminAuditLogViewer() {
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
-          setIsRefreshing(false);
         }
       }
     }, search ? 300 : 0);
@@ -177,7 +173,7 @@ export function AdminAuditLogViewer() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [action, entityType, from, page, refreshKey, search, to]);
+  }, [action, entityType, from, page, search, to]);
 
   const hasFilters = Boolean(search || action || entityType || from || to);
   const firstRecord =
@@ -196,11 +192,6 @@ export function AdminAuditLogViewer() {
     setFrom("");
     setTo("");
     setPage(1);
-  };
-
-  const refresh = () => {
-    setIsRefreshing(true);
-    setRefreshKey((value) => value + 1);
   };
 
   return (
@@ -252,17 +243,6 @@ export function AdminAuditLogViewer() {
                 Review who performed an action, what changed, and when it happened.
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={refresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw
-                className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(170px,1fr)_minmax(160px,1fr)_150px_150px_auto]">

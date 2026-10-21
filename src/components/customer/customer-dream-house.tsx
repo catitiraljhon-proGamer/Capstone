@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { HardHat, RefreshCw } from "lucide-react";
+import { HardHat } from "lucide-react";
 import { BillingErrorMessage, billingJson } from "@/components/billing/billing-primitives";
 import { ConstructionEstimateCard } from "@/components/customer/construction-estimate-card";
 import { ConstructionProjectCard } from "@/components/customer/construction-project-card";
@@ -151,7 +151,6 @@ export function CustomerDreamHouse({ designId, designRequestId, estimateId }: { 
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-600">Only designs, estimates, and projects that belong to you appear here.</p>
-        <Button variant="outline" disabled={loading} onClick={() => { setLoading(true); void load(); }}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
       </div>
 
       <BillingErrorMessage message={error} />
