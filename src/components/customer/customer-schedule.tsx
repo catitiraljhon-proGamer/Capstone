@@ -2,6 +2,7 @@
 
 import { PaymentDueCard } from "@/components/billing/payment-due-card";
 import { Button } from "@/components/ui/button";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
 import { formatPeso } from "@/lib/house-design-data";
 import { officeHoursText } from "@/lib/office-hours";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/schedule-display";
 import type { PaymentDueDto } from "@/types/billing";
 import type { CustomerMeetingDto, CustomerScheduleData, MeetingMode, MeetingRequestDto } from "@/types/schedules";
-import { Banknote, CalendarDays, CalendarPlus, Clock3, Inbox, MapPin, Monitor, Plus, Trash2, Users, X } from "lucide-react";
+import { Banknote, CalendarDays, CalendarPlus, Clock3, Inbox, MapPin, Monitor, Plus, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -175,26 +176,20 @@ export function CustomerSchedule() {
         />
       </div>
 
-      {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      {error && !isFormOpen ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {successMessage ? (
         <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</p>
       ) : null}
 
       {isFormOpen ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Request a Meeting</h2>
-              <p className="mt-1 text-sm text-stone-600">
-                Give up to three times that work for you. The admin confirms one or suggests another, and you are notified.
-              </p>
-            </div>
-            <button type="button" onClick={() => setIsFormOpen(false)} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="Close request form">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <form onSubmit={submitRequest} className="mt-5 grid gap-4 md:grid-cols-2">
+        <FormDialog
+          title="Request a Meeting"
+          description="Give up to three times that work for you. The admin confirms one or suggests another, and you are notified."
+          error={error}
+          busy={isSaving}
+          onClose={() => setIsFormOpen(false)}
+        >
+          <form onSubmit={submitRequest} className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-stone-700">
               What is the meeting about?
               <input required minLength={3} maxLength={120} value={form.topic} onChange={(event) => setForm({ ...form, topic: event.target.value })} placeholder="Example: Discuss changes to the floor plan" className={fieldClass} />
@@ -207,11 +202,11 @@ export function CustomerSchedule() {
               </select>
             </label>
 
-            <fieldset className="md:col-span-2">
+            <fieldset className="sm:col-span-2">
               <legend className="text-sm font-medium text-stone-700">Meeting Type</legend>
               <div className="mt-2 flex flex-wrap gap-3">
                 {([["In person", MapPin, "At the G4 Builders Inc office or your project site"], ["Online", Monitor, "Video call; the admin sends the link"]] as const).map(([mode, Icon, hint]) => (
-                  <label key={mode} className={`flex min-w-56 flex-1 cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${form.mode === mode ? "border-red-600 bg-red-50/60" : "border-stone-200"}`}>
+                  <label key={mode} className={`flex min-w-48 flex-1 cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${form.mode === mode ? "border-red-600 bg-red-50/60" : "border-stone-200"}`}>
                     <input type="radio" name="meeting-mode" checked={form.mode === mode} onChange={() => setForm({ ...form, mode })} className="mt-1 accent-red-700" />
                     <span>
                       <span className="flex items-center gap-1.5 font-semibold text-stone-950"><Icon className="h-4 w-4" />{mode}</span>
@@ -222,10 +217,10 @@ export function CustomerSchedule() {
               </div>
             </fieldset>
 
-            <fieldset className="md:col-span-2">
+            <fieldset className="sm:col-span-2">
               <legend className="text-sm font-medium text-stone-700">Preferred Times</legend>
               <p className="mt-1 text-xs text-stone-500">Office hours: {officeHoursText}. From tomorrow up to 90 days ahead.</p>
-              <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <div className="mt-2 grid gap-3">
                 {form.preferredTimes.map((time, index) => (
                   <div key={index} className="flex items-end gap-2">
                     <label className="min-w-0 flex-1 text-xs font-semibold text-stone-600">
@@ -262,7 +257,7 @@ export function CustomerSchedule() {
               ) : null}
             </fieldset>
 
-            <label className="text-sm font-medium text-stone-700 md:col-span-2">
+            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Details (optional)
               <textarea
                 maxLength={1000}
@@ -273,12 +268,12 @@ export function CustomerSchedule() {
               />
             </label>
 
-            <div className="flex flex-wrap justify-end gap-3 md:col-span-2">
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+            <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">
+              <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsFormOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSaving}>{isSaving ? "Sending…" : "Send Request"}</Button>
             </div>
           </form>
-        </section>
+        </FormDialog>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

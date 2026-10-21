@@ -4,6 +4,7 @@ import { AdminMeetingRequests } from "@/components/admin/admin-meeting-requests"
 import { PaymentDueCard } from "@/components/billing/payment-due-card";
 import { Button } from "@/components/ui/button";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatPeso } from "@/lib/house-design-data";
 import {
@@ -29,7 +30,6 @@ import {
   PhoneCall,
   Plus,
   Users,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 
@@ -219,7 +219,19 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
     }
   };
 
-  const handleRequestAnswered = (request: MeetingRequestDto, schedule?: ScheduleDto) => {
+  // Placed next to Duration for meetings, and next to Date and Time for follow-ups.
+  const statusField = (
+    <label className="text-sm font-medium text-stone-700">
+      Status
+      <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ScheduleStatus })} className={fieldClass}>
+        <option>Scheduled</option>
+        <option>Completed</option>
+        <option>Cancelled</option>
+      </select>
+    </label>
+  );
+
+  const handleRequestAnswered =(request: MeetingRequestDto, schedule?: ScheduleDto) => {
     setData((current) => ({ ...current, meetingRequests: current.meetingRequests.filter((item) => item.id !== request.id) }));
     if (schedule) showSchedule(schedule);
     setSuccessMessage(schedule ? `${schedule.title} was added to the calendar and the client was notified.` : `The request from ${request.customerName} was declined.`);
@@ -244,7 +256,7 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
         ))}
       </div>
 
-      {error ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
+      {error && !isFormOpen ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {successMessage ? (
         <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</p>
       ) : null}
@@ -254,23 +266,13 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
       ) : null}
 
       {isFormOpen ? (
-        <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">{copy.newLabel}</h2>
-              <p className="mt-1 text-sm text-stone-600">{copy.formDescription}</p>
-            </div>
-            <button type="button" onClick={() => setIsFormOpen(false)} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="Close form">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+        <FormDialog title={copy.newLabel} description={copy.formDescription} error={error} busy={isSaving} onClose={() => setIsFormOpen(false)}>
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Title
               <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={copy.titlePlaceholder} className={fieldClass} />
             </label>
-            <div className="text-sm font-medium text-stone-700 xl:col-span-2">
+            <div className="text-sm font-medium text-stone-700 sm:col-span-2">
               <label htmlFor="schedule-client">Client</label>
               <SearchableSelect
                 id="schedule-client"
@@ -283,14 +285,14 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 className={fieldClass}
               />
             </div>
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Project (optional)
               <select value={form.projectId} disabled={!form.clientId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className={fieldClass}>
                 <option value="">No Linked Project</option>
                 {clientProjects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}
               </select>
             </label>
-            <label className={`text-sm font-medium text-stone-700 ${role === "admin" ? "" : "xl:col-span-2"}`}>
+            <label className="text-sm font-medium text-stone-700">
               Date and Time
               <input required type="datetime-local" value={form.scheduledFor} onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })} className={fieldClass} />
             </label>
@@ -306,7 +308,8 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 </select>
               </label>
             ) : null}
-            <label className="text-sm font-medium text-stone-700 xl:col-span-2">
+            {role === "admin" ? null : statusField}
+            <label className="text-sm font-medium text-stone-700">
               {role === "admin" ? "Location or meeting link (optional)" : "Phone number or channel (optional)"}
               <input
                 value={form.location}
@@ -315,24 +318,17 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 className={fieldClass}
               />
             </label>
-            <label className="text-sm font-medium text-stone-700">
-              Status
-              <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ScheduleStatus })} className={fieldClass}>
-                <option>Scheduled</option>
-                <option>Completed</option>
-                <option>Cancelled</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium text-stone-700 md:col-span-2 xl:col-span-4">
+            {role === "admin" ? statusField : null}
+            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Notes (optional)
               <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder={copy.notesPlaceholder} className={textareaClass} />
             </label>
-            <div className="flex flex-wrap justify-end gap-3 md:col-span-2 xl:col-span-4">
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
+            <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">
+              <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsFormOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isSaving || data.clients.length === 0}>{isSaving ? "Saving…" : "Add to Calendar"}</Button>
             </div>
           </form>
-        </section>
+        </FormDialog>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
