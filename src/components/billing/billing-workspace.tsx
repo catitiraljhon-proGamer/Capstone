@@ -197,7 +197,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
       {customer && <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">Customer Billing</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Your Invoices & Payments</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Review your bills, submit payment details, and access receipts for verified payments.</p></div>}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={loading} onClick={() => { setSuccess(null); setLoading(true); void load(); }}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-        {!customer && ["Dashboard", "Progress Billings"].includes(section) && <Button disabled={loading || Boolean(error)} onClick={() => setDialog({ type: "invoice-form" })}><Plus className="mr-2 h-4 w-4" />Prepare billing</Button>}
+        {!customer && section === "Progress Billings" && <Button disabled={loading || Boolean(error)} onClick={() => setDialog({ type: "invoice-form" })}><Plus className="mr-2 h-4 w-4" />Prepare billing</Button>}
         {(customer || section === "Payments") && <Button disabled={loading || Boolean(error) || !unpaid.length} onClick={() => setDialog({ type: "payment-form" })}><Plus className="mr-2 h-4 w-4" />{customer ? "Submit Payment" : "Record Payment"}</Button>}
       </div>
     </div>}
