@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { CreditCard } from "lucide-react";
+import { AlertTriangle, Check, Clock3, CreditCard, Info, Printer } from "lucide-react";
 import { PesoInput } from "@/components/ui/peso-input";
 import { FieldError } from "@/components/ui/field-error";
 import { amountError, dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
@@ -11,12 +11,16 @@ import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
 import { GatewayPills } from "@/components/billing/billing-tables";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
-import { manilaDate } from "@/lib/billing";
+import { fromCentavos, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import type { PaymentMilestoneDto } from "@/types/construction";
 import { PAYMONGO_MIN_AMOUNT, type CreateCheckoutInput, type PaymongoCheckoutDto } from "@/types/paymongo";
-import { paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type PaymentMethod } from "@/types/billing";
+import {
+  customerPaymentMethods, paymentMethods,
+  type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type BillingReceipt, type CustomerPaymentMethod, type PaymentMethod,
+} from "@/types/billing";
 
-export type BillingMutation = (url: string, method: "POST" | "PATCH", body: unknown) => Promise<void>;
+/** Sends a billing write, refreshes the billing records, and resolves with the response body. */
+export type BillingMutation = <T = unknown>(url: string, method: "POST" | "PATCH", body: unknown) => Promise<T>;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Unable to save this record.";
 const downpaymentBasis = "Downpayment per accepted cost estimate";
 const billableStatuses = ["Awaiting downpayment", "Scheduled", "Active", "Completed"];
@@ -48,6 +52,8 @@ function useFieldMessages() {
       document.getElementById(`${prefix}-${first[0]}`)?.focus();
       return true;
     },
+    /** Forgets touched fields and submit attempts, for a form that is reused for another entry. */
+    reset() { setSubmitted(false); setTouched({}); },
   };
 }
 
@@ -165,78 +171,246 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
   </BillingDialog>;
 }
 
-export function PaymentForm({ invoices, selectedInvoice, customer, mutate, onClose }: {
-  invoices: BillingInvoice[]; selectedInvoice?: BillingInvoice; customer: boolean; mutate: BillingMutation; onClose: () => void;
+/** Payments on an invoice that were submitted or recorded but not yet verified by the Billing Clerk. */
+export type PendingTotals = { count: number; total: number };
+
+export function pendingTotals(payments: BillingPayment[], invoiceId: string): PendingTotals {
+  const pending = payments.filter((payment) => payment.invoiceId === invoiceId && payment.status === "Pending");
+  return { count: pending.length, total: sumMoney(pending.map((payment) => payment.amount)) };
+}
+
+/** What would remain on the invoice once every pending payment is verified. */
+export const balanceAfterPending = (invoice: BillingInvoice, pending: PendingTotals) =>
+  fromCentavos(Math.max(0, toCentavos(invoice.balance) - toCentavos(pending.total)));
+
+export const countLabel = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/** Optional proof image for a payment; reports the encoded image ("" when cleared) and whether it is still being read. */
+function PaymentProofField({ label, attached, disabled, onChange, onUploading }: {
+  label: string; attached: boolean; disabled: boolean; onChange: (proofImage: string) => void; onUploading: (uploading: boolean) => void;
+}) {
+  const id = useId();
+  const [error, setError] = useState<string | null>(null);
+  return <div>
+    <label className="block text-sm font-medium" htmlFor={id}>{label} <span className="font-normal text-stone-500">(optional, JPG / PNG / WebP, up to 750 KB)</span></label>
+    <input id={id} type="file" accept={embeddedImageAccept} disabled={disabled} className={invalidField} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={async (event) => {
+      const file = event.target.files?.[0];
+      setError(null); onChange("");
+      if (!file) return;
+      onUploading(true);
+      try { onChange(await readEmbeddedImage(file)); }
+      catch (reason) { setError(errorText(reason)); event.target.value = ""; }
+      finally { onUploading(false); }
+    }} />
+    <FieldError id={`${id}-error`} message={error} />
+    {attached && <p className="mt-1.5 text-xs text-stone-600">Payment proof attached.</p>}
+  </div>;
+}
+
+const customerMethodText: Record<CustomerPaymentMethod, {
+  title: string; detail: string; date: string; reference: string; placeholder: string; help: string; proof: string; footnote: string;
+}> = {
+  "Bank transfer": {
+    title: "Bank transfer or deposit", detail: "InstaPay, PESONet or over the counter",
+    date: "Transfer or deposit date", reference: "Bank reference no.", placeholder: "e.g. 2026102200123",
+    help: "From your transfer confirmation or deposit slip.", proof: "Deposit slip or transfer screenshot",
+    footnote: "The Billing Clerk matches your reference number with G4 Builders Inc bank records before the balance changes and a receipt becomes available.",
+  },
+  Cheque: {
+    title: "Cheque", detail: "Payable to G4 Builders Inc",
+    date: "Cheque date", reference: "Cheque no.", placeholder: "e.g. 0012345 (issuing bank)",
+    help: "Include the issuing bank so the Billing Clerk can match the cheque.", proof: "Photo of the cheque",
+    footnote: "Make the cheque payable to G4 Builders Inc. The balance changes and a receipt becomes available once the Billing Clerk confirms the cheque has cleared.",
+  },
+};
+
+/** A customer's bank deposit or cheque details for one invoice; the Billing Clerk verifies them before the balance changes. */
+export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOnline }: {
+  invoice: BillingInvoice; pending: PendingTotals; mutate: BillingMutation; onClose: () => void; onPayOnline: () => void;
 }) {
   const [submissionKey] = useState(() => crypto.randomUUID());
-  const [form, setForm] = useState({
-    invoiceId: selectedInvoice?.id ?? "", amount: "", method: (customer ? "Bank transfer" : "Cash") as PaymentMethod,
-    transactionReference: "", paidAt: manilaDate(), notes: "", proofImage: "",
-  });
+  const [method, setMethod] = useState<CustomerPaymentMethod>("Bank transfer");
+  const [form, setForm] = useState({ amount: "", transactionReference: "", paidAt: manilaDate(), notes: "", proofImage: "" });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [proofError, setProofError] = useState<string | null>(null);
   const fields = useFieldMessages();
-  const payable = invoices.filter((invoice) => !["Draft", "Void"].includes(invoice.status) && invoice.balance > 0);
-  const invoice = payable.find((item) => item.id === form.invoiceId);
-  const cash = form.method === "Cash";
+  const text = customerMethodText[method];
   const messages = {
-    invoice: invoice ? null : "Choose the invoice you are paying.",
-    amount: amountError(form.amount, { label: "Amount", max: invoice?.balance, maxLabel: "the remaining invoice balance" }),
-    method: customer && cash ? "Cash payments must be recorded by the Billing Clerk. Choose another payment method." : null,
-    paidAt: dateError(form.paidAt, { label: "Payment date", max: manilaDay(), maxLabel: "today" }),
-    transactionReference: cash
-      ? textError(form.transactionReference, { label: "Transaction reference", required: false, max: 120 })
-      : textError(form.transactionReference, { label: "Transaction reference", min: 3, max: 120 }),
+    amount: amountError(form.amount, { label: "Amount", max: invoice.balance, maxLabel: "the remaining invoice balance" }),
+    paidAt: dateError(form.paidAt, { label: text.date, max: manilaDay(), maxLabel: "today" }),
+    transactionReference: textError(form.transactionReference, { label: text.reference, min: 3, max: 120 }),
   };
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (fields.blocked(messages)) return;
     setBusy(true); setError(null);
     try {
-      await mutate("/api/billing/payments", "POST", { ...form, amount: Number(form.amount), submissionKey, proofImage: form.proofImage || undefined });
+      await mutate("/api/billing/payments", "POST", {
+        ...form, invoiceId: invoice.id, method, amount: Number(form.amount), submissionKey, proofImage: form.proofImage || undefined,
+      });
       onClose();
     } catch (error) { setError(errorText(error)); } finally { setBusy(false); }
   }
-  return <BillingDialog title={customer ? "Submit Payment Details" : "Record Customer Payment"} onClose={onClose} busy={busy || uploading}>
-    <form onSubmit={submit} noValidate className="space-y-4">
+  return <BillingDialog title="Submit Bank Deposit or Cheque" onClose={onClose} busy={busy || uploading}>
+    <form onSubmit={submit} noValidate className="space-y-5">
       <BillingErrorMessage message={error} />
-      <div><label className="block text-sm font-medium">Invoice<select required className={invalidField} {...fields.props("invoice", messages.invoice)} value={form.invoiceId} onChange={(event) => setForm({ ...form, invoiceId: event.target.value })}>
-        <option value="">Select an unpaid invoice</option>{payable.map((item) => <option key={item.id} value={item.id}>{item.invoiceNumber} — {item.customerName} · {item.label}</option>)}
-      </select></label>{fields.error("invoice", messages.invoice)}</div>
-      {invoice && <p className="rounded-lg bg-rose-50 p-3 text-sm">Remaining invoice balance: <strong>{formatPeso(invoice.balance)}</strong></p>}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div><label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
-        <div><label className="text-sm font-medium">Payment Method<select value={form.method} className={invalidField} {...fields.props("method", messages.method)} onChange={(event) => setForm({ ...form, method: event.target.value as PaymentMethod })}>
-          {paymentMethods.filter((method) => !customer || method !== "Cash").map((method) => <option key={method}>{method}</option>)}
-        </select></label>{fields.error("method", messages.method)}{customer && <p className="mt-1.5 text-xs leading-5 text-stone-500">Cash payments are recorded by the Billing Clerk.</p>}</div>
-        <div><label className="text-sm font-medium">Payment Date<input required type="date" max={manilaDate()} value={form.paidAt} className={invalidField} {...fields.props("paidAt", messages.paidAt)} onChange={(event) => setForm({ ...form, paidAt: event.target.value })} /></label>{fields.error("paidAt", messages.paidAt)}</div>
-        <div><label className="text-sm font-medium">Transaction reference {cash ? "(optional)" : ""}<input required={!cash} maxLength={120} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}</div>
+      <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3">
+        <p className="text-xs text-stone-500">Paying invoice</p>
+        <p className="mt-1 break-words font-semibold">{invoice.invoiceNumber} · {invoice.label}</p>
+        <p className="mt-1 text-sm text-stone-600">Remaining balance <strong className="text-stone-950">{formatPeso(invoice.balance)}</strong>{pending.count > 0 && ` · ${formatPeso(pending.total)} awaiting verification`}</p>
       </div>
-      <div><label className="block text-sm font-medium">Payment proof (optional, JPG / PNG / WebP, up to 750 KB)
-        <input type="file" accept={embeddedImageAccept} disabled={busy || uploading} className={invalidField} aria-invalid={Boolean(proofError)} aria-describedby={proofError ? "payment-proof-error" : undefined} onChange={async (event) => {
-          const file = event.target.files?.[0];
-          setError(null); setProofError(null); setForm((previous) => ({ ...previous, proofImage: "" }));
-          if (!file) return;
-          setUploading(true);
-          try { const proofImage = await readEmbeddedImage(file); setForm((previous) => ({ ...previous, proofImage })); }
-          catch (error) { setProofError(errorText(error)); event.target.value = ""; }
-          finally { setUploading(false); }
-        }} />
-      </label><FieldError id="payment-proof-error" message={proofError} /></div>
-      {form.proofImage && <p className="text-xs text-stone-600">Payment proof attached.</p>}
+      <p className="flex items-start gap-2 text-sm leading-6 text-stone-600">
+        <Info className="mt-1 h-4 w-4 shrink-0 text-stone-500" aria-hidden="true" />
+        <span>Paying with GCash, Maya, GrabPay, card or online banking? <button type="button" disabled={busy || uploading} className="font-semibold text-red-700 underline underline-offset-4 hover:text-red-800" onClick={onPayOnline}>Use Pay online</button> instead. It is confirmed instantly.</span>
+      </p>
+      <fieldset disabled={busy} className="min-w-0">
+        <legend className="text-sm font-medium">How did you pay?</legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">{customerPaymentMethods.map((item) => <label key={item} className="flex min-h-[76px] cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3.5 transition has-[:checked]:border-red-700 has-[:checked]:bg-rose-50 has-[:checked]:ring-1 has-[:checked]:ring-red-700 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-600">
+          <input type="radio" name="customer-payment-method" value={item} checked={method === item} onChange={() => setMethod(item)} className="mt-0.5 h-4 w-4 shrink-0 accent-red-700" />
+          <span className="min-w-0"><span className="block text-sm font-semibold text-stone-950">{customerMethodText[item].title}</span><span className="mt-1 block text-xs leading-5 text-stone-600">{customerMethodText[item].detail}</span></span>
+        </label>)}</div>
+        <p className="mt-2 text-xs text-stone-500">Paying in cash? Pay at the G4 Builders Inc office and the Billing Clerk will record it.</p>
+      </fieldset>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div><label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice.balance} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
+        <div><label className="text-sm font-medium">{text.date}<input required type="date" max={manilaDate()} value={form.paidAt} className={invalidField} {...fields.props("paidAt", messages.paidAt)} onChange={(event) => setForm({ ...form, paidAt: event.target.value })} /></label>{fields.error("paidAt", messages.paidAt)}</div>
+        <div className="sm:col-span-2"><label className="text-sm font-medium">{text.reference}<input required maxLength={120} placeholder={text.placeholder} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}<p className="mt-1.5 text-xs text-stone-500">{text.help}</p></div>
+      </div>
+      <PaymentProofField label={text.proof} attached={Boolean(form.proofImage)} disabled={busy || uploading} onUploading={setUploading} onChange={(proofImage) => { setError(null); setForm((previous) => ({ ...previous, proofImage })); }} />
       <label className="block text-sm font-medium">Notes (optional)<textarea rows={2} maxLength={1000} value={form.notes} className={field} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-      <p className="text-xs leading-5 text-stone-500">This records a payment made through the selected method. The Billing Clerk will verify the actual transaction before the balance changes and a receipt becomes available.</p>
+      <p className="text-xs leading-5 text-stone-500">{text.footnote}</p>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy || uploading} onClick={onClose}>Cancel</Button><Button disabled={busy || uploading}>{busy ? "Submitting…" : uploading ? "Attaching…" : "Submit for Verification"}</Button></div>
     </form>
   </BillingDialog>;
 }
 
+function recordReferenceText(method: PaymentMethod) {
+  if (method === "Cash") return { label: "Reference (optional)", help: "Leave blank for cash. The payment number is used on the receipt." };
+  return { label: "Transaction reference", help: method === "Cheque" ? "Cheque no. and issuing bank." : "Reference from the bank, card terminal or e-wallet." };
+}
+
+async function loadReceipt(paymentId: string) {
+  try { return await billingJson<BillingReceipt>(await fetch(`/api/billing/payments/${paymentId}/receipt`, { cache: "no-store" })); }
+  catch { return null; }
+}
+
+type RecordedPayment = { id: string; amount: number; method: PaymentMethod; invoiceNumber: string; paidAt: string; receipt: BillingReceipt | null };
+
+/** Shown after the clerk saves a payment: cash with its receipt ready to print, other methods as Pending. */
+function RecordedPaymentSummary({ recorded, onAgain, onClose }: { recorded: RecordedPayment; onAgain: () => void; onClose: () => void }) {
+  const cash = recorded.method === "Cash";
+  const receipt = recorded.receipt?.receipt;
+  return <div className="space-y-5">
+    <div className="flex flex-wrap items-center gap-3.5">
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${cash ? "bg-stone-900 text-white" : "bg-rose-50 text-red-700"}`}>{cash ? <Check className="h-5 w-5" aria-hidden="true" /> : <Clock3 className="h-5 w-5" aria-hidden="true" />}</span>
+      <div className="min-w-0 flex-1">
+        <p className="break-words text-xl font-semibold tracking-tight">{formatPeso(recorded.amount)} {cash ? "received in cash" : `recorded by ${recorded.method.toLowerCase()}`}</p>
+        <p className="mt-1 text-sm text-stone-600">{recorded.invoiceNumber} · {billingDate(recorded.paidAt)}</p>
+      </div>
+      <BillingBadge status={cash ? "Verified" : "Pending"} />
+    </div>
+    {cash ? <>
+      {receipt ? <div className="overflow-hidden rounded-xl border border-stone-200">
+        <p className="break-words bg-red-700 px-4 py-3 font-semibold text-white">Receipt for #{receipt.number}</p>
+        <dl className="grid gap-x-5 gap-y-4 p-4 text-sm sm:grid-cols-2">{[
+          ["Customer", receipt.customerName], ["Invoice", `${receipt.invoiceNumber} · ${receipt.invoiceLabel}`],
+          ["Amount paid", formatPeso(receipt.amount)], ["Balance after payment", formatPeso(receipt.balanceAfterPayment)],
+          ["Method", receipt.method], ["Reference", receipt.transactionReference],
+          ["Verified by", receipt.verifiedByName], ["Issued", billingDate(receipt.issuedAt)],
+        ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-stone-500">{label}</dt><dd className="mt-1 break-words font-semibold">{value}</dd></div>)}</dl>
+      </div> : <p className="rounded-lg bg-stone-50 p-3 text-sm text-stone-700">The payment is verified and its receipt is ready to print.</p>}
+      <p className="text-sm leading-6 text-stone-600">{receipt?.customerName ?? "The customer"} was notified and can open this receipt from Billing Status. If this was entered by mistake, open the payment and use Reverse.</p>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onAgain}>Record Another</Button>
+        <Button asChild><a target="_blank" rel="noreferrer" href={`/billing-clerk/receipts/${recorded.id}`}><Printer className="mr-2 h-4 w-4" />Print Receipt</a></Button>
+      </div>
+    </> : <>
+      <p className="text-sm leading-6 text-stone-600">The balance does not change yet. Verify this payment from Payments once the cheque clears or the funds appear in the bank. The receipt is issued then.</p>
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={onAgain}>Record Another</Button><Button type="button" onClick={onClose}>Done</Button></div>
+    </>}
+  </div>;
+}
+
+/** The Billing Clerk's record of a payment made at the office: cash is verified and receipted as it is saved; other methods wait for verification. */
+export function RecordPaymentForm({ invoices, selectedInvoice, mutate, onClose }: {
+  invoices: BillingInvoice[]; selectedInvoice?: BillingInvoice; mutate: BillingMutation; onClose: () => void;
+}) {
+  const blankForm = (invoiceId = selectedInvoice?.id ?? "") => ({
+    submissionKey: crypto.randomUUID(), invoiceId, amount: "", method: "Cash" as PaymentMethod,
+    transactionReference: "", paidAt: manilaDate(), notes: "", proofImage: "", cashReceived: false,
+  });
+  const [form, setForm] = useState(() => blankForm());
+  const [recorded, setRecorded] = useState<RecordedPayment | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fields = useFieldMessages();
+  const payable = invoices.filter((invoice) => !["Draft", "Void"].includes(invoice.status) && invoice.balance > 0);
+  const invoice = payable.find((item) => item.id === form.invoiceId);
+  const cash = form.method === "Cash";
+  const reference = recordReferenceText(form.method);
+  const messages = {
+    invoice: invoice ? null : "Choose the invoice being paid.",
+    amount: amountError(form.amount, { label: "Amount", max: invoice?.balance, maxLabel: "the remaining invoice balance" }),
+    paidAt: dateError(form.paidAt, { label: "Payment date", max: manilaDay(), maxLabel: "today" }),
+    transactionReference: cash
+      ? textError(form.transactionReference, { label: "Reference", required: false, max: 120 })
+      : textError(form.transactionReference, { label: "Transaction reference", min: 3, max: 120 }),
+    cashReceived: cash && !form.cashReceived ? "Tick the box to confirm you received and counted the cash." : null,
+  };
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (fields.blocked(messages) || !invoice) return;
+    setBusy(true); setError(null);
+    try {
+      const { id } = await mutate<{ id: string }>("/api/billing/payments", "POST", {
+        invoiceId: form.invoiceId, amount: Number(form.amount), method: form.method, transactionReference: form.transactionReference,
+        paidAt: form.paidAt, notes: form.notes, submissionKey: form.submissionKey,
+        ...(cash ? { cashReceived: true } : form.proofImage ? { proofImage: form.proofImage } : {}),
+      });
+      setRecorded({ id, amount: Number(form.amount), method: form.method, invoiceNumber: invoice.invoiceNumber, paidAt: form.paidAt, receipt: cash ? await loadReceipt(id) : null });
+    } catch (error) { setError(errorText(error)); } finally { setBusy(false); }
+  }
+  function recordAnother() {
+    setForm(blankForm(payable.some((item) => item.id === form.invoiceId) ? form.invoiceId : ""));
+    setRecorded(null); setError(null); fields.reset();
+  }
+  const title = !recorded ? "Record Customer Payment" : recorded.method === "Cash" ? "Cash Payment Recorded" : "Payment Recorded";
+  return <BillingDialog title={title} onClose={onClose} busy={busy || uploading}>
+    {recorded ? <RecordedPaymentSummary recorded={recorded} onAgain={recordAnother} onClose={onClose} /> : <form onSubmit={submit} noValidate className="space-y-4">
+      <BillingErrorMessage message={error} />
+      <div><label className="block text-sm font-medium">Invoice<select required className={invalidField} {...fields.props("invoice", messages.invoice)} value={form.invoiceId} onChange={(event) => setForm({ ...form, invoiceId: event.target.value, cashReceived: false })}>
+        <option value="">Select an unpaid invoice</option>{payable.map((item) => <option key={item.id} value={item.id}>{item.invoiceNumber} — {item.customerName} · {item.label}</option>)}
+      </select></label>{fields.error("invoice", messages.invoice)}</div>
+      {invoice && <p className="rounded-lg bg-rose-50 p-3 text-sm">Remaining invoice balance: <strong>{formatPeso(invoice.balance)}</strong></p>}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div><label className="text-sm font-medium">Amount received (PHP)<PesoInput required min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value, cashReceived: false })} /></label>{fields.error("amount", messages.amount)}</div>
+        <div><label className="text-sm font-medium">Payment Method<select value={form.method} className={field} onChange={(event) => setForm({ ...form, method: event.target.value as PaymentMethod })}>
+          {paymentMethods.map((method) => <option key={method}>{method}</option>)}
+        </select></label></div>
+        <div><label className="text-sm font-medium">Payment Date<input required type="date" max={manilaDate()} value={form.paidAt} className={invalidField} {...fields.props("paidAt", messages.paidAt)} onChange={(event) => setForm({ ...form, paidAt: event.target.value })} /></label>{fields.error("paidAt", messages.paidAt)}</div>
+        <div><label className="text-sm font-medium">{reference.label}<input required={!cash} maxLength={120} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}</div>
+        <p className="-mt-2 text-xs text-stone-500 sm:col-span-2">{reference.help}</p>
+      </div>
+      {!cash && <PaymentProofField label="Payment proof" attached={Boolean(form.proofImage)} disabled={busy || uploading} onUploading={setUploading} onChange={(proofImage) => { setError(null); setForm((previous) => ({ ...previous, proofImage })); }} />}
+      <label className="block text-sm font-medium">Notes (optional)<textarea rows={2} maxLength={1000} value={form.notes} className={field} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+      {cash ? <>
+        <div><label className="flex items-start gap-3 rounded-lg border border-stone-200 p-3 text-sm leading-6"><input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-red-700" {...fields.props("cashReceived", messages.cashReceived)} checked={form.cashReceived} onChange={(event) => setForm({ ...form, cashReceived: event.target.checked })} /><span>I received {messages.amount ? "this amount" : formatPeso(Number(form.amount))} in cash from the customer and counted it.</span></label>{fields.error("cashReceived", messages.cashReceived)}</div>
+        <p className="flex items-start gap-2.5 rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm leading-6 text-stone-700"><Check className="mt-1 h-4 w-4 shrink-0 text-stone-900" aria-hidden="true" /><span>Cash is saved as <strong>Verified</strong>. The balance updates, the receipt number is issued, and the receipt is ready to print.</span></p>
+      </> : <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-stone-700"><Clock3 className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" /><span>This is saved as <strong>Pending</strong>. Verify it from Payments once the cheque clears or the funds appear in the bank.</span></p>}
+      <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy || uploading} onClick={onClose}>Cancel</Button><Button disabled={busy || uploading}>{busy ? "Saving…" : uploading ? "Attaching…" : cash ? "Record & Issue Receipt" : "Record as Pending"}</Button></div>
+    </form>}
+  </BillingDialog>;
+}
+
 /** Starts a simulated PayMongo checkout for an invoice and sends the customer to the test checkout page. */
-export function PayOnlineDialog({ invoice, onClose }: { invoice: BillingInvoice; onClose: () => void }) {
+export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: BillingInvoice; pending: PendingTotals; onClose: () => void }) {
   const minimum = Math.min(PAYMONGO_MIN_AMOUNT, invoice.balance);
-  const [amount, setAmount] = useState(String(invoice.balance));
+  const hasPending = pending.count > 0;
+  const afterPending = balanceAfterPending(invoice, pending);
+  // Start at what is left after submissions still awaiting verification, so the same balance is not paid twice.
+  const [amount, setAmount] = useState(() => !hasPending ? String(invoice.balance) : afterPending > 0 ? String(afterPending) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fields = useFieldMessages();
@@ -245,6 +419,7 @@ export function PayOnlineDialog({ invoice, onClose }: { invoice: BillingInvoice;
     label: "Amount", min: minimum, max: invoice.balance, maxLabel: "the remaining balance",
     minLabel: invoice.balance < PAYMONGO_MIN_AMOUNT ? "the remaining balance, which is below the usual online minimum" : "the minimum online payment",
   });
+  const overPending = hasPending && afterPending > 0 && !amountMessage && value > afterPending;
   const halfBalance = Math.round(invoice.balance * 50) / 100;
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -261,16 +436,21 @@ export function PayOnlineDialog({ invoice, onClose }: { invoice: BillingInvoice;
     <form onSubmit={submit} noValidate className="space-y-4">
       <BillingErrorMessage message={error} />
       <div><p className="font-semibold">{invoice.invoiceNumber} · {invoice.label}</p><p className="mt-1 text-sm text-stone-600">Remaining invoice balance: <strong className="text-stone-950">{formatPeso(invoice.balance)}</strong></p></div>
+      {hasPending && (afterPending > 0
+        ? <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-stone-700"><Clock3 className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" /><span>You already submitted <strong className="text-stone-950">{formatPeso(pending.total)}</strong> for this invoice ({countLabel(pending.count, "payment")} awaiting verification). To avoid paying twice, the amount starts at what remains after them.</span></p>
+        : <p className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-900"><AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" /><span>Your submitted payments (<strong>{formatPeso(pending.total)}</strong>) already cover this balance. Wait for the Billing Clerk to verify them. Pay online only if one of those submissions was a mistake.</span></p>)}
       <div>
         <label className="block text-sm font-medium">Amount to pay (PHP)<PesoInput required min={minimum} max={invoice.balance} step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", amountMessage)} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
         {fields.error("amount", amountMessage)}
+        {overPending && <p className="mt-1.5 text-xs text-red-700">This is more than what remains after your pending payments ({formatPeso(afterPending)}).</p>}
         <div className="mt-2 flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(invoice.balance))}>Full Balance</Button>
-          {invoice.balance >= PAYMONGO_MIN_AMOUNT * 2 && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(halfBalance))}>Half</Button>}
+          {hasPending && afterPending > 0 && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(afterPending))}>After Pending · {formatPeso(afterPending)}</Button>}
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(invoice.balance))}>Full Balance · {formatPeso(invoice.balance)}</Button>
+          {!hasPending && invoice.balance >= PAYMONGO_MIN_AMOUNT * 2 && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(halfBalance))}>Half</Button>}
         </div>
       </div>
       <p className="text-xs leading-5 text-stone-500">Minimum online payment is {formatPeso(minimum)}. Partial payments are allowed, but design images only unlock once the fee is fully paid.</p>
-      <p className="rounded-lg bg-rose-50 p-3 text-sm leading-6 text-stone-700">This is a test checkout. You will choose a payment method on the next page; no real money is charged.</p>
+      <p className="rounded-lg bg-rose-50 p-3 text-sm leading-6 text-stone-700">This is a test checkout. You will choose GCash, Maya, GrabPay, card, online banking or QR Ph on the next page; no real money is charged.</p>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}><CreditCard className="mr-2 h-4 w-4" />{busy ? "Starting checkout…" : "Continue to Checkout"}</Button></div>
     </form>
   </BillingDialog>;

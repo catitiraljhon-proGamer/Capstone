@@ -3,6 +3,11 @@ import type { PaymongoMethod } from "@/types/paymongo";
 
 export const paymentMethods = ["Cash", "Bank transfer", "Card", "E-wallet", "Cheque"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
+/** What customers submit for verification; card and e-wallet payments go through Pay online, and cash is recorded by the Billing Clerk. */
+export const customerPaymentMethods = ["Bank transfer", "Cheque"] as const satisfies readonly PaymentMethod[];
+export type CustomerPaymentMethod = (typeof customerPaymentMethods)[number];
+export const isCustomerPaymentMethod = (method: PaymentMethod): method is CustomerPaymentMethod =>
+  (customerPaymentMethods as readonly PaymentMethod[]).includes(method);
 /** Payments saved before the "Cheque" spelling may still read "Check" in MongoDB. */
 export type StoredPaymentMethod = PaymentMethod | "Check";
 

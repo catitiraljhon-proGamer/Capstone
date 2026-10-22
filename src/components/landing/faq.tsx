@@ -71,7 +71,7 @@ const categories: FaqCategory[] = [
       },
       {
         question: "What payment methods do you accept?",
-        answer: "You can pay online through PayMongo (GCash, Maya, GrabPay, card, online banking, or QR Ph). You can also pay by bank transfer, e-wallet, card, or cheque and submit the reference number and proof in Billing Status, or pay in cash at our office.",
+        answer: "You can pay online through PayMongo (GCash, Maya, GrabPay, card, online banking, or QR Ph). You can also pay by bank transfer or cheque and submit the reference or cheque number in Billing Status, or pay in cash at our office.",
       },
       {
         question: "Can I pay an invoice in parts?",
@@ -79,7 +79,7 @@ const categories: FaqCategory[] = [
       },
       {
         question: "When is my payment confirmed?",
-        answer: "Online payments are confirmed automatically. Payments you submit with a reference and proof stay Pending until the Billing Clerk verifies them. Your official receipt appears in Billing Status once the payment is verified.",
+        answer: "Online payments and cash paid at our office are confirmed right away. Bank transfers and cheques you submit stay Pending until the Billing Clerk verifies them. Your official receipt appears in Billing Status once the payment is verified.",
       },
       {
         question: "Will I be reminded before a payment is due?",

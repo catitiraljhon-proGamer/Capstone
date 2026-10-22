@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleCheck, CircleX, Download, FileText, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
+import { Check, CircleCheck, CircleX, Download, FileText, Landmark, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
-import { InvoiceActionDialog, InvoiceForm, PayOnlineDialog, PaymentForm, PaymentReview, type BillingMutation } from "@/components/billing/billing-forms";
+import {
+  CustomerPaymentForm, InvoiceActionDialog, InvoiceForm, PayOnlineDialog, PaymentReview, RecordPaymentForm,
+  balanceAfterPending, countLabel, pendingTotals, type BillingMutation, type PendingTotals,
+} from "@/components/billing/billing-forms";
 import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { exportXlsx, type XlsxColumn } from "@/lib/export-xlsx";
@@ -95,6 +98,41 @@ function CheckoutReturnBanner({ sessionId, onResolved, onDismiss }: { sessionId:
   </div>;
 }
 
+/** Tells the customer how much of an invoice is already submitted and waiting for the Billing Clerk. */
+function PendingNotice({ invoice, pending }: { invoice: BillingInvoice; pending: PendingTotals }) {
+  if (!pending.count) return null;
+  const remaining = balanceAfterPending(invoice, pending);
+  return <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-stone-700">
+    <Clock3 className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
+    <span><strong className="text-stone-950">{formatPeso(pending.total)}</strong> in {countLabel(pending.count, "submitted payment")} is awaiting verification. {remaining > 0
+      ? <><strong className="text-stone-950">{formatPeso(remaining)}</strong> remains once {pending.count === 1 ? "it is" : "they are"} verified.</>
+      : "Nothing remains on this invoice once verified."}</span>
+  </p>;
+}
+
+/** The customer's two ways to pay an invoice: online through PayMongo, or a bank deposit or cheque that the Billing Clerk verifies. */
+function PayInvoiceChoices({ onPayOnline, onSubmitDetails }: { onPayOnline: () => void; onSubmitDetails: () => void }) {
+  return <div className="border-t border-stone-200 pt-4">
+    <h3 className="mb-3 font-semibold">Pay this invoice</h3>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-red-700 bg-white p-4">
+        <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-red-700"><Smartphone className="h-[18px] w-[18px]" aria-hidden="true" /></span><p className="font-semibold">Pay online</p></div>
+        <p className="text-sm leading-6 text-stone-600">GCash, Maya, GrabPay, card, online banking or QR Ph.</p>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-700"><Check className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Confirmed instantly · receipt right away</p>
+        <Button className="mt-auto min-h-11" onClick={onPayOnline}>Pay online</Button>
+      </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4">
+        <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600"><Landmark className="h-[18px] w-[18px]" aria-hidden="true" /></span><p className="font-semibold">Bank deposit or cheque</p></div>
+        <p className="text-sm leading-6 text-stone-600">Already paid by bank transfer, over-the-counter deposit or cheque.</p>
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-700"><Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Checked by the Billing Clerk first</p>
+        <Button variant="outline" className="mt-auto min-h-11" onClick={onSubmitDetails}>Submit payment details</Button>
+      </div>
+    </div>
+  </div>;
+}
+
+const payableInvoice = (invoice: BillingInvoice) => !["Draft", "Void"].includes(invoice.status) && invoice.balance > 0;
+
 function clearCheckoutParam() {
   const url = new URL(window.location.href);
   if (!url.searchParams.has("checkout")) return;
@@ -142,11 +180,12 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   }, [load]);
   const checkoutResolved = useCallback(() => { clearCheckoutParam(); setLoading(true); void load(); }, [load]);
   const dismissCheckout = useCallback(() => { clearCheckoutParam(); setCheckoutId(null); }, []);
-  const mutate: BillingMutation = async (url, method, body) => {
-    await billingJson(await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+  const mutate: BillingMutation = async <T,>(url: string, method: "POST" | "PATCH", body: unknown) => {
+    const result = await billingJson<T>(await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
     setSuccess("Record saved successfully.");
     setLoading(true);
     await load();
+    return result;
   };
   const query = search.trim().toLowerCase();
   const matches = (values: string[]) => !query || values.join(" ").toLowerCase().includes(query);
@@ -185,6 +224,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const close = () => setDialog(null);
   const viewInvoice = (invoice: BillingInvoice) => setDialog({ type: "invoice", invoice });
   const viewPayment = (payment: BillingPayment) => setDialog({ type: "payment", payment });
+  const pendingFor = (invoice: BillingInvoice) => pendingTotals(data.payments, invoice.id);
   // Issued invoices only; drafts stay on Progress Billings until they are issued.
   const invoiceStatuses = ["Sent", "Partially Paid", "Paid", "Overdue", "Void"];
   const paymentStatuses = ["Pending", "Verified", "Rejected", "Reversed"];
@@ -193,12 +233,8 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const inReportTab = section === "Reports";
   return <div className="space-y-6">
     {/* Staff pages show the section title in the top bar and their action buttons on the table headings. */}
-    {customer && <div className="flex flex-wrap items-start justify-between gap-4">
-      {customer && <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">Customer Billing</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Your Invoices & Payments</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Review your bills, submit payment details, and access receipts for verified payments.</p></div>}
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={loading || Boolean(error) || !unpaid.length} onClick={() => setDialog({ type: "payment-form" })}><Plus className="mr-2 h-4 w-4" />Submit Payment</Button>
-      </div>
-    </div>}
+    {/* Customers pay from an invoice, where both ways to pay are explained. */}
+    {customer && <div><p className="text-xs font-semibold uppercase tracking-widest text-red-700">Customer Billing</p><h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Your Invoices & Payments</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Open an invoice to pay online or submit a bank deposit or cheque, and access receipts for verified payments.</p></div>}
     {customer && checkoutId && <CheckoutReturnBanner key={checkoutId} sessionId={checkoutId} onResolved={checkoutResolved} onDismiss={dismissCheckout} />}
     <BillingErrorMessage message={error} />
     {success && <p role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700">{success}</p>}
@@ -247,13 +283,16 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
       </>}
     </>}
     {dialog?.type === "invoice-form" && <InvoiceForm projects={data.projects} designRequests={data.designRequests} designRequestId={dialog.designRequestId} invoice={dialog.invoice} mutate={mutate} onClose={close} />}
-    {dialog?.type === "payment-form" && <PaymentForm invoices={data.invoices} selectedInvoice={dialog.invoice} customer={customer} mutate={mutate} onClose={close} />}
-    {dialog?.type === "pay-online" && <PayOnlineDialog invoice={dialog.invoice} onClose={close} />}
+    {dialog?.type === "payment-form" && (customer
+      ? dialog.invoice && <CustomerPaymentForm invoice={dialog.invoice} pending={pendingFor(dialog.invoice)} mutate={mutate} onClose={close} onPayOnline={() => dialog.invoice && setDialog({ type: "pay-online", invoice: dialog.invoice })} />
+      : <RecordPaymentForm invoices={data.invoices} selectedInvoice={dialog.invoice} mutate={mutate} onClose={close} />)}
+    {dialog?.type === "pay-online" && <PayOnlineDialog invoice={dialog.invoice} pending={pendingFor(dialog.invoice)} onClose={close} />}
     {dialog?.type === "invoice-action" && <InvoiceActionDialog invoice={dialog.invoice} action={dialog.action} mutate={mutate} onClose={close} />}
     {dialog?.type === "payment" && <PaymentReview payment={dialog.payment} customer={customer} mutate={mutate} onClose={close} />}
     {dialog?.type === "invoice" && <BillingDialog title={dialog.invoice.invoiceNumber} onClose={close}>
       <div className="space-y-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-xl font-semibold">{dialog.invoice.label}</h3><p className="mt-1 text-sm text-stone-600">{dialog.invoice.customerName}</p><p className="mt-1 text-xs text-stone-500">{dialog.invoice.projectName}</p></div><BillingBadge status={dialog.invoice.status} /></div>
         <div className="grid gap-3 rounded-lg bg-stone-50 p-4 sm:grid-cols-3">{[["Invoice amount", dialog.invoice.amount], ["Verified paid", dialog.invoice.paid], ["Remaining balance", dialog.invoice.balance]].map(([label, value]) => <div key={label}><p className="text-xs text-stone-500">{label}</p><p className="mt-1 font-semibold">{dialog.invoice.status === "Void" && label === "Remaining balance" ? "—" : formatPeso(Number(value))}</p></div>)}</div>
+        {customer && payableInvoice(dialog.invoice) && <PendingNotice invoice={dialog.invoice} pending={pendingFor(dialog.invoice)} />}
         <p className="text-sm text-stone-600">Due {billingDate(dialog.invoice.dueDate)}{dialog.invoice.designRequestId ? ` · ${designFeeLabels[dialog.invoice.feeType ?? "design"]}` : " · Project progress: " + dialog.invoice.progressPercentage + "%"}{dialog.invoice.overdue ? " · Overdue balance" : ""}</p>
         <div><p className="text-sm font-semibold">Billing Basis</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-600">{dialog.invoice.basis || "No reference recorded. Add the billing basis before issuing."}</p></div>
         {dialog.invoice.voidReason && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800">Void reason: {dialog.invoice.voidReason}</p>}
@@ -261,9 +300,10 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
           {customer && dialog.invoice.designRequestId && <Button asChild><Link href={`/customer/dream-house?design=${encodeURIComponent(dialog.invoice.designRequestId)}`}>Open Dream House</Link></Button>}
           <Button variant="outline" asChild><a target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/invoices/${dialog.invoice.id}`}>Print / Download Invoice</a></Button>
           {!customer && dialog.invoice.status === "Draft" && <><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", invoice: dialog.invoice })}>Edit draft</Button><Button onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "issue" })}>Issue invoice</Button></>}
-          {!["Draft", "Void"].includes(dialog.invoice.status) && dialog.invoice.balance > 0 && <>{customer && <Button onClick={() => setDialog({ type: "pay-online", invoice: dialog.invoice })}><Smartphone className="mr-2 h-4 w-4" />Pay online</Button>}<Button variant={customer ? "outline" : "default"} onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>{customer ? "Submit payment" : "Record payment"}</Button>{!customer && <Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button>}</>}
+          {!customer && payableInvoice(dialog.invoice) && <><Button onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>Record payment</Button><Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button></>}
           {!customer && dialog.invoice.status !== "Void" && <Button variant="ghost" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "void" })}>Void invoice</Button>}
         </div>
+        {customer && payableInvoice(dialog.invoice) && <PayInvoiceChoices onPayOnline={() => setDialog({ type: "pay-online", invoice: dialog.invoice })} onSubmitDetails={() => setDialog({ type: "payment-form", invoice: dialog.invoice })} />}
         <div className="border-t border-stone-200 pt-4"><h3 className="mb-4 font-semibold">Payments for This Invoice</h3><div className="px-5"><PaymentTable payments={data.payments.filter((payment) => payment.invoiceId === dialog.invoice.id)} customer={customer} onView={viewPayment} /></div></div>
       </div>
     </BillingDialog>}

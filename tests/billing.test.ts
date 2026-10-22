@@ -596,7 +596,7 @@ test("partial payments get separate immutable receipts; pending payments do not 
   assert.equal(firstReceipt.receipt.amount, 40000);
   assert.equal(firstReceipt.receipt.balanceAfterPayment, 60000);
   assert.equal((await getBillingData(db, clerk)).invoices[0].status, "Partially Paid");
-  const second = await submitPayment(db, customer, payment(id, 60000, { method: "E-wallet" }));
+  const second = await submitPayment(db, customer, payment(id, 60000, { method: "Cheque" }));
   await reviewPayment(db, clerk, second, { action: "verify" });
   const data = await getBillingData(db, customer);
   assert.equal(data.invoices[0].balance, 0);
@@ -605,6 +605,32 @@ test("partial payments get separate immutable receipts; pending payments do not 
   assert.deepEqual(await getReceipt(db, customer, first), firstReceipt);
   await assert.rejects(reviewPayment(db, clerk, first, { action: "verify" }), isError(409));
   assert.equal(await db.collection("payments").countDocuments({ "receipt.number": { $exists: true } }), 2);
+});
+test("customers submit only bank transfers and cheques; card and e-wallet payments go through Pay online", async () => {
+  const id = await issuedInvoice();
+  for (const method of ["Card", "E-wallet"]) await assert.rejects(submitPayment(db, customer, payment(id, 1000, { method })), isError(400));
+  await submitPayment(db, customer, payment(id, 1000, { method: "Cheque" }));
+  assert.equal(await db.collection("payments").countDocuments(), 1);
+});
+test("cash recorded by the clerk needs the counted-cash confirmation and is verified with a receipt in the same step", async () => {
+  const id = await issuedInvoice();
+  const cash = { method: "Cash", transactionReference: "" };
+  await assert.rejects(submitPayment(db, clerk, payment(id, 40000, cash)), isError(400));
+  const paymentId = await submitPayment(db, clerk, payment(id, 40000, { ...cash, cashReceived: true }));
+  const { receipt } = await getReceipt(db, customer, paymentId);
+  assert.equal(receipt.method, "Cash");
+  assert.equal(receipt.amount, 40000);
+  assert.equal(receipt.balanceAfterPayment, 60000);
+  assert.equal(receipt.verifiedByName, clerk.name);
+  const data = await getBillingData(db, customer);
+  assert.equal(data.payments[0].status, "Verified");
+  assert.equal(receipt.transactionReference, data.payments[0].reference);
+  assert.equal(data.invoices[0].balance, 60000);
+  assert.equal(data.invoices[0].status, "Partially Paid");
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "payment.verify" }), 1);
+  // Cheques and transfers the clerk records still wait for verification.
+  const cheque = await submitPayment(db, clerk, payment(id, 10000, { method: "Cheque" }));
+  await assert.rejects(getReceipt(db, clerk, cheque), isError(404));
 });
 test("concurrent verification cannot overpay an invoice", async () => {
   const id = await issuedInvoice();

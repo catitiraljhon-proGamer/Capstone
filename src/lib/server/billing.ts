@@ -4,7 +4,7 @@ import { collections, type AuditLogDocument, type BlueprintFileDocument, type De
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { insertNotifications } from "@/lib/server/notifications";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
-import { normalizePaymentMethod, paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
+import { isCustomerPaymentMethod, normalizePaymentMethod, paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
 import type { SessionUser, UserRole } from "@/types/domain";
 
 export class BillingError extends Error {
@@ -56,6 +56,8 @@ export const paymentInputSchema = z.object({
   notes: z.string().trim().max(1000).optional(),
   proofImage: z.string().max(1_000_100).refine(validProof, "Upload a valid JPG, PNG or WebP image under 750 KB.").optional(),
   submissionKey: z.uuid(),
+  /** The Billing Clerk's confirmation that cash was received and counted; cash is verified as it is recorded. */
+  cashReceived: z.literal(true).optional(),
 }).strict().refine((value) => value.method === "Cash" || value.transactionReference.length >= 3, {
   message: "Enter the transaction reference for this payment.", path: ["transactionReference"],
 });
@@ -298,7 +300,11 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
 export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
   assertBillingRole(actor, true);
   const input = paymentInputSchema.parse(raw);
-  if (actor.role === "customer" && input.method === "Cash") throw new BillingError("Cash payments must be recorded by the Billing Clerk.");
+  const cash = input.method === "Cash";
+  if (actor.role === "customer" && !isCustomerPaymentMethod(input.method)) {
+    throw new BillingError(cash ? "Cash payments must be recorded by the Billing Clerk." : "Card and e-wallet payments are made through Pay online.");
+  }
+  if (cash && !input.cashReceived) throw new BillingError("Confirm that you received and counted the cash.");
   return billingTransaction(db, async (session) => {
     const invoice = await lockInvoice(db, session, recordId(input.invoiceId));
     if (actor.role === "customer" && invoice.customerId.toHexString() !== actor.id) throw new BillingError("Invoice not found.", 404);
@@ -324,6 +330,8 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
     };
     await db.collection<PaymentDocument>(collections.payments).insertOne(payment, { session });
     await audit(db, session, actor, "payment.submitted", "payment", payment._id, { reference: payment.reference, amount: payment.amount });
+    // Cash is already counted at the counter, so the clerk's record is also its verification and the receipt is issued now.
+    if (cash) await verifyPaymentInSession(db, session, { payment, invoice, verifier: { id: actor.id, name: actor.name, role: actor.role }, now });
     return payment._id.toHexString();
   });
 }
