@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
@@ -194,10 +195,14 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
         <div className={`mt-5 grid gap-4 md:grid-cols-2 ${view === "monthly" ? "xl:grid-cols-4" : ""}`}>
           <label className="text-sm font-medium text-stone-700">
             Project
-            <select className={field} value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-              <option value="">All Projects</option>
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}
-            </select>
+            <SearchableSelect
+              className={field}
+              value={projectId}
+              onChange={setProjectId}
+              options={[{ value: "", label: "All Projects" }, ...projects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))]}
+              placeholder="All Projects"
+              emptyMessage="No project matches that search."
+            />
           </label>
           <label className="text-sm font-medium text-stone-700">
             Project Status

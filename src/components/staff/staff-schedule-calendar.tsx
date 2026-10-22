@@ -285,13 +285,19 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 className={fieldClass}
               />
             </div>
-            <label className="text-sm font-medium text-stone-700 sm:col-span-2">
-              Project (optional)
-              <select value={form.projectId} disabled={!form.clientId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className={fieldClass}>
-                <option value="">No Linked Project</option>
-                {clientProjects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}
-              </select>
-            </label>
+            <div className="text-sm font-medium text-stone-700 sm:col-span-2">
+              <label htmlFor="schedule-project">Project (optional)</label>
+              <SearchableSelect
+                id="schedule-project"
+                disabled={!form.clientId}
+                value={form.projectId}
+                onChange={(projectId) => setForm({ ...form, projectId })}
+                options={[{ value: "", label: "No Linked Project" }, ...clientProjects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))]}
+                placeholder="No Linked Project"
+                emptyMessage="No project matches that search."
+                className={fieldClass}
+              />
+            </div>
             <label className="text-sm font-medium text-stone-700">
               Date and Time
               <input required type="datetime-local" value={form.scheduledFor} onChange={(event) => setForm({ ...form, scheduledFor: event.target.value })} className={fieldClass} />

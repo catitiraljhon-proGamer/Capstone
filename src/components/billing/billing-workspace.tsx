@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, CircleCheck, CircleX, Download, FileText, Landmark, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingEmpty, BillingErrorMessage, BillingPanel, billingDate, billingFieldClass as field, billingJson, statusLabel } from "@/components/billing/billing-primitives";
 import {
@@ -266,7 +267,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         <BillingPanel>
           <div className="grid items-end gap-3 md:grid-cols-3">
             {section !== "Reports" && <label className="text-xs font-semibold text-stone-600"><span className="flex items-center gap-1"><Search className="h-3.5 w-3.5" />Search records</span><input type="search" className={field} placeholder="Customer, project or reference…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>}
-            <label className="text-xs font-semibold text-stone-600">Project<select className={field} value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">All Projects</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}</select></label>
+            <label className="text-xs font-semibold text-stone-600">Project<SearchableSelect className={field} value={projectId} onChange={setProjectId} options={[{ value: "", label: "All Projects" }, ...data.projects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))]} placeholder="All Projects" emptyMessage="No project matches that search." /></label>
             {!customer && ["Invoices", "Payments"].includes(section) && <label className="text-xs font-semibold text-stone-600">Status<select className={field} value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{(section === "Payments" ? paymentStatuses : invoiceStatuses).map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}</select></label>}
             {section === "Reports" && <><label className="text-xs font-semibold text-stone-600">From<input type="date" className={field} max={to || undefined} value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className="text-xs font-semibold text-stone-600">To<input type="date" className={field} min={from || undefined} value={to} onChange={(event) => setTo(event.target.value)} /></label></>}
           </div>
@@ -300,7 +301,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         {dialog.invoice.voidReason && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-800">Void reason: {dialog.invoice.voidReason}</p>}
         <div className="flex flex-wrap gap-2">
           {customer && dialog.invoice.designRequestId && <Button asChild><Link href={`/customer/dream-house?design=${encodeURIComponent(dialog.invoice.designRequestId)}`}>Open Dream House</Link></Button>}
-          <Button variant="outline" asChild><a target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/invoices/${dialog.invoice.id}`}>Print / Download Invoice</a></Button>
+          {(customer || section !== "Progress Billings") && <Button variant="outline" asChild><a target="_blank" rel="noreferrer" href={`/${customer ? "customer" : "billing-clerk"}/invoices/${dialog.invoice.id}`}>Print / Download Invoice</a></Button>}
           {!customer && dialog.invoice.status === "Draft" && <><Button variant="outline" onClick={() => setDialog({ type: "invoice-form", invoice: dialog.invoice })}>Edit draft</Button><Button onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "issue" })}>Issue invoice</Button></>}
           {!customer && payableInvoice(dialog.invoice) && <><Button onClick={() => setDialog({ type: "payment-form", invoice: dialog.invoice })}>Record cash payment</Button><Button variant="outline" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "remind" })}>Send reminder</Button></>}
           {!customer && dialog.invoice.status !== "Void" && <Button variant="ghost" onClick={() => setDialog({ type: "invoice-action", invoice: dialog.invoice, action: "void" })}>Void invoice</Button>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { roleLabels, type UserRole } from "@/types/domain";
 import {
   Activity,
@@ -267,40 +268,32 @@ export function AdminAuditLogViewer() {
 
             <label>
               <span className="sr-only">Filter by action</span>
-              <select
+              <SearchableSelect
                 value={action}
-                onChange={(event) => {
-                  setAction(event.target.value);
+                onChange={(next) => {
+                  setAction(next);
                   setPage(1);
                 }}
+                options={[{ value: "", label: "All Actions" }, ...payload.filters.actions.map((option) => ({ value: option, label: actionLabel(option) }))]}
+                placeholder="All Actions"
+                emptyMessage="No action matches that search."
                 className={`${fieldClass} w-full`}
-              >
-                <option value="">All Actions</option>
-                {payload.filters.actions.map((option) => (
-                  <option key={option} value={option}>
-                    {actionLabel(option)}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
 
             <label>
               <span className="sr-only">Filter by target</span>
-              <select
+              <SearchableSelect
                 value={entityType}
-                onChange={(event) => {
-                  setEntityType(event.target.value);
+                onChange={(next) => {
+                  setEntityType(next);
                   setPage(1);
                 }}
+                options={[{ value: "", label: "All Targets" }, ...payload.filters.entityTypes.map((option) => ({ value: option, label: humanize(option) }))]}
+                placeholder="All Targets"
+                emptyMessage="No target matches that search."
                 className={`${fieldClass} w-full`}
-              >
-                <option value="">All Targets</option>
-                {payload.filters.entityTypes.map((option) => (
-                  <option key={option} value={option}>
-                    {humanize(option)}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
 
             <label className="text-xs font-medium text-stone-500">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, Check, Clock3, CreditCard, Info, Printer } from "lucide-react";
 import { PesoInput } from "@/components/ui/peso-input";
 import { FieldError } from "@/components/ui/field-error";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { amountError, dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
@@ -132,17 +133,16 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         </select>
       </label>
       {form.designRequestId ? <label className="block text-sm font-medium">Customer / Design Request
-        <select required disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId} onChange={(event) => setForm({ ...form, designRequestId: event.target.value, label: feeLabelFor(event.target.value) })}>
-          {designRequests.filter((item) => !item.invoiceId || item.id === invoice?.designRequestId).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.feeType === "blueprint" ? "Blueprint" : "Design fee"} · {item.label}</option>)}
-        </select>
+        <SearchableSelect required disabled={busy || Boolean(invoice)} className={field} value={form.designRequestId} onChange={(id) => setForm({ ...form, designRequestId: id, label: feeLabelFor(id) })}
+          options={designRequests.filter((item) => !item.invoiceId || item.id === invoice?.designRequestId).map((item) => ({ value: item.id, label: `${item.customerName} — ${item.feeType === "blueprint" ? "Blueprint" : "Design fee"} · ${item.label}` }))}
+          placeholder="Search customer or design request" emptyMessage="No design request matches that search." />
         <p className="mt-2 text-xs font-normal leading-5 text-stone-500">{feeTypeOf(form.designRequestId) === "blueprint"
           ? "Set the agreed blueprint fee. Full verified payment unlocks the blueprint download, and only then can the construction downpayment be invoiced."
           : "Use the agreed design fee. Full verified payment unlocks this request only. This fee is separate from the construction contract."}</p>
       </label> : <div><label className="block text-sm font-medium">Customer / Project
-        <select required disabled={busy || Boolean(invoice)} className={invalidField} {...fields.props("project", messages.project)} value={form.projectId} onChange={(event) => chooseProject(event.target.value)}>
-          <option value="">Select a project</option>
-          {projects.filter((item) => billableStatuses.includes(item.status) || item.id === invoice?.projectId).map((item) => <option key={item.id} value={item.id}>{item.customerName} — {item.reference} · {item.name}</option>)}
-        </select>
+        <SearchableSelect required disabled={busy || Boolean(invoice)} className={invalidField} {...fields.props("project", messages.project)} value={form.projectId} onChange={chooseProject}
+          options={projects.filter((item) => billableStatuses.includes(item.status) || item.id === invoice?.projectId).map((item) => ({ value: item.id, label: `${item.customerName} — ${item.reference} · ${item.name}` }))}
+          placeholder="Search customer or project" emptyMessage="No project matches that search." />
       </label>{fields.error("project", messages.project)}</div>}
       {project && <div className="rounded-lg bg-rose-50 p-3 text-sm text-stone-600">
         Contract: <strong className="text-stone-950">{formatPeso(project.contractPrice)}</strong> · Available to bill, including drafts: <strong className="text-stone-950">{formatPeso(project.contractPrice - project.allocated + (invoice?.amount ?? 0))}</strong>
@@ -361,9 +361,9 @@ export function RecordPaymentForm({ invoices, selectedInvoice, mutate, onClose }
   return <BillingDialog title={recorded ? "Cash Payment Recorded" : "Record Cash Payment"} onClose={onClose} busy={busy}>
     {recorded ? <RecordedPaymentSummary recorded={recorded} onAgain={recordAnother} /> : <form onSubmit={submit} noValidate className="space-y-4">
       <BillingErrorMessage message={error} />
-      <div><label className="block text-sm font-medium">Invoice<select required className={invalidField} {...fields.props("invoice", messages.invoice)} value={form.invoiceId} onChange={(event) => setForm({ ...form, invoiceId: event.target.value, cashReceived: false })}>
-        <option value="">Select an unpaid invoice</option>{payable.map((item) => <option key={item.id} value={item.id}>{item.invoiceNumber} — {item.customerName} · {item.label}</option>)}
-      </select></label>{fields.error("invoice", messages.invoice)}</div>
+      <div><label className="block text-sm font-medium">Invoice<SearchableSelect required className={invalidField} {...fields.props("invoice", messages.invoice)} value={form.invoiceId} onChange={(invoiceId) => setForm({ ...form, invoiceId, cashReceived: false })}
+        options={payable.map((item) => ({ value: item.id, label: `${item.invoiceNumber} — ${item.customerName} · ${item.label}` }))}
+        placeholder="Search invoice number or customer" emptyMessage="No unpaid invoice matches that search." /></label>{fields.error("invoice", messages.invoice)}</div>
       {invoice && <p className="rounded-lg bg-rose-50 p-3 text-sm">Remaining invoice balance: <strong>{formatPeso(invoice.balance)}</strong></p>}
       <div><label className="text-sm font-medium">Amount received (PHP)<PesoInput required min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value, cashReceived: false })} /></label>{fields.error("amount", messages.amount)}</div>
       <label className="block text-sm font-medium">Notes (optional)<textarea rows={2} maxLength={1000} value={form.notes} className={field} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>

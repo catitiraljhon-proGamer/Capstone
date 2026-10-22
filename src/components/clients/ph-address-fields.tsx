@@ -2,6 +2,7 @@
 
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { textError } from "@/lib/form-validation";
 import { loadProvinceCities, loadProvinces, type PhCity, type PhPlace } from "@/lib/ph-address";
 import type { AddressDetails } from "@/types/clients";
@@ -159,73 +160,65 @@ export function PhAddressFields({
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-province`}>
             Province <RequiredIndicator />
-            <select
+            <SearchableSelect
               id={`${id}-province`}
               name={fieldNames.provinceCode}
               {...describe(fieldNames.provinceCode, "province")}
               required
               value={provinceCode}
-              onChange={(event) => {
-                setProvinceCode(event.target.value);
+              onChange={(code) => {
+                setProvinceCode(code);
                 setCities([]);
                 setCityCode("");
                 setBarangayCode("");
-                setLoadingCities(Boolean(event.target.value));
+                setLoadingCities(Boolean(code));
               }}
+              options={provinces.map((item) => ({ value: item.code, label: item.name }))}
+              placeholder={provinces.length ? "Select province" : "Loading provinces…"}
+              emptyMessage="No province matches that name."
               className={selectClassName}
-            >
-              <option value="">{provinces.length ? "Select province" : "Loading provinces…"}</option>
-              {provinces.map((item) => (
-                <option key={item.code} value={item.code}>{item.name}</option>
-              ))}
-            </select>
+            />
           </label>
           <FieldError id={`${id}-province-error`} message={errorFor(fieldNames.provinceCode)} />
         </div>
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-city`}>
             City / Municipality <RequiredIndicator />
-            <select
+            <SearchableSelect
               id={`${id}-city`}
               name={fieldNames.cityCode}
               {...describe(fieldNames.cityCode, "city")}
               required
               disabled={!provinceCode || loadingCities}
               value={cityCode}
-              onChange={(event) => {
-                setCityCode(event.target.value);
+              onChange={(code) => {
+                setCityCode(code);
                 setBarangayCode("");
               }}
+              options={cities.map((item) => ({ value: item.code, label: item.name }))}
+              placeholder={!provinceCode ? "Select province first" : loadingCities ? "Loading…" : "Select city / municipality"}
+              emptyMessage="No city or municipality matches that name."
               className={selectClassName}
-            >
-              <option value="">
-                {!provinceCode ? "Select province first" : loadingCities ? "Loading…" : "Select city / municipality"}
-              </option>
-              {cities.map((item) => (
-                <option key={item.code} value={item.code}>{item.name}</option>
-              ))}
-            </select>
+            />
           </label>
           <FieldError id={`${id}-city-error`} message={errorFor(fieldNames.cityCode)} />
         </div>
         <div className="min-w-0">
           <label className={`min-w-0 ${labelClassName}`} htmlFor={`${id}-barangay`}>
             Barangay <RequiredIndicator />
-            <select
+            <SearchableSelect
               id={`${id}-barangay`}
               name={fieldNames.barangayCode}
               {...describe(fieldNames.barangayCode, "barangay")}
               required
               disabled={!city}
               value={barangayCode}
-              onChange={(event) => setBarangayCode(event.target.value)}
+              onChange={setBarangayCode}
+              options={barangays.map((item) => ({ value: item.code, label: item.name }))}
+              placeholder={city ? "Select barangay" : "Select city first"}
+              emptyMessage="No barangay matches that name."
               className={selectClassName}
-            >
-              <option value="">{city ? "Select barangay" : "Select city first"}</option>
-              {barangays.map((item) => (
-                <option key={item.code} value={item.code}>{item.name}</option>
-              ))}
-            </select>
+            />
           </label>
           <FieldError id={`${id}-barangay-error`} message={errorFor(fieldNames.barangayCode)} />
         </div>
