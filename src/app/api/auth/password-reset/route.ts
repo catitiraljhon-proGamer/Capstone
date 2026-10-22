@@ -2,6 +2,7 @@ import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
 import {
+  emailErrorDetails,
   googleSignInReminderEmail,
   isEmailConfigured,
   passwordResetEmail,
@@ -71,10 +72,8 @@ export async function POST(request: Request) {
         try {
           await sendEmail(message);
         } catch (error) {
-          // Log only a fixed label; SMTP errors can echo addresses and credentials.
-          console.error("Password reset email failed", {
-            errorType: error instanceof Error ? error.name : "UnknownError",
-          });
+          // Log only fixed labels; SMTP errors can echo addresses and credentials.
+          console.error("Password reset email failed", emailErrorDetails(error));
         }
       } else {
         // Local development without Gmail settings: read the link from the server log.

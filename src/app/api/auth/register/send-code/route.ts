@@ -1,7 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
-import { isEmailConfigured, sendEmail, verificationCodeEmail } from "@/lib/server/email";
+import { emailErrorDetails, isEmailConfigured, sendEmail, verificationCodeEmail } from "@/lib/server/email";
 import {
   clearEmailVerification,
   EmailVerificationError,
@@ -66,10 +66,8 @@ export async function POST(request: Request) {
         await sendEmail(verificationCodeEmail(email, code, settings.signupCodeMinutes));
       } catch (error) {
         await clearEmailVerification(db, email);
-        // Log only a fixed label; SMTP errors can echo addresses and credentials.
-        console.error("Verification email failed", {
-          errorType: error instanceof Error ? error.name : "UnknownError",
-        });
+        // Log only fixed labels; SMTP errors can echo addresses and credentials.
+        console.error("Verification email failed", emailErrorDetails(error));
         return NextResponse.json(
           { error: "We could not send a code to this email address. Check it and try again." },
           { status: 502 },

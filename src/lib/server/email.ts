@@ -69,6 +69,16 @@ export async function sendEmail(message: EmailMessage) {
   });
 }
 
+/** Safe log fields for a failed send: Nodemailer's fixed code (e.g. EAUTH) and SMTP status, never the message. */
+export function emailErrorDetails(error: unknown) {
+  const details = error as { code?: unknown; responseCode?: unknown };
+  return {
+    errorType: error instanceof Error ? error.name : "UnknownError",
+    code: typeof details?.code === "string" ? details.code.slice(0, 32) : undefined,
+    responseCode: typeof details?.responseCode === "number" ? details.responseCode : undefined,
+  };
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")
