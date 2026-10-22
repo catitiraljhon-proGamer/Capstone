@@ -14,8 +14,9 @@ const prefix = "backups/";
  */
 const localFolder = () => process.env.BACKUP_LOCAL_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), ".local", "backups");
 
+/** Vercel connects new stores with BLOB_STORE_ID (signed in per request over OIDC), older ones with a read-write token. */
 function blobStoreConnected() {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return true;
+  if (process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN) return true;
   if (process.env.VERCEL) {
     throw new BackupStorageError(
       "Backups need a Vercel Blob store. In Vercel, open Storage, create a private Blob store, and connect it to this project.",
