@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Banknote, LoaderCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import { BillingBadge, billingDate, billingJson } from "@/components/billing/billing-primitives";
 import { CashReportVerifyDialog, differenceText } from "@/components/billing/cash-reports";
 import { formatPeso } from "@/lib/house-design-data";
@@ -42,16 +42,15 @@ export function AdminCashReports() {
       : <div className="overflow-x-auto">
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="text-xs font-semibold uppercase tracking-wide text-stone-500"><tr>
-            {["Report", "Billing Clerk", "Expected", "Counted", "Submitted", "Status", ""].map((heading, index) => <th key={heading || index} className={`border-b border-stone-200 px-5 py-3 ${["Expected", "Counted"].includes(heading) ? "text-right" : ""}`}>{heading}</th>)}
+            {["Report", "Billing Clerk", "Expected", "Counted", "Submitted", "Status"].map((heading) => <th key={heading} className={`border-b border-stone-200 px-5 py-3 ${["Expected", "Counted"].includes(heading) ? "text-right" : ""}`}>{heading}</th>)}
           </tr></thead>
-          <tbody className="divide-y divide-stone-200">{reports.map((report) => <tr key={report.id}>
+          <tbody className="divide-y divide-stone-200">{reports.map((report) => <tr key={report.id} {...clickableRowProps(`${report.status === "Pending" ? "Verify" : "View"} ${report.reference}`, () => { setSuccess(null); setSelected(report); })} className={clickableRowClass}>
             <td className="px-5 py-3.5"><p className="font-semibold">{report.reference}</p><p className="text-xs text-stone-500">{billingDate(report.businessDate)}</p></td>
             <td className="px-5 py-3.5">{report.clerkName}</td>
             <td className="px-5 py-3.5 text-right tabular-nums">{formatPeso(report.expected)}</td>
             <td className="px-5 py-3.5 text-right tabular-nums">{formatPeso(report.counted)}<span className={`block text-xs ${report.difference ? "font-semibold text-red-700" : "text-stone-500"}`}>{differenceText(report.difference)}</span></td>
             <td className="whitespace-nowrap px-5 py-3.5 text-stone-600">{billingDate(report.submittedAt)}</td>
             <td className="px-5 py-3.5"><BillingBadge status={report.status} /></td>
-            <td className="px-5 py-3.5 text-right"><Button size="sm" variant={report.status === "Pending" ? "default" : "outline"} onClick={() => { setSuccess(null); setSelected(report); }}>{report.status === "Pending" ? "Verify" : "View"}</Button></td>
           </tr>)}</tbody>
         </table>
       </div>}
