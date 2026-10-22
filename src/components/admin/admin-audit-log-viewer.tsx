@@ -85,6 +85,9 @@ const actionLabels: Record<string, string> = {
   "design-request.terms-accepted": "Accepted design request terms",
   "finished-designs.terms-accepted": "Accepted Finished Designs terms",
   "message.sent": "Sent a message",
+  "payment.reverse": "Voided a payment",
+  "cash-report.submitted": "Submitted a daily cash report",
+  "cash-report.verified": "Verified a daily cash report",
 };
 
 function humanize(value: string) {

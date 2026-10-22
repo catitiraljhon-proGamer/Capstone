@@ -17,8 +17,11 @@ export function BillingBadge({ status }: { status: string }) {
     : ["Paid", "Verified"].includes(status) ? "bg-stone-900 text-white ring-stone-900"
     : status === "Draft" ? "bg-stone-100 text-stone-600 ring-stone-200"
     : "bg-rose-50 text-red-700 ring-rose-200";
-  return <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${tone}`}>{status === "Sent" ? "Issued" : status}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-xs font-semibold ring-1 ring-inset ${tone}`}>{statusLabel(status)}</span>;
 }
+
+/** Stored statuses keep their original names; invoices show "Sent" as Issued and payments show "Reversed" as Void, like void invoices. */
+export const statusLabel = (status: string) => status === "Sent" ? "Issued" : status === "Reversed" ? "Void" : status;
 
 export function BillingEmpty({ text = "No records match your filters." }: { text?: string }) {
   return <p className="rounded-lg border border-dashed border-stone-200 p-8 text-center text-sm text-stone-500">{text}</p>;

@@ -12,10 +12,19 @@ export async function billingRequest(
   allowCustomer: boolean,
   handler: (db: Db, actor: SessionUser) => Promise<Response>,
 ) {
+  return roleRequest(request, (actor) => assertBillingRole(actor, allowCustomer), handler);
+}
+
+/** Runs a billing-style JSON request after `authorize` accepts the signed-in user; it throws a BillingError to refuse. */
+export async function roleRequest(
+  request: Request,
+  authorize: (actor: SessionUser) => void,
+  handler: (db: Db, actor: SessionUser) => Promise<Response>,
+) {
   try {
     const actor = await readSession();
     if (!actor) return unauthorized();
-    assertBillingRole(actor, allowCustomer);
+    authorize(actor);
     if (!["GET", "HEAD"].includes(request.method)) {
       const origin = request.headers.get("origin");
       if (request.headers.get("sec-fetch-site") === "cross-site" || (origin && origin !== new URL(request.url).origin)) {

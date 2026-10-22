@@ -52,7 +52,8 @@ export const paymentInputSchema = z.object({
   amount: moneySchema,
   method: z.enum(paymentMethods),
   transactionReference: z.string().trim().max(120),
-  paidAt: z.iso.date().refine((value) => value <= manilaDate(), "Payment date cannot be in the future."),
+  /** Required for bank transfers and cheques; cash takes the server's date and time when it is recorded. */
+  paidAt: z.iso.date().refine((value) => value <= manilaDate(), "Payment date cannot be in the future.").optional(),
   notes: z.string().trim().max(1000).optional(),
   proofImage: z.string().max(1_000_100).refine(validProof, "Upload a valid JPG, PNG or WebP image under 750 KB.").optional(),
   submissionKey: z.uuid(),
@@ -60,6 +61,8 @@ export const paymentInputSchema = z.object({
   cashReceived: z.literal(true).optional(),
 }).strict().refine((value) => value.method === "Cash" || value.transactionReference.length >= 3, {
   message: "Enter the transaction reference for this payment.", path: ["transactionReference"],
+}).refine((value) => value.method === "Cash" || Boolean(value.paidAt), {
+  message: "Enter the payment date.", path: ["paidAt"],
 });
 export const paymentActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("verify") }).strict(),
@@ -274,7 +277,7 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
       const activePayments = await db.collection<PaymentDocument>(collections.payments).countDocuments({
         invoiceId: invoice._id, status: { $in: ["Pending", "Verified"] },
       }, { session });
-      if (activePayments) throw new BillingError("Reject pending payments and reverse verified payments before voiding this invoice.", 409);
+      if (activePayments) throw new BillingError("Reject pending payments and void verified payments before voiding this invoice.", 409);
       await invoices.updateOne({ _id: invoice._id }, { $set: { status: "Void", voidReason: input.reason, voidedAt: now, updatedAt: now } }, { session });
       if (project && invoice.milestoneId) {
         await db.collection<ProjectDocument>(collections.projects).updateOne(
@@ -304,6 +307,9 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
   if (actor.role === "customer" && !isCustomerPaymentMethod(input.method)) {
     throw new BillingError(cash ? "Cash payments must be recorded by the Billing Clerk." : "Card and e-wallet payments are made through Pay online.");
   }
+  if (actor.role === "billing-clerk" && !cash) {
+    throw new BillingError("The Billing Clerk records cash only. Customers submit bank transfers and cheques from Billing Status and pay by card or e-wallet through Pay online.");
+  }
   if (cash && !input.cashReceived) throw new BillingError("Confirm that you received and counted the cash.");
   return billingTransaction(db, async (session) => {
     const invoice = await lockInvoice(db, session, recordId(input.invoiceId));
@@ -323,9 +329,10 @@ export async function submitPayment(db: Db, actor: SessionUser, raw: unknown) {
     const payment: PaymentDocument = {
       _id: new ObjectId(), reference: await nextReference(db, session, "PAY", now),
       customerId: invoice.customerId, projectId: invoice.projectId, invoiceId: invoice._id,
-      amount: input.amount, method: input.method, status: "Pending", paidAt: new Date(`${input.paidAt}T04:00:00.000Z`), createdAt: now,
+      // Cash cannot be backdated: it is dated when recorded and waits for the clerk's next daily cash report.
+      amount: input.amount, method: input.method, status: "Pending", paidAt: cash ? now : new Date(`${input.paidAt}T04:00:00.000Z`), createdAt: now,
       transactionReference: input.transactionReference, submissionKey,
-      ...(input.method !== "Cash" ? { duplicateKey: `${input.method}:${input.transactionReference.toLowerCase()}` } : {}),
+      ...(cash ? { uncountedCash: true as const } : { duplicateKey: `${input.method}:${input.transactionReference.toLowerCase()}` }),
       ...(input.proofImage ? { proofImage: input.proofImage } : {}), ...(input.notes ? { notes: input.notes } : {}),
     };
     await db.collection<PaymentDocument>(collections.payments).insertOne(payment, { session });
@@ -371,8 +378,8 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
   } else if (action === "reverse" && !fullyPaid && project.status === "Scheduled") {
     await projects.updateOne({ _id: project._id, status: "Scheduled" }, { $set: { status: "Awaiting downpayment", updatedAt: now } }, { session });
     await insertNotifications(db, [{
-      _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment reversed",
-      body: `A downpayment payment for ${project.name} was reversed. Settle the downpayment to keep your project schedule.`,
+      _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment voided",
+      body: `A downpayment payment for ${project.name} was voided. Settle the downpayment to keep your project schedule.`,
       href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
     }], session);
   }
@@ -460,7 +467,7 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
         status: "Rejected", reviewNote: input.reason, reviewedAt: now, reviewedByName: actor.name,
       }, $unset: { duplicateKey: "" } }, { session });
     } else {
-      if (payment.status !== "Verified") throw new BillingError("Only verified payments can be reversed.", 409);
+      if (payment.status !== "Verified") throw new BillingError("Only verified payments can be voided.", 409);
       updatedPaid = fromCentavos(toCentavos(paid) - toCentavos(payment.amount));
       await payments.updateOne({ _id: payment._id }, { $set: {
         status: "Reversed", reversedAt: now, reversedByName: actor.name, reversalReason: input.reason,
@@ -474,8 +481,8 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
         await insertNotifications(db, [{
           _id: new ObjectId(), userId: invoice.customerId, title: invoice.feeType === "blueprint" ? "Blueprint access requires payment" : "Design access requires payment",
           body: invoice.feeType === "blueprint"
-            ? "A blueprint payment was reversed. Settle the remaining blueprint fee to restore download access."
-            : "A design payment was reversed. Settle the remaining design fee to restore viewing access.",
+            ? "A blueprint payment was voided. Settle the remaining blueprint fee to restore download access."
+            : "A design payment was voided. Settle the remaining design fee to restore viewing access.",
           href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
         }], session);
       }
@@ -484,7 +491,7 @@ export async function reviewPayment(db: Db, actor: SessionUser, id: string, raw:
     await audit(db, session, actor, `payment.${input.action}`, "payment", payment._id, {
       reference: payment.reference, amount: payment.amount, reason: input.reason,
     });
-    await notifyCustomer(db, session, payment.customerId, input.action === "reject" ? "Payment rejected" : "Payment reversed",
+    await notifyCustomer(db, session, payment.customerId, input.action === "reject" ? "Payment rejected" : "Payment voided",
       `${payment.reference} for ${invoice.invoiceNumber}. ${input.reason}`, payment._id);
   });
 }

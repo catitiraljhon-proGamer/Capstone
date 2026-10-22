@@ -8,6 +8,7 @@ import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocu
 import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBillingData, getOwnedPayment, getReceipt, invoiceInputSchema, paymentInputSchema, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
+import { getClerkCashSummary, listCashReports, submitCashReport, verifyCashReport } from "@/lib/server/cash-reports";
 import { sendDuePaymentReminders } from "@/lib/server/payment-reminders";
 import { deleteBlueprintFile, getBlueprintFile, getCustomerDesignImage, getDesignVersionImage, getDesignWorkflow, listCustomerDesigns, reopenBlueprint, respondToDesign, submitBlueprint, uploadBlueprintFile, uploadDesignVersion } from "@/lib/server/design-requests";
 import { createDesignRequest } from "@/lib/server/create-design-request";
@@ -509,7 +510,7 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_billing_tests");
-  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "design_requests", "users", "projects", "invoices", "payments", "cash_reports", "approvals", "audit_logs", "notifications", "billing_counters", "design_versions", "blueprint_files", "cost_estimates"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,
@@ -527,6 +528,10 @@ async function issuedInvoice(amount = 100000) {
 }
 function payment(invoiceId: string, amount = 40000, extra = {}) {
   return { invoiceId, amount, method: "Bank transfer", transactionReference: randomUUID(), paidAt: manilaDate(), submissionKey: randomUUID(), ...extra };
+}
+/** Cash the clerk records at the counter; it is verified with a receipt as it is saved. */
+function recordCash(invoiceId: string, amount: number) {
+  return submitPayment(db, clerk, { invoiceId, amount, method: "Cash", transactionReference: "", submissionKey: randomUUID(), cashReceived: true });
 }
 
 test("customers get one automatic reminder when an unpaid invoice is 3 days or fewer from its due date", async () => {
@@ -575,7 +580,7 @@ test("only clerk manages billing; customers submit only their own payments", asy
 test("drafts are private; clerk issues without admin approval; issued records cannot be edited", async () => {
   const id = await createInvoice(db, clerk, draft);
   assert.equal((await getBillingData(db, customer)).invoices.length, 0);
-  await assert.rejects(submitPayment(db, clerk, payment(id)), isError(400));
+  await assert.rejects(submitPayment(db, customer, payment(id)), isError(400));
   await changeInvoice(db, clerk, id, { action: "edit", invoice: { ...draft, label: "Approved foundation work" } });
   await changeInvoice(db, clerk, id, { action: "issue" });
   const data = await getBillingData(db, customer);
@@ -628,14 +633,72 @@ test("cash recorded by the clerk needs the counted-cash confirmation and is veri
   assert.equal(data.invoices[0].balance, 60000);
   assert.equal(data.invoices[0].status, "Partially Paid");
   assert.equal(await db.collection("audit_logs").countDocuments({ action: "payment.verify" }), 1);
-  // Cheques and transfers the clerk records still wait for verification.
-  const cheque = await submitPayment(db, clerk, payment(id, 10000, { method: "Cheque" }));
-  await assert.rejects(getReceipt(db, clerk, cheque), isError(404));
+});
+test("the clerk records cash only, dated by the server when it is saved", async () => {
+  const id = await issuedInvoice();
+  // Customers submit transfers and cheques themselves and pay by card or e-wallet online.
+  for (const method of ["Bank transfer", "Cheque", "Card", "E-wallet"]) await assert.rejects(submitPayment(db, clerk, payment(id, 1000, { method })), isError(400));
+  const before = Date.now();
+  const paymentId = await submitPayment(db, clerk, payment(id, 1000, { method: "Cash", transactionReference: "", cashReceived: true, paidAt: "2020-01-01" }));
+  const saved = await db.collection<PaymentDocument>("payments").findOne({ _id: new ObjectId(paymentId) });
+  assert.ok(saved!.paidAt.getTime() >= before);
+  assert.equal(saved!.uncountedCash, true);
+  // Transfers and cheques still need the date they were paid.
+  assert.equal(paymentInputSchema.safeParse(payment(id, 1, { paidAt: undefined })).success, false);
+  assert.equal(paymentInputSchema.safeParse(payment(id, 1, { method: "Cash", transactionReference: "", paidAt: undefined })).success, true);
+});
+test("the clerk counts recorded cash into a daily cash report that only the Admin verifies", async () => {
+  const id = await issuedInvoice();
+  const first = await recordCash(id, 25000);
+  const voided = await recordCash(id, 12500);
+  await reviewPayment(db, clerk, voided, { action: "reverse", reason: "Recorded on the wrong invoice." });
+  const third = await recordCash(id, 8000);
+  // Cash recorded before daily reports existed is never counted.
+  await db.collection<PaymentDocument>("payments").insertOne({ _id: new ObjectId(), reference: "LEGACY-CASH", customerId: new ObjectId(customer.id), amount: 500, method: "Cash", status: "Verified", paidAt: new Date(), createdAt: new Date(), verifiedBy: new ObjectId(clerk.id) });
+
+  const { cashDrawer } = await getClerkCashSummary(db, clerk);
+  assert.equal(cashDrawer.expected, 33000);
+  assert.deepEqual(cashDrawer.payments.map((item) => item.id), [first, voided, third]);
+  assert.equal(cashDrawer.payments[1].status, "Reversed");
+  const input = { paymentIds: cashDrawer.payments.map((item) => item.id), expected: cashDrawer.expected };
+
+  await assert.rejects(getClerkCashSummary(db, admin), isError(403));
+  await assert.rejects(submitCashReport(db, admin, { ...input, counted: 33000 }), isError(403));
+  await assert.rejects(submitCashReport(db, customer, { ...input, counted: 33000 }), isError(403));
+  // A short count needs an explanation, and a count against an out-of-date list of cash is refused.
+  await assert.rejects(submitCashReport(db, clerk, { ...input, counted: 32800 }), isError(400));
+  await assert.rejects(submitCashReport(db, clerk, { ...input, expected: 45500, counted: 45500 }), isError(409));
+  await assert.rejects(submitCashReport(db, clerk, { ...input, paymentIds: [first, third], counted: 33000 }), isError(409));
+
+  const reportId = await submitCashReport(db, clerk, { ...input, counted: 32800, explanation: "Gave too much change on one payment." });
+  const summary = await getClerkCashSummary(db, clerk);
+  assert.equal(summary.cashDrawer.payments.length, 0);
+  assert.equal(summary.cashReports[0].difference, -200);
+  assert.equal(summary.cashReports[0].status, "Pending");
+  await assert.rejects(submitCashReport(db, clerk, { ...input, counted: 32800, explanation: "Counted again." }), isError(409));
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(admin.id), kind: "cash-report" }), 1);
+  // Cash recorded after the report waits for the next one.
+  const later = await recordCash(id, 1000);
+  assert.deepEqual((await getClerkCashSummary(db, clerk)).cashDrawer.payments.map((item) => item.id), [later]);
+
+  await assert.rejects(verifyCashReport(db, clerk, reportId, { received: true, note: "Shortage noted." }), isError(403));
+  await assert.rejects(verifyCashReport(db, admin, reportId, { note: "Shortage noted." }), ZodError);
+  await assert.rejects(verifyCashReport(db, admin, reportId, { received: true }), isError(400));
+  await verifyCashReport(db, admin, reportId, { received: true, note: "Shortage of ₱200.00 noted." });
+  const [report] = await listCashReports(db, admin);
+  assert.equal(report.status, "Verified");
+  assert.equal(report.verifiedByName, admin.name);
+  assert.equal(report.adminNote, "Shortage of ₱200.00 noted.");
+  assert.deepEqual(report.payments.map((item) => item.id), [first, voided, third]);
+  await assert.rejects(verifyCashReport(db, admin, reportId, { received: true, note: "Verified again." }), isError(409));
+  await assert.rejects(listCashReports(db, clerk), isError(403));
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(clerk.id), kind: "cash-report" }), 1);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: { $in: ["cash-report.submitted", "cash-report.verified"] } }), 2);
 });
 test("concurrent verification cannot overpay an invoice", async () => {
   const id = await issuedInvoice();
-  const first = await submitPayment(db, clerk, payment(id, 70000));
-  const second = await submitPayment(db, clerk, payment(id, 70000));
+  const first = await submitPayment(db, customer, payment(id, 70000));
+  const second = await submitPayment(db, customer, payment(id, 70000));
   const results = await Promise.allSettled([first, second].map((paymentId) => reviewPayment(db, clerk, paymentId, { action: "verify" })));
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
   const data = await getBillingData(db, clerk);
@@ -645,7 +708,7 @@ test("concurrent verification cannot overpay an invoice", async () => {
 });
 test("simultaneous review of the same payment creates one receipt and one audit event", async () => {
   const id = await issuedInvoice();
-  const paymentId = await submitPayment(db, clerk, payment(id));
+  const paymentId = await submitPayment(db, customer, payment(id));
   const results = await Promise.allSettled([1, 2].map(() => reviewPayment(db, clerk, paymentId, { action: "verify" })));
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
   assert.equal(await db.collection("audit_logs").countDocuments({ action: "payment.verify" }), 1);
@@ -662,27 +725,27 @@ test("submission retries are idempotent and repeated transaction references are 
 });
 test("reversals restore balances and preserve the original receipt", async () => {
   const id = await issuedInvoice();
-  const paymentId = await submitPayment(db, clerk, payment(id, 100000));
+  const paymentId = await submitPayment(db, customer, payment(id, 100000));
   await reviewPayment(db, clerk, paymentId, { action: "verify" });
   const original = await getReceipt(db, clerk, paymentId);
   await reviewPayment(db, clerk, paymentId, { action: "reverse", reason: "Payment was returned by the bank." });
   const reversed = await getReceipt(db, clerk, paymentId);
   assert.deepEqual(reversed.receipt, original.receipt);
   assert.equal(reversed.status, "Reversed");
-  assert.match(receiptHtml(reversed), /VOID — PAYMENT REVERSED/);
+  assert.match(receiptHtml(reversed), /VOID PAYMENT/);
   assert.equal((await getBillingData(db, clerk)).invoices[0].balance, 100000);
   await assert.rejects(reviewPayment(db, clerk, paymentId, { action: "reverse", reason: "Repeated reversal" }), isError(409));
 });
 test("a reversed payment can be re-recorded against the correct invoice without changing its original receipt", async () => {
   const id = await issuedInvoice();
   const originalInput = payment(id, 50000);
-  const originalId = await submitPayment(db, clerk, originalInput);
+  const originalId = await submitPayment(db, customer, originalInput);
   await reviewPayment(db, clerk, originalId, { action: "verify" });
   const originalReceipt = await getReceipt(db, clerk, originalId);
   await reviewPayment(db, clerk, originalId, { action: "reverse", reason: "Payment was allocated to the wrong invoice." });
   const correctedInvoice = await createInvoice(db, clerk, { ...draft, label: "Correct milestone", amount: 50000 });
   await changeInvoice(db, clerk, correctedInvoice, { action: "issue" });
-  const correctedId = await submitPayment(db, clerk, { ...originalInput, invoiceId: correctedInvoice, submissionKey: randomUUID() });
+  const correctedId = await submitPayment(db, customer, { ...originalInput, invoiceId: correctedInvoice, submissionKey: randomUUID() });
   await reviewPayment(db, clerk, correctedId, { action: "verify" });
   assert.deepEqual((await getReceipt(db, clerk, originalId)).receipt, originalReceipt.receipt);
   const records = await getBillingData(db, clerk);
@@ -722,7 +785,7 @@ test("contract allocation is atomic and includes drafts; duplicate billing stage
 test("centavo arithmetic is exact; invalid precision, dates, proofs and overposting are rejected", async () => {
   const id = await issuedInvoice(0.3);
   for (const amount of [0.1, 0.2]) {
-    const paymentId = await submitPayment(db, clerk, payment(id, amount));
+    const paymentId = await submitPayment(db, customer, payment(id, amount));
     await reviewPayment(db, clerk, paymentId, { action: "verify" });
   }
   assert.equal((await getBillingData(db, clerk)).invoices[0].balance, 0);

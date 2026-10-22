@@ -99,11 +99,54 @@ export type BillingProject = {
   milestones: PaymentMilestoneDto[];
 };
 
+/** A cash payment as listed in the Billing Clerk's cash total and in a daily cash report. */
+export type CashReportPayment = {
+  id: string;
+  reference: string;
+  receiptNumber?: string;
+  customerName: string;
+  invoiceNumber: string;
+  amount: number;
+  /** Void ("Reversed") cash stays listed but is not expected in the drawer. */
+  status: "Verified" | "Reversed";
+  paidAt: string;
+  reversalReason?: string;
+};
+
+/** Cash the Billing Clerk recorded that no daily cash report has counted yet. */
+export type CashDrawer = {
+  payments: CashReportPayment[];
+  expected: number;
+};
+
+/** The Billing Clerk's counted cash for the day, which the Admin verifies when the cash is handed over. */
+export type CashReport = {
+  id: string;
+  reference: string;
+  clerkName: string;
+  /** YYYY-MM-DD, Manila time. */
+  businessDate: string;
+  expected: number;
+  counted: number;
+  /** Counted minus expected: negative when short, positive when over. */
+  difference: number;
+  explanation?: string;
+  status: "Pending" | "Verified";
+  submittedAt: string;
+  verifiedAt?: string;
+  verifiedByName?: string;
+  adminNote?: string;
+  payments: CashReportPayment[];
+};
+
 export type BillingData = {
   designRequests: { id: string; customerName: string; label: string; feeType: DesignFeeType; invoiceId?: string }[];
   projects: BillingProject[];
   invoices: BillingInvoice[];
   payments: BillingPayment[];
+  /** Billing Clerk only: cash not counted yet and the clerk's recent daily cash reports. */
+  cashDrawer?: CashDrawer;
+  cashReports?: CashReport[];
 };
 
 /** A customer payment date shown read-only on the admin calendar; billing itself stays with the Billing Clerk. */

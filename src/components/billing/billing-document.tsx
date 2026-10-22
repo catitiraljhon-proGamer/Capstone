@@ -76,7 +76,7 @@ function ReceiptSheet({ data }: { data: BillingReceipt }) {
         <p className="bg-stone-100 px-4 py-2 text-xs text-stone-600">Transaction date: {billingDate(r.paidAt)}</p>
       </div>
     </section>
-    {data.status === "Reversed" && <p className="mt-6 rounded-lg border-2 border-red-700 p-4 text-red-800"><strong>VOID — PAYMENT REVERSED</strong><br />{data.reversalReason}</p>}
+    {data.status === "Reversed" && <p className="mt-6 rounded-lg border-2 border-red-700 p-4 text-red-800"><strong>VOID PAYMENT</strong><br />{data.reversalReason}</p>}
     <div className="mt-8 overflow-x-auto">
       <table className="w-full min-w-[34rem] border-collapse text-left">
         <thead className="bg-red-700 text-xs font-semibold uppercase tracking-wide text-white">
@@ -105,6 +105,6 @@ function ReceiptSheet({ data }: { data: BillingReceipt }) {
         </dl>
       </div>
     </section>
-    <footer className="mt-10 border-t border-stone-200 pt-5 text-xs leading-6 text-stone-500">This receipt acknowledges the verified payment above. The balance shown is the invoice balance when the receipt was issued. Subsequent payments and reversals appear in your payment history.</footer>
+    <footer className="mt-10 border-t border-stone-200 pt-5 text-xs leading-6 text-stone-500">This receipt acknowledges the verified payment above. The balance shown is the invoice balance when the receipt was issued. Later payments and voided payments appear in your payment history.</footer>
   </article>;
 }

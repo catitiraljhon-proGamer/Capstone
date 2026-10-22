@@ -42,6 +42,7 @@ export const collections = {
   invoices: "invoices",
   payments: "payments",
   paymentCheckouts: "payment_checkouts",
+  cashReports: "cash_reports",
   documents: "documents",
   notifications: "notifications",
   schedules: "schedules",
@@ -399,6 +400,33 @@ export type PaymentDocument = {
   gatewaySessionId?: string;
   /** False for simulated/test-mode gateway payments. */
   gatewayLivemode?: boolean;
+  /** Set on cash the Billing Clerk records (verifiedBy is that clerk) until it is counted in a daily cash report. */
+  uncountedCash?: true;
+  /** The daily cash report that counted this cash payment. */
+  cashReportId?: ObjectId;
+};
+
+/** The Billing Clerk's counted cash total for the cash recorded since their last report, verified by the Admin. */
+export type CashReportDocument = {
+  _id: ObjectId;
+  reference: string;
+  clerkId: ObjectId;
+  clerkName: string;
+  /** Manila date (YYYY-MM-DD) the cash was counted. */
+  businessDate: string;
+  /** Every cash payment the report covers, voided ones included; only verified ones count toward `expected`. */
+  paymentIds: ObjectId[];
+  expected: number;
+  counted: number;
+  /** Required when the counted cash differs from the expected cash. */
+  explanation?: string;
+  status: "Pending" | "Verified";
+  submittedAt: Date;
+  verifiedAt?: Date;
+  verifiedBy?: ObjectId;
+  verifiedByName?: string;
+  /** The Admin's note, required when the counted cash differs from the expected cash. */
+  adminNote?: string;
 };
 
 /** A PayMongo-style checkout session for paying one invoice online. */
