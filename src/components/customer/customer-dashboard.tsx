@@ -14,7 +14,7 @@ import {
   type HouseDesign,
 } from "@/lib/house-design-data";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
-import { DesignPager } from "@/components/house-designs/design-pager";
+import { useDesignNavigation } from "@/lib/use-design-navigation";
 import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
@@ -338,6 +338,12 @@ function FinishedDesignsBrowser() {
     setSelectedDesignId(design.id);
     setActiveStep("details");
   };
+  // Arrow keys and clicks on the photo's sides move through the designs of the open house type.
+  const designNavigation = useDesignNavigation(
+    activeStep === "details" && selectedDesign ? filteredDesigns : [],
+    selectedDesign?.id ?? "",
+    openDesign,
+  );
 
   return (
       <div className="space-y-6">
@@ -457,11 +463,11 @@ function FinishedDesignsBrowser() {
             <div>
               <div className="mb-5 flex flex-wrap items-center gap-3">
                 <BackButton type="button" onClick={() => setActiveStep("designs")} />
-                <DesignPager designs={filteredDesigns} currentId={selectedDesign.id} onSelect={openDesign} />
               </div>
 
               <HouseDesignGallery
                 key={selectedDesign.id}
+                navigation={designNavigation}
                 images={selectedDesign.images}
                 name={selectedDesign.name}
                 protectedView
