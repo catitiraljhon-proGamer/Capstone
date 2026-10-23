@@ -257,5 +257,85 @@
     "notes": "Simple grey volumes with a lit stone feature wall, full-height glass living areas, and a garden walkway.",
     "status": "Published",
     "customItems": []
+  },
+  {
+    "name": "Redbrick Bay Cottage",
+    "style": "Two-Storey",
+    "houseType": "Victorian",
+    "area": 160,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 52000,
+    "images": [
+      "/House/victorian/redbrick-bay-cottage.webp"
+    ],
+    "notes": "Red brick two-storey home with a steep front gable, a copper-roofed bay window, and a covered entry porch.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Mansard Manor",
+    "style": "Three-Storey",
+    "houseType": "Victorian",
+    "area": 420,
+    "bedrooms": 6,
+    "bathrooms": 5,
+    "rooms": "6 bedrooms, 5 bathrooms",
+    "rate": 70000,
+    "images": [
+      "/House/victorian/mansard-manor.webp"
+    ],
+    "notes": "Grand brick manor with a slate mansard roof, arched windows, iron balconies, and an ornate covered entrance.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Limestone Bay Residence",
+    "style": "Three-Storey with Garage",
+    "houseType": "Victorian",
+    "area": 320,
+    "bedrooms": 5,
+    "bathrooms": 4,
+    "rooms": "5 bedrooms, 4 bathrooms",
+    "rate": 68000,
+    "images": [
+      "/House/victorian/limestone-bay-residence.webp"
+    ],
+    "notes": "Cream limestone home with a curved bay tower, arched glass doors, iron balconies, and a lower-level garage.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Brickglow Gable House",
+    "style": "Two-Storey",
+    "houseType": "Victorian",
+    "area": 240,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 58000,
+    "images": [
+      "/House/victorian/brickglow-gable-house.webp"
+    ],
+    "notes": "Warm brick home with layered gables, tall black-framed windows, and soft lighting under the eaves.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Timber Gable Residence",
+    "style": "Two-Storey",
+    "houseType": "Victorian",
+    "area": 260,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 60000,
+    "images": [
+      "/House/victorian/timber-gable-residence.webp"
+    ],
+    "notes": "Half-timbered gables over brick and stone walls, leaded windows, and an arched stone entry.",
+    "status": "Published",
+    "customItems": []
   }
 ]
