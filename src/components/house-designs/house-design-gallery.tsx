@@ -2,7 +2,7 @@
 
 import { DesignWatermark } from "@/components/ui/design-watermark";
 import { isDataImage } from "@/lib/house-design-data";
-import { ImageOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
 
@@ -18,6 +18,7 @@ export function HouseDesignGallery({
   name,
   protectedView = false,
   fit = "cover",
+  navigation,
 }: {
   images: string[];
   name: string;
@@ -25,6 +26,14 @@ export function HouseDesignGallery({
   protectedView?: boolean;
   /** "contain" keeps floor plans and drawings uncropped. */
   fit?: "cover" | "contain";
+  /** Clicking the left or right side of the photo opens the previous or next design. */
+  navigation?: {
+    position: string | null;
+    onPrevious?: () => void;
+    onNext?: () => void;
+    previousName?: string;
+    nextName?: string;
+  };
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const safeIndex = activeIndex < images.length ? activeIndex : 0;
@@ -79,6 +88,31 @@ export function HouseDesignGallery({
             className="object-contain"
             sizes="(min-width: 1024px) 72vw, 100vw"
           />
+          {navigation?.onPrevious && navigation.onNext ? (
+            <>
+              <button
+                type="button"
+                onClick={navigation.onPrevious}
+                aria-label={`Previous design: ${navigation.previousName}`}
+                className="group absolute inset-y-0 left-0 z-20 flex w-1/2 cursor-w-resize items-center justify-start pl-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-600"
+              >
+                <ChevronLeft className="h-10 w-10 rounded-full bg-white/70 p-2 text-stone-800 opacity-0 shadow transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={navigation.onNext}
+                aria-label={`Next design: ${navigation.nextName}`}
+                className="group absolute inset-y-0 right-0 z-20 flex w-1/2 cursor-e-resize items-center justify-end pr-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-red-600"
+              >
+                <ChevronRight className="h-10 w-10 rounded-full bg-white/70 p-2 text-stone-800 opacity-0 shadow transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
+              </button>
+              {navigation.position ? (
+                <span className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-md bg-stone-950/70 px-2 py-0.5 text-xs font-semibold tabular-nums text-white">
+                  {navigation.position}
+                </span>
+              ) : null}
+            </>
+          ) : null}
         </div>
       </div>
 

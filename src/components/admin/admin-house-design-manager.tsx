@@ -12,7 +12,7 @@ import {
   type HouseDesign,
   type HouseDesignStatus,
 } from "@/lib/house-design-data";
-import { DesignPager } from "@/components/house-designs/design-pager";
+import { useDesignNavigation } from "@/lib/use-design-navigation";
 import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import { useHouseDesigns } from "@/lib/house-design-store";
@@ -274,6 +274,12 @@ export function AdminHouseDesignManager() {
     setSelectedDesignId(design.id);
     goToStep("details");
   };
+  // Arrow keys and clicks on the photo's sides move through the designs of the open house type.
+  const designNavigation = useDesignNavigation(
+    activeStep === "details" && selectedDesign ? filteredDesigns : [],
+    selectedDesign?.id ?? "",
+    openDesign,
+  );
 
   const handleStatusChange = async (status: HouseDesignStatus) => {
     if (!selectedDesign) {
@@ -581,7 +587,6 @@ export function AdminHouseDesignManager() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <BackButton type="button" onClick={() => goToStep("designs")} />
-              <DesignPager designs={filteredDesigns} currentId={selectedDesign.id} onSelect={openDesign} />
             </div>
             {isConfirmingArchive ? (
               <div className="flex flex-wrap items-center gap-3">
@@ -653,6 +658,7 @@ export function AdminHouseDesignManager() {
 
           <HouseDesignGallery
             key={selectedDesign.id}
+            navigation={designNavigation}
             images={selectedDesign.images}
             name={selectedDesign.name}
           />
