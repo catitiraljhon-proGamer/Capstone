@@ -12,6 +12,7 @@ import {
   type HouseDesign,
   type HouseDesignStatus,
 } from "@/lib/house-design-data";
+import { DesignPager } from "@/components/house-designs/design-pager";
 import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import { useHouseDesigns } from "@/lib/house-design-store";
@@ -578,7 +579,10 @@ export function AdminHouseDesignManager() {
       ) : selectedDesign ? (
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <BackButton type="button" onClick={() => goToStep("designs")} />
+            <div className="flex flex-wrap items-center gap-3">
+              <BackButton type="button" onClick={() => goToStep("designs")} />
+              <DesignPager designs={filteredDesigns} currentId={selectedDesign.id} onSelect={openDesign} />
+            </div>
             {isConfirmingArchive ? (
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-sm font-medium text-stone-700">
@@ -648,6 +652,7 @@ export function AdminHouseDesignManager() {
           </div>
 
           <HouseDesignGallery
+            key={selectedDesign.id}
             images={selectedDesign.images}
             name={selectedDesign.name}
           />

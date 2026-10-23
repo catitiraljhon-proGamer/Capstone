@@ -14,6 +14,7 @@ import {
   type HouseDesign,
 } from "@/lib/house-design-data";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
+import { DesignPager } from "@/components/house-designs/design-pager";
 import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
@@ -454,11 +455,13 @@ function FinishedDesignsBrowser() {
             </>
           ) : selectedDesign ? (
             <div>
-              <div className="mb-5 flex justify-start">
+              <div className="mb-5 flex flex-wrap items-center gap-3">
                 <BackButton type="button" onClick={() => setActiveStep("designs")} />
+                <DesignPager designs={filteredDesigns} currentId={selectedDesign.id} onSelect={openDesign} />
               </div>
 
               <HouseDesignGallery
+                key={selectedDesign.id}
                 images={selectedDesign.images}
                 name={selectedDesign.name}
                 protectedView
