@@ -41,6 +41,18 @@ function groupTitle(group: DesignGroup | null) {
   return group.kind === "completed-projects" ? "Completed Projects" : "Designs Without a House Type";
 }
 
+function groupDescription(group: DesignGroup | null) {
+  if (!group) {
+    return "Choose a house type, then manage the designs and exterior materials under that category.";
+  }
+  if (group.kind === "completed-projects") {
+    return "Each completed project is saved here as a draft design with its cost estimate. Assign a house type and publish it to show customers.";
+  }
+  return group.kind === "unassigned"
+    ? "Edit each design and select a house type so customers can find it."
+    : "Select a design to review and edit its details and custom items.";
+}
+
 function isInGroup(design: HouseDesign, group: DesignGroup | null) {
   if (!group) return false;
   if (group.kind === "house-type") return design.houseType === group.houseType;
@@ -141,11 +153,13 @@ function StatusBadge({ status }: { status: HouseDesignStatus }) {
 
 function Breadcrumb({
   items,
+  className = "mb-4",
 }: {
   items: { label: string; onClick?: () => void }[];
+  className?: string;
 }) {
   return (
-    <nav aria-label="House design steps" className="mb-4">
+    <nav aria-label="House design steps" className={className}>
       <ol className="flex flex-wrap items-center gap-1 text-sm">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -362,19 +376,15 @@ export function AdminHouseDesignManager() {
         </p>
       ) : null}
 
-      {activeStep !== "types" ? <Breadcrumb items={breadcrumbItems} /> : null}
+      {activeStep !== "types" && activeStep !== "designs" ? (
+        <Breadcrumb items={breadcrumbItems} />
+      ) : null}
 
       {activeStep === "types" ? (
         <div>
-          <div className="mb-5">
-            <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-              Select House Type
-            </h1>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              Admin can choose a house type first, then manage the designs and
-              exterior materials under that category.
-            </p>
-          </div>
+          <h2 className="mb-4 text-base font-semibold tracking-tight text-stone-950">
+            Select House Type
+          </h2>
           <HouseTypeCards
             houseTypes={catalog.houseTypes}
             onSelect={(houseType) => openGroup({ kind: "house-type", houseType })}
@@ -464,18 +474,7 @@ export function AdminHouseDesignManager() {
       ) : activeStep === "designs" ? (
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-stone-950">
-                {groupTitle(selectedGroup)}
-              </h1>
-              <p className="mt-1 text-sm leading-6 text-stone-600">
-                {selectedGroup?.kind === "completed-projects"
-                  ? "Each completed project is saved here as a draft design with its cost estimate. Assign a house type and publish it to show customers."
-                  : selectedGroup?.kind === "unassigned"
-                    ? "Edit each design and select a house type so customers can find it."
-                    : "Select a design to review its details."}
-              </p>
-            </div>
+            <Breadcrumb items={breadcrumbItems} className="" />
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-600">
                 <input
@@ -717,11 +716,7 @@ export function AdminHouseDesignManager() {
     <AdminSectionPage
       activeLabel="House Design"
       title={groupTitle(selectedGroup)}
-      description={
-        selectedGroup
-          ? "Select a design to review and edit its details and custom items."
-          : "Review house design submissions and design-related project records."
-      }
+      description={groupDescription(selectedGroup)}
       mainContent={mainContent}
     />
   );
