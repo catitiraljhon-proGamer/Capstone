@@ -191,6 +191,8 @@ export type ProjectDocument = {
   paymentSchedule?: ProjectMilestoneDocument[];
   /** When the admin marked the project Completed; older completed projects fall back to updatedAt. */
   completedAt?: Date;
+  /** When the draft design made from this completed project was removed, so it is not recreated. */
+  completedDesignRemovedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 };

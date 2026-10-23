@@ -162,10 +162,12 @@ async function createDesignFromProject(
 /**
  * Every completed construction project gets a draft house design holding its floor area, design images,
  * and accepted cost estimate, so the Admin can review and publish it as a finished design.
+ * Projects whose design was removed are skipped.
  */
 export async function syncCompletedProjectDesigns(db: Db, actor: Pick<SessionUser, "id" | "name" | "role">) {
   const completed = await db.collection<ProjectDocument>(collections.projects)
-    .find({ status: "Completed" }).sort({ completedAt: 1, updatedAt: 1 }).limit(500).toArray();
+    .find({ status: "Completed", completedDesignRemovedAt: { $exists: false } })
+    .sort({ completedAt: 1, updatedAt: 1 }).limit(500).toArray();
   if (!completed.length) return [];
   const linked = await db.collection<HouseDesignDocument>(collections.houseDesigns)
     .find({ "sourceProject.projectId": { $in: completed.map((project) => project._id) } }, { projection: { "sourceProject.projectId": 1 } })
