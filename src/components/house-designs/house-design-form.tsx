@@ -36,7 +36,7 @@ type FieldName =
   | "name"
   | "houseType"
   | "area"
-  | "rate"
+  | "cost"
   | "bedrooms"
   | "bathrooms"
   | "images"
@@ -48,7 +48,7 @@ type FormValues = {
   name: string;
   houseType: string;
   area: string;
-  rate: string;
+  cost: string;
   bedrooms: string;
   bathrooms: string;
 };
@@ -57,7 +57,7 @@ const fieldOrder: FieldName[] = [
   "name",
   "houseType",
   "area",
-  "rate",
+  "cost",
   "bedrooms",
   "bathrooms",
   "images",
@@ -68,7 +68,7 @@ const fieldLabels: Record<FieldName, string> = {
   name: "Design Name",
   houseType: "House Type",
   area: "Floor Area",
-  rate: "Cost Rate",
+  cost: "Estimated Project Cost",
   bedrooms: "Bedrooms",
   bathrooms: "Bathrooms",
   images: "Design Images",
@@ -79,7 +79,7 @@ const fieldIds: Record<FieldName, string> = {
   name: "design-name",
   houseType: "design-house-type",
   area: "design-area",
-  rate: "design-rate",
+  cost: "design-cost",
   bedrooms: "design-bedrooms",
   bathrooms: "design-bathrooms",
   images: "design-images",
@@ -100,7 +100,7 @@ type CustomItemDraft = Omit<CustomExteriorItem, "quantity" | "unitPrice"> & {
 type CustomItemField = "item" | "material" | "unit" | "quantity" | "unitPrice";
 type CustomItemErrors = Partial<Record<CustomItemField, string | null>>;
 
-const maxUnitPrice = 100_000_000;
+const maxProjectCost = 10_000_000_000;
 
 function customItemErrors(item: CustomItemDraft): CustomItemErrors {
   return {
@@ -158,8 +158,8 @@ function validate(
     (Number(values.area) <= 0 ? "Floor area must be more than 0 sq m." : null);
   if (areaMessage) errors.area = areaMessage;
 
-  const rateMessage = amountError(values.rate, { label: "Cost rate", max: maxUnitPrice });
-  if (rateMessage) errors.rate = rateMessage;
+  const costMessage = amountError(values.cost, { label: "Estimated project cost", max: maxProjectCost });
+  if (costMessage) errors.cost = costMessage;
 
   const bedroomsMessage = numberError(values.bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount });
   if (bedroomsMessage) errors.bedrooms = bedroomsMessage;
@@ -256,7 +256,7 @@ export function HouseDesignForm({
     name: design?.name ?? "",
     houseType: design?.houseType ?? defaultHouseType ?? "",
     area: design ? String(design.area) : "",
-    rate: design ? String(design.rate) : "",
+    cost: design ? String(getDesignEstimate({ area: design.area, rate: design.rate }).baseEstimate) : "",
     bedrooms: design ? String(design.bedrooms) : "",
     bathrooms: design ? String(design.bathrooms) : "",
   });
@@ -323,12 +323,15 @@ export function HouseDesignForm({
   };
 
   const areaValue = Number(values.area);
-  const rateValue = Number(values.rate);
-  const preview = getDesignEstimate({
-    area: Number.isFinite(areaValue) ? areaValue : 0,
-    rate: Number.isFinite(rateValue) ? rateValue : 0,
+  const costValue = Number.isFinite(Number(values.cost)) ? Number(values.cost) : 0;
+  // The Admin keeps the project cost current; the per-sqm rate is worked out from it and the floor area.
+  const rateValue = Number.isFinite(areaValue) && areaValue > 0 ? costValue / areaValue : 0;
+  const { customTotal } = getDesignEstimate({
+    area: 0,
+    rate: 0,
     customItems: customItems.filter(isCustomItemComplete).map(toCustomItem),
   });
+  const preview = { baseEstimate: costValue, customTotal, estimate: Math.round((costValue + customTotal) * 100) / 100 };
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -592,28 +595,32 @@ export function HouseDesignForm({
               </Field>
 
               <Field
-                htmlFor={fieldIds.rate}
-                label="Cost Rate (PHP / sqm)"
-                hint="Base estimate is floor area multiplied by this rate."
+                htmlFor={fieldIds.cost}
+                label="Estimated Project Cost (PHP)"
+                hint={
+                  rateValue > 0
+                    ? `Update it as material and labor prices change. Works out to ${formatPeso(Math.round(rateValue * 100) / 100)} per sqm.`
+                    : "Update it as material and labor prices change."
+                }
                 required
-                error={errors.rate}
+                error={errors.cost}
               >
                 <PesoInput
-                  id={fieldIds.rate}
-                  name="rate"
+                  id={fieldIds.cost}
+                  name="cost"
                   inputMode="decimal"
                   min="0.01"
                   step="0.01"
-                  value={values.rate}
-                  onChange={(event) => setValue("rate", event.target.value)}
-                  onBlur={() => handleBlur("rate")}
-                  aria-invalid={Boolean(errors.rate)}
+                  value={values.cost}
+                  onChange={(event) => setValue("cost", event.target.value)}
+                  onBlur={() => handleBlur("cost")}
+                  aria-invalid={Boolean(errors.cost)}
                   aria-describedby={describedBy(
-                    fieldIds.rate,
+                    fieldIds.cost,
                     true,
-                    Boolean(errors.rate),
+                    Boolean(errors.cost),
                   )}
-                  placeholder="40000"
+                  placeholder="6000000"
                 />
               </Field>
 
@@ -881,7 +888,7 @@ export function HouseDesignForm({
                   No custom items yet.
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-stone-600">
-                  The estimate is the floor area times the cost rate.
+                  The estimate is the Estimated Project Cost above.
                 </p>
               </div>
             )}
@@ -1020,7 +1027,7 @@ export function HouseDesignForm({
             </p>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Base Estimate</dt>
+                <dt className="text-stone-600">Project Cost</dt>
                 <dd className="font-medium tabular-nums">
                   {formatPeso(preview.baseEstimate)}
                 </dd>
@@ -1033,8 +1040,7 @@ export function HouseDesignForm({
               </div>
             </dl>
             <p className="mt-4 text-xs leading-5 text-stone-600">
-              Computed from floor area, cost rate, and any completed custom
-              items.
+              The Estimated Project Cost plus any completed custom items.
             </p>
           </section>
         </div>
