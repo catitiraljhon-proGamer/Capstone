@@ -177,5 +177,85 @@
     "notes": "Simple exterior composition with efficient floor area planning.",
     "status": "Published",
     "customItems": []
+  },
+  {
+    "name": "Timber Box Residence",
+    "style": "Two-Storey",
+    "houseType": "Minimalist",
+    "area": 200,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 55000,
+    "images": [
+      "/House/minimalist/timber-box-residence.webp"
+    ],
+    "notes": "Two-storey home in light panel cladding with warm timber accents, wide glass balconies, and a two-car garage.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Monochrome Slat House",
+    "style": "Two-Storey",
+    "houseType": "Minimalist",
+    "area": 190,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 55000,
+    "images": [
+      "/House/minimalist/monochrome-slat-house.webp"
+    ],
+    "notes": "Black and white two-storey home with vertical timber slats, a glass-railed terrace, and a wood-finish garage door.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Marble Frame Residence",
+    "style": "Two-Storey with Carport",
+    "houseType": "Minimalist",
+    "area": 230,
+    "bedrooms": 4,
+    "bathrooms": 4,
+    "rooms": "4 bedrooms, 4 bathrooms",
+    "rate": 60000,
+    "images": [
+      "/House/minimalist/marble-frame-residence.webp"
+    ],
+    "notes": "Clean white frame with a black marble entry column, a planted balcony ledge, and a covered carport for two cars.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Light Line Residence",
+    "style": "Two-Storey with Carport",
+    "houseType": "Minimalist",
+    "area": 210,
+    "bedrooms": 3,
+    "bathrooms": 3,
+    "rooms": "3 bedrooms, 3 bathrooms",
+    "rate": 58000,
+    "images": [
+      "/House/minimalist/light-line-residence.webp"
+    ],
+    "notes": "Bold black and white volumes with lit vertical lines, a double-height glass stairwell, and a single carport.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Stonewall Glow House",
+    "style": "Two-Storey",
+    "houseType": "Minimalist",
+    "area": 180,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 56000,
+    "images": [
+      "/House/minimalist/stonewall-glow-house.webp"
+    ],
+    "notes": "Simple grey volumes with a lit stone feature wall, full-height glass living areas, and a garden walkway.",
+    "status": "Published",
+    "customItems": []
   }
 ]
