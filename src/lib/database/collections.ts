@@ -4,7 +4,6 @@ import type {
   FinishLevel,
   HouseDesignStatus,
   HouseType,
-  MaterialPriceOverride,
 } from "@/lib/house-design-data";
 import type {
   MessageRecipientRole,
@@ -113,8 +112,6 @@ export type HouseDesignDocument = {
   images: string[];
   notes: string;
   status: HouseDesignStatus;
-  defaultSelections: number[];
-  materialPrices?: MaterialPriceOverride[];
   customItems: CustomExteriorItem[];
   /** The completed project this design was created from, with a snapshot of its accepted estimate. */
   sourceProject?: {

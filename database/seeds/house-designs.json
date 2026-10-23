@@ -15,15 +15,6 @@
     ],
     "notes": "Clean layout for subdivision-ready residential builds.",
     "status": "Published",
-    "defaultSelections": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
     "customItems": []
   },
   {
@@ -41,15 +32,6 @@
     ],
     "notes": "Modern facade with wider openings and stronger street presence.",
     "status": "Published",
-    "defaultSelections": [
-      1,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
     "customItems": []
   },
   {
@@ -66,15 +48,6 @@
     ],
     "notes": "Balanced room sizes with stronger facade treatment.",
     "status": "Published",
-    "defaultSelections": [
-      1,
-      1,
-      1,
-      0,
-      0,
-      0,
-      0
-    ],
     "customItems": []
   },
   {
@@ -91,15 +64,6 @@
     ],
     "notes": "Compact contemporary plan with practical exterior materials.",
     "status": "Published",
-    "defaultSelections": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
     "customItems": []
   },
   {
@@ -116,15 +80,6 @@
     ],
     "notes": "Two-storey home in dark granite cladding with warm-lit timber slat panels, a double-height entry, and parking for two cars.",
     "status": "Published",
-    "defaultSelections": [
-      2,
-      2,
-      2,
-      1,
-      1,
-      2,
-      1
-    ],
     "customItems": []
   },
   {
@@ -141,15 +96,6 @@
     ],
     "notes": "Single-storey home with a sloped skillion roof, a timber-slat entry wall, stone accents, and a covered carport.",
     "status": "Published",
-    "defaultSelections": [
-      1,
-      1,
-      1,
-      1,
-      2,
-      0,
-      1
-    ],
     "customItems": []
   },
   {
@@ -166,15 +112,6 @@
     ],
     "notes": "Bold angular facade with tall glass fins, a perforated privacy screen, a reflecting pool, and a two-car garage.",
     "status": "Published",
-    "defaultSelections": [
-      2,
-      2,
-      2,
-      2,
-      1,
-      2,
-      2
-    ],
     "customItems": []
   },
   {
@@ -191,15 +128,6 @@
     ],
     "notes": "Three-level home with deep terraces, glass balconies, stone-clad walls, and an enclosed garage.",
     "status": "Published",
-    "defaultSelections": [
-      2,
-      2,
-      2,
-      2,
-      1,
-      2,
-      1
-    ],
     "customItems": []
   },
   {
@@ -216,15 +144,6 @@
     ],
     "notes": "Symmetrical two-storey home around a stone fireplace column, with glass balconies and an infinity pool.",
     "status": "Published",
-    "defaultSelections": [
-      2,
-      1,
-      2,
-      2,
-      1,
-      2,
-      1
-    ],
     "customItems": []
   },
   {
@@ -241,15 +160,6 @@
     ],
     "notes": "Lower starting estimate for smaller lots and budgets.",
     "status": "Published",
-    "defaultSelections": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0
-    ],
     "customItems": []
   },
   {
@@ -266,15 +176,6 @@
     ],
     "notes": "Simple exterior composition with efficient floor area planning.",
     "status": "Published",
-    "defaultSelections": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
     "customItems": []
   }
 ]

@@ -5,16 +5,11 @@ import {
   type DesignRequestDocument,
   type DesignVersionDocument,
   type EstimateDocument,
-  type ExteriorItemDocument,
   type HouseDesignDocument,
   type ProjectDocument,
   type UserDocument,
 } from "@/lib/database/collections";
-import {
-  formatPeso,
-  getExteriorEstimate,
-  normalizeSelections,
-} from "@/lib/house-design-data";
+import { formatPeso, getDesignEstimate } from "@/lib/house-design-data";
 import type { SessionUser } from "@/types/domain";
 
 const maxImages = 6;
@@ -74,7 +69,7 @@ async function createDesignFromProject(
   project: ProjectDocument,
   choice: DesignChoice = {},
 ) {
-  const [estimate, request, customer, exteriorItemDocuments] = await Promise.all([
+  const [estimate, request, customer] = await Promise.all([
     project.estimateId
       ? db.collection<EstimateDocument>(collections.estimates).findOne({ _id: project.estimateId })
       : null,
@@ -82,7 +77,6 @@ async function createDesignFromProject(
       ? db.collection<DesignRequestDocument>(collections.designRequests).findOne({ _id: project.designRequestId })
       : null,
     db.collection<UserDocument>(collections.users).findOne({ _id: project.customerId }, { projection: { name: 1 } }),
-    db.collection<ExteriorItemDocument>(collections.exteriorItems).find({ active: true }).sort({ order: 1 }).toArray(),
   ]);
   const sourceDesignId = project.houseDesignId ?? request?.houseDesignId;
   const sourceDesign = sourceDesignId
@@ -96,15 +90,10 @@ async function createDesignFromProject(
   const completedAt = project.completedAt ?? project.updatedAt;
   const houseType = choice.houseType ?? request?.houseType ?? sourceDesign?.houseType;
 
-  // The rate is set so the design's estimate with its default materials equals what the project cost.
-  const exteriorItems = exteriorItemDocuments.map(({ item, detail, quantity, quantityByArea, options }) => ({
-    item, detail, quantity, quantityByArea, options,
-  }));
-  const defaultSelections = normalizeSelections(sourceDesign?.defaultSelections, exteriorItems);
-  const materialPrices = sourceDesign?.materialPrices ?? [];
+  // The rate is set so the design's estimate, with its custom items, equals what the project cost.
   const customItems = sourceDesign?.customItems ?? [];
-  const { exteriorTotal } = getExteriorEstimate({ area, rate: 0, materialPrices, customItems }, defaultSelections, exteriorItems);
-  const rate = Math.max(0, roundAmount((project.contractPrice - exteriorTotal) / area));
+  const { customTotal } = getDesignEstimate({ area, rate: 0, customItems });
+  const rate = Math.max(0, roundAmount((project.contractPrice - customTotal) / area));
 
   const now = new Date();
   const document: HouseDesignDocument = {
@@ -119,8 +108,6 @@ async function createDesignFromProject(
     images: await designImages(db, request, sourceDesign),
     notes: `Built under project ${project.reference} and completed on ${completedAt.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long" })}. ${area} sqm, ${rooms}. Contract price ${formatPeso(project.contractPrice)}.`,
     status: "Draft",
-    defaultSelections,
-    materialPrices,
     customItems,
     sourceProject: {
       projectId: project._id,

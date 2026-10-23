@@ -15,7 +15,6 @@ export type NewHouseDesignInput = Omit<
 
 const emptyCatalog: HouseDesignCatalog = {
   houseTypes: [],
-  exteriorItems: [],
 };
 
 async function readJson<T>(response: Response): Promise<T> {

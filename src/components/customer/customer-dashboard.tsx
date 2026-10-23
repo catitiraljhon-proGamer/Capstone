@@ -9,9 +9,8 @@ import { BackButton } from "@/components/ui/back-button";
 import HouseTypeCards, { HouseTypeCard, houseTypeGridClass } from "@/components/house-designs/house-type-cards";
 import {
   formatPeso,
-  getExteriorEstimate,
+  getDesignEstimate,
   isDataImage,
-  normalizeSelections,
   type HouseDesign,
 } from "@/lib/house-design-data";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
@@ -323,7 +322,6 @@ function FinishedDesignsBrowser() {
   const [activeStep, setActiveStep] = useState<"types" | "designs" | "details">("types");
   const [selectedHouseType, setSelectedHouseType] = useState<string | null>(null);
   const [selectedDesignId, setSelectedDesignId] = useState<string | null>(null);
-  const [materialSelections, setMaterialSelections] = useState<number[]>([]);
   const publishedDesigns = designs.filter(
     (design) => design.status === "Published",
   );
@@ -337,9 +335,6 @@ function FinishedDesignsBrowser() {
 
   const openDesign = (design: HouseDesign) => {
     setSelectedDesignId(design.id);
-    setMaterialSelections(
-      normalizeSelections(design.defaultSelections, catalog.exteriorItems),
-    );
     setActiveStep("details");
   };
 
@@ -485,17 +480,10 @@ function FinishedDesignsBrowser() {
                     Total Estimated Price
                   </p>
                   <p className="mt-1 text-3xl font-semibold tracking-tight text-red-700">
-                    {formatPeso(
-                      getExteriorEstimate(
-                        selectedDesign,
-                        materialSelections,
-                        catalog.exteriorItems,
-                      )
-                        .revisedEstimate,
-                    )}
+                    {formatPeso(getDesignEstimate(selectedDesign).estimate)}
                   </p>
                   <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600">
-                    Request this design as shown or include your preferred changes.
+                    Request this design as shown, or suggest the materials and items you prefer.
                     Reviewing the design and its cost estimate is free; only the blueprint is billed.
                   </p>
                 </div>

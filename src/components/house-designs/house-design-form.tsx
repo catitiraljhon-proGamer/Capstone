@@ -7,17 +7,13 @@ import { PesoInput } from "@/components/ui/peso-input";
 import { maxRoomCount } from "@/lib/design-request-limit";
 import { amountError, numberError, textError } from "@/lib/form-validation";
 import {
-  createDefaultSelections,
   formatPeso,
-  getExteriorEstimate,
+  getDesignEstimate,
   isDataImage,
-  normalizeSelections,
   type CustomExteriorItem,
-  type ExteriorItemChoice,
   type HouseDesign,
   type HouseDesignStatus,
   type HouseType,
-  type MaterialPriceOverride,
 } from "@/lib/house-design-data";
 import {
   createCustomItemId,
@@ -44,7 +40,6 @@ type FieldName =
   | "bedrooms"
   | "bathrooms"
   | "images"
-  | "materialPrices"
   | "customItems";
 
 type FieldErrors = Partial<Record<FieldName, string>>;
@@ -66,7 +61,6 @@ const fieldOrder: FieldName[] = [
   "bedrooms",
   "bathrooms",
   "images",
-  "materialPrices",
   "customItems",
 ];
 
@@ -78,7 +72,6 @@ const fieldLabels: Record<FieldName, string> = {
   bedrooms: "Bedrooms",
   bathrooms: "Bathrooms",
   images: "Design Images",
-  materialPrices: "Material Prices",
   customItems: "Custom Exterior Items",
 };
 
@@ -90,7 +83,6 @@ const fieldIds: Record<FieldName, string> = {
   bedrooms: "design-bedrooms",
   bathrooms: "design-bathrooms",
   images: "design-images",
-  materialPrices: "design-material-prices",
   customItems: "design-custom-items",
 };
 
@@ -98,8 +90,6 @@ const inputClass =
   "w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-950 outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
 
 const invalidInputClass = "border-red-600";
-
-type MaterialPriceDraft = Omit<MaterialPriceOverride, "unitPrice"> & { unitPrice: string };
 
 /** Quantity and unit price stay as typed text until the form is saved. */
 type CustomItemDraft = Omit<CustomExteriorItem, "quantity" | "unitPrice"> & {
@@ -111,15 +101,6 @@ type CustomItemField = "item" | "material" | "unit" | "quantity" | "unitPrice";
 type CustomItemErrors = Partial<Record<CustomItemField, string | null>>;
 
 const maxUnitPrice = 100_000_000;
-
-/** Same rule as the server: unit prices must be above zero, two decimals at most. */
-function materialPriceError(price: MaterialPriceDraft) {
-  return amountError(price.unitPrice, { label: `${price.item} unit price`, max: maxUnitPrice });
-}
-
-function isMaterialPriceValid(price: MaterialPriceDraft) {
-  return materialPriceError(price) === null;
-}
 
 function customItemErrors(item: CustomItemDraft): CustomItemErrors {
   return {
@@ -257,7 +238,6 @@ export function HouseDesignForm({
   defaultHouseType,
   houseTypes,
   existingNames,
-  exteriorItems,
   onCancel,
   onSubmit,
 }: {
@@ -266,7 +246,6 @@ export function HouseDesignForm({
   defaultHouseType?: string | null;
   houseTypes: HouseType[];
   existingNames: string[];
-  exteriorItems: ExteriorItemChoice[];
   onCancel: () => void;
   onSubmit: (design: NewHouseDesignInput) => void;
 }) {
@@ -287,11 +266,6 @@ export function HouseDesignForm({
   );
   const [notes, setNotes] = useState(design?.notes ?? "");
   const [images, setImages] = useState<string[]>(design?.images ?? []);
-  const [selections, setSelections] = useState(() =>
-    design
-      ? normalizeSelections(design.defaultSelections, exteriorItems)
-      : createDefaultSelections(exteriorItems),
-  );
   const [customItems, setCustomItems] = useState<CustomItemDraft[]>(() =>
     (design?.customItems ?? []).map((item) => ({
       ...item,
@@ -301,34 +275,14 @@ export function HouseDesignForm({
   );
   const [submitted, setSubmitted] = useState(false);
   const [touchedItemFields, setTouchedItemFields] = useState<Record<string, boolean>>({});
-  const [materialPriceDrafts, setMaterialPriceDrafts] = useState<MaterialPriceDraft[]>(() =>
-    (design?.materialPrices ?? []).map((price) => ({ ...price, unitPrice: String(price.unitPrice) })),
-  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showSummary, setShowSummary] = useState(false);
 
   const setValue = (field: keyof FormValues, value: string) =>
     setValues((current) => ({ ...current, [field]: value }));
 
-  const runValidation = (): FieldErrors => ({
-    ...validate(values, images, customItems, existingNames),
-    ...(materialPriceDrafts.some((price) => !isMaterialPriceValid(price)) ? {
-      materialPrices: materialPriceDrafts.map(materialPriceError).find(Boolean) ?? "Fix the unit prices marked below.",
-    } : {}),
-  });
-
-  const materialPrices: MaterialPriceOverride[] = materialPriceDrafts
-    .filter(isMaterialPriceValid)
-    .map((price) => ({ ...price, unitPrice: Number(price.unitPrice) }));
-
-  const updateMaterialPrice = (itemIndex: number, unitPrice: string) => {
-    const item = exteriorItems[itemIndex];
-    const option = item.options[selections[itemIndex]];
-    setMaterialPriceDrafts((current) => [
-      ...current.filter((price) => !(price.item === item.item && price.material === option.name && price.unit === option.unit)),
-      { item: item.item, material: option.name, unit: option.unit, unitPrice },
-    ]);
-  };
+  const runValidation = (): FieldErrors =>
+    validate(values, images, customItems, existingNames);
 
   const touchItemField = (id: string, field: CustomItemField) =>
     setTouchedItemFields((current) => (current[`${id}-${field}`] ? current : { ...current, [`${id}-${field}`]: true }));
@@ -351,22 +305,6 @@ export function HouseDesignForm({
     setErrors((current) => ({ ...current, [field]: runValidation()[field] }));
 
   const focusField = (field: FieldName) => {
-    if (field === "materialPrices") {
-      const invalidPrice = materialPriceDrafts.find((price) => !isMaterialPriceValid(price));
-      const itemIndex = exteriorItems.findIndex((item) => item.item === invalidPrice?.item);
-      if (itemIndex >= 0 && invalidPrice) {
-        const optionIndex = exteriorItems[itemIndex].options.findIndex((option) =>
-          option.name === invalidPrice.material && option.unit === invalidPrice.unit,
-        );
-        if (optionIndex >= 0) {
-          setSelections((current) => current.map((value, index) => index === itemIndex ? optionIndex : value));
-          const input = document.getElementById(`material-${itemIndex}-price`);
-          input?.focus();
-          input?.scrollIntoView({ block: "center", behavior: "smooth" });
-          return;
-        }
-      }
-    }
     // Custom items have per-row ids, so aim at the first incomplete row.
     const invalidItem = customItems.find((item) => !isCustomItemComplete(item));
     const invalidItemField = invalidItem
@@ -386,16 +324,11 @@ export function HouseDesignForm({
 
   const areaValue = Number(values.area);
   const rateValue = Number(values.rate);
-  const preview = getExteriorEstimate(
-    {
-      area: Number.isFinite(areaValue) ? areaValue : 0,
-      rate: Number.isFinite(rateValue) ? rateValue : 0,
-      customItems: customItems.filter(isCustomItemComplete).map(toCustomItem),
-      materialPrices,
-    },
-    selections,
-    exteriorItems,
-  );
+  const preview = getDesignEstimate({
+    area: Number.isFinite(areaValue) ? areaValue : 0,
+    rate: Number.isFinite(rateValue) ? rateValue : 0,
+    customItems: customItems.filter(isCustomItemComplete).map(toCustomItem),
+  });
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -506,8 +439,6 @@ export function HouseDesignForm({
       images,
       notes: notes.trim(),
       status,
-      defaultSelections: selections,
-      materialPrices,
       customItems: customItems.map(toCustomItem),
     });
   };
@@ -525,7 +456,7 @@ export function HouseDesignForm({
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
             {isEditing
-              ? "Update the design record, images, exterior materials, and custom items. Changes recalculate the estimate."
+              ? "Update the design record, images, and custom items. Changes recalculate the estimate."
               : "Designs are saved as a draft first. Publish when the design is ready for customers to browse."}
           </p>
         </div>
@@ -784,90 +715,14 @@ export function HouseDesignForm({
             </div>
           </fieldset>
 
-          <fieldset id={fieldIds.materialPrices} tabIndex={-1} className="min-w-0 rounded-xl border border-stone-200 p-5">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
-              Default Exterior Materials
-            </legend>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              Choose each material type and update its unit price as costs change.
-              Prices are saved for this house design when you save your changes.
-            </p>
-            <div className="mt-4 space-y-5">
-              {exteriorItems.map((item, itemIndex) => {
-                const id = `material-${itemIndex}`;
-                const option = item.options[selections[itemIndex]];
-                const priceDraft = materialPriceDrafts.find((price) =>
-                  price.item === item.item && price.material === option.name && price.unit === option.unit,
-                );
-                const priceMessage = errors.materialPrices && priceDraft ? materialPriceError(priceDraft) : null;
-
-                return (
-                  <div key={item.item} className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_11rem] sm:items-end">
-                    <Field htmlFor={id} label={`${item.item} type`} hint={item.detail}>
-                    <select
-                      id={id}
-                      className={inputClass}
-                      value={selections[itemIndex]}
-                      aria-describedby={`${id}-hint`}
-                      onChange={(event) =>
-                        setSelections((current) =>
-                          current.map((value, index) =>
-                            index === itemIndex
-                              ? Number(event.target.value)
-                              : value,
-                          ),
-                        )
-                      }
-                    >
-                      {item.options.map((option, optionIndex) => (
-                        <option key={option.name} value={optionIndex}>
-                          {option.name}
-                        </option>
-                      ))}
-                    </select>
-                    </Field>
-                    <Field
-                      htmlFor={`${id}-price`}
-                      label={`Price (PHP / ${option.unit})`}
-                      error={priceMessage ?? undefined}
-                    >
-                      <PesoInput
-                        id={`${id}-price`}
-                        aria-label={`${item.item} unit price (PHP / ${option.unit})`}
-                        inputMode="decimal"
-                        min="0.01"
-                        max="100000000"
-                        step="0.01"
-                        required
-                        value={priceDraft?.unitPrice ?? String(option.unitPrice)}
-                        onChange={(event) => updateMaterialPrice(itemIndex, event.target.value)}
-                        onBlur={() => handleBlur("materialPrices")}
-                        aria-invalid={Boolean(priceMessage)}
-                        aria-describedby={priceMessage ? `${id}-price-error` : undefined}
-                      />
-                    </Field>
-                    {priceDraft && <button
-                      type="button"
-                      onClick={() => setMaterialPriceDrafts((current) => current.filter((price) =>
-                        !(price.item === item.item && price.material === option.name && price.unit === option.unit),
-                      ))}
-                      className="justify-self-start text-xs font-medium text-red-700 underline underline-offset-4 hover:text-red-800 sm:col-span-2"
-                      aria-label={`Reset ${item.item} price to catalog price`}
-                    >Use catalog price: {formatPeso(option.unitPrice)} / {option.unit}</button>}
-                  </div>
-                );
-              })}
-            </div>
-          </fieldset>
-
           <fieldset className="rounded-xl border border-stone-200 p-5">
             <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
               Custom Exterior Items
             </legend>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              Add exterior work that is not in the standard list, such as
-              perimeter fencing or a carport canopy. Each item is added to the
-              estimate.
+              Add exterior work for this design, such as perimeter fencing or a
+              carport canopy. Each item is added to the estimate. Customers
+              suggest other items when they request the design.
             </p>
 
             {customItems.length > 0 ? (
@@ -1026,7 +881,7 @@ export function HouseDesignForm({
                   No custom items yet.
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-stone-600">
-                  The seven standard exterior items already apply to this design.
+                  The estimate is the floor area times the cost rate.
                 </p>
               </div>
             )}
@@ -1161,7 +1016,7 @@ export function HouseDesignForm({
               aria-live="polite"
               className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-red-700"
             >
-              {formatPeso(preview.revisedEstimate)}
+              {formatPeso(preview.estimate)}
             </p>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-3">
@@ -1171,15 +1026,15 @@ export function HouseDesignForm({
                 </dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Exterior Materials</dt>
+                <dt className="text-stone-600">Custom Items</dt>
                 <dd className="font-medium tabular-nums">
-                  {formatPeso(preview.exteriorTotal)}
+                  {formatPeso(preview.customTotal)}
                 </dd>
               </div>
             </dl>
             <p className="mt-4 text-xs leading-5 text-stone-600">
-              Computed from floor area, cost rate, standard materials, and any
-              completed custom items.
+              Computed from floor area, cost rate, and any completed custom
+              items.
             </p>
           </section>
         </div>

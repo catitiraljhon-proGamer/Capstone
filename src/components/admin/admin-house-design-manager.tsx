@@ -7,9 +7,8 @@ import { HouseDesignForm } from "@/components/house-designs/house-design-form";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import {
   formatPeso,
-  getExteriorEstimate,
+  getDesignEstimate,
   isDataImage,
-  normalizeSelections,
   type HouseDesign,
   type HouseDesignStatus,
 } from "@/lib/house-design-data";
@@ -415,7 +414,6 @@ export function AdminHouseDesignManager() {
           defaultHouseType={selectedHouseType}
           existingNames={designs.map((design) => design.name)}
           houseTypes={catalog.houseTypes}
-          exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("designs")}
           onSubmit={async (draft) => {
             try {
@@ -442,7 +440,6 @@ export function AdminHouseDesignManager() {
             .filter((design) => design.id !== selectedDesign.id)
             .map((design) => design.name)}
           houseTypes={catalog.houseTypes}
-          exteriorItems={catalog.exteriorItems}
           onCancel={() => goToStep("details")}
           onSubmit={async (changes) => {
             try {
@@ -469,7 +466,7 @@ export function AdminHouseDesignManager() {
                   ? "Each completed project is saved here as a draft design with its cost estimate. Assign a house type and publish it to show customers."
                   : selectedGroup?.kind === "unassigned"
                     ? "Edit each design and select a house type so customers can find it."
-                    : "Select a design to review its details and exterior materials."}
+                    : "Select a design to review its details."}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
@@ -675,16 +672,7 @@ export function AdminHouseDesignManager() {
                 Estimated Project Cost
               </p>
               <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums text-red-700">
-                {formatPeso(
-                  getExteriorEstimate(
-                    selectedDesign,
-                    normalizeSelections(
-                      selectedDesign.defaultSelections,
-                      catalog.exteriorItems,
-                    ),
-                    catalog.exteriorItems,
-                  ).revisedEstimate,
-                )}
+                {formatPeso(getDesignEstimate(selectedDesign).estimate)}
               </p>
             </div>
           </div>
@@ -720,7 +708,7 @@ export function AdminHouseDesignManager() {
       title={groupTitle(selectedGroup)}
       description={
         selectedGroup
-          ? "Select a design to review and edit its details, materials, and custom items."
+          ? "Select a design to review and edit its details and custom items."
           : "Review house design submissions and design-related project records."
       }
       mainContent={mainContent}

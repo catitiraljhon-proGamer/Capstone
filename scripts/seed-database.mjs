@@ -125,7 +125,7 @@ try {
         filter: { name: design.name },
         update: {
           $set: { ...design, createdByName: admin.name, updatedAt: now },
-          $unset: { finish: "" },
+          $unset: { finish: "", defaultSelections: "", materialPrices: "" },
           $setOnInsert: {
             _id: new ObjectId(),
             createdAt: now,

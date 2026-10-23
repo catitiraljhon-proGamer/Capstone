@@ -45,7 +45,7 @@ async function publishedHouseDesign() {
     _id: new ObjectId(), name: "Selected courtyard house",
     area: 95, rooms: "2 bedrooms, 1 bathroom", rate: 25000,
     images: [privateImage], notes: "Published design", status: "Published",
-    defaultSelections: [], customItems: [], createdAt: now, updatedAt: now,
+    customItems: [], createdAt: now, updatedAt: now,
     createdBy: new ObjectId(admin.id), createdByName: admin.name,
   };
   await db.collection<HouseDesignDocument>("house_designs").insertOne(design);

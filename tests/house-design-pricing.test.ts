@@ -4,115 +4,47 @@ import { ObjectId } from "mongodb";
 import {
   formatPeso,
   formatRoomSetup,
-  getExteriorEstimate,
-  type ExteriorItemChoice,
-  type MaterialPriceOverride,
+  getDesignEstimate,
 } from "@/lib/house-design-data";
 import { houseDesignInputSchema, houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import type { HouseDesignDocument } from "@/lib/database/collections";
 
-const materials: ExteriorItemChoice[] = [
-  { item: "Roof", detail: "Roof material", quantityByArea: 0.63, options: [
-    { name: "Rib-type roofing", unit: "sqm", unitPrice: 1450 },
-    { name: "Metal tile roofing", unit: "sqm", unitPrice: 1850 },
-  ] },
-  { item: "Windows", detail: "Window package", quantity: 2, options: [
-    { name: "Aluminum windows", unit: "set", unitPrice: 11500 },
-  ] },
-];
-const roofPrice: MaterialPriceOverride = {
-  item: "Roof", material: "Rib-type roofing", unit: "sqm", unitPrice: 1675.25,
-};
+const fence = { id: "fence", item: "Fence", material: "Steel", unit: "lm", quantity: 2.5, unitPrice: 10.25 };
 const designInput = {
   name: "Test House", houseType: "Bungalow", area: 100,
   bedrooms: 3, bathrooms: 2, rate: 20000, images: ["/test-house.jpg"], notes: "",
-  status: "Published", defaultSelections: [0, 0], customItems: [],
+  status: "Published", customItems: [],
 };
 
-test("existing designs continue to use catalog prices", () => {
-  const estimate = getExteriorEstimate({ area: 100, rate: 20000 }, [0, 0], materials);
-  assert.equal(estimate.exteriorRows[0].quantity, 63);
-  assert.equal(estimate.exteriorRows[0].unitPrice, 1450);
-  assert.equal(estimate.exteriorTotal, 114350);
-  assert.equal(estimate.revisedEstimate, 2114350);
+test("a design's estimate is the floor area times the cost rate", () => {
+  assert.deepEqual(getDesignEstimate({ area: 100, rate: 20000 }), { baseEstimate: 2_000_000, customTotal: 0, estimate: 2_000_000 });
+  assert.equal(getDesignEstimate({ area: 120.5, rate: 35000.5 }).estimate, 4_217_560.25);
 });
 
-test("an edited price changes the breakdown and total only for that design", () => {
-  const estimate = getExteriorEstimate({ area: 100, rate: 20000, materialPrices: [roofPrice] }, [0, 0], materials);
-  assert.equal(estimate.exteriorRows[0].unitPrice, 1675.25);
-  assert.equal(estimate.exteriorRows[0].amount, 105540.75);
-  assert.equal(estimate.exteriorTotal, 128540.75);
-  assert.equal(estimate.revisedEstimate, 2128540.75);
-  assert.equal(getExteriorEstimate({ area: 100, rate: 20000 }, [0, 0], materials).revisedEstimate, 2114350);
-  assert.equal(materials[0].options[0].unitPrice, 1450);
+test("custom exterior items are added to the estimate", () => {
+  const estimate = getDesignEstimate({ area: 100, rate: 20000, customItems: [fence, { ...fence, id: "canopy", quantity: 1, unitPrice: 85000 }] });
+  assert.equal(estimate.customTotal, 85025.63);
+  assert.equal(estimate.estimate, 2_085_025.63);
 });
 
-test("switching material types uses the matching saved price and retains other option prices", () => {
-  const design = { area: 100, rate: 20000, materialPrices: [roofPrice,
-    { ...roofPrice, material: "Metal tile roofing", unitPrice: 2100 },
-  ] };
-  assert.equal(getExteriorEstimate(design, [1, 0], materials).exteriorRows[0].unitPrice, 2100);
-  assert.equal(getExteriorEstimate(design, [0, 0], materials).exteriorRows[0].unitPrice, 1675.25);
-  assert.equal(getExteriorEstimate({ ...design, materialPrices: [roofPrice] }, [1, 0], materials).exteriorRows[0].unitPrice, 1850);
-});
-
-test("saved prices follow material identity when catalog options are reordered", () => {
-  const reordered = [{ ...materials[0], options: [...materials[0].options].reverse() }, materials[1]];
-  const estimate = getExteriorEstimate({ area: 100, rate: 20000, materialPrices: [roofPrice] }, [1, 0], reordered);
-  assert.equal(estimate.exteriorRows[0].material, "Rib-type roofing");
-  assert.equal(estimate.exteriorRows[0].unitPrice, 1675.25);
-});
-
-test("a saved price is not applied to a different unit or item", () => {
-  for (const price of [{ ...roofPrice, unit: "set" }, { ...roofPrice, item: "Windows" }]) {
-    const estimate = getExteriorEstimate({ area: 100, rate: 20000, materialPrices: [price] }, [0, 0], materials);
-    assert.equal(estimate.exteriorRows[0].unitPrice, 1450);
-  }
-});
-
-test("clearing overrides restores catalog prices and preserves custom exterior items", () => {
-  const estimate = getExteriorEstimate({ area: 100, rate: 20000, materialPrices: [], customItems: [
-    { id: "fence", item: "Fence", material: "Steel", unit: "lm", quantity: 2.5, unitPrice: 10.25 },
-  ] }, [0, 0], materials);
-  assert.equal(estimate.exteriorRows[0].unitPrice, 1450);
-  assert.equal(estimate.exteriorRows[2].amount, 25.63);
-  assert.equal(estimate.revisedEstimate, 2114375.63);
-});
-
-test("create and edit validation accepts peso amounts with up to two decimals", () => {
-  for (const unitPrice of [0.01, 0.29, 1675.25, 100000000]) {
-    const materialPrices = [{ ...roofPrice, unitPrice }];
-    assert.deepEqual(houseDesignInputSchema.parse({ ...designInput, materialPrices }).materialPrices, materialPrices);
-    assert.deepEqual(houseDesignPatchSchema.parse({ materialPrices }).materialPrices, materialPrices);
-  }
-});
-
-test("invalid, duplicate, or incomplete price overrides are rejected", () => {
-  for (const unitPrice of [-1, 0, 1.234, 100000001, NaN, Infinity, "1500", null]) {
-    assert.equal(houseDesignPatchSchema.safeParse({ materialPrices: [{ ...roofPrice, unitPrice }] }).success, false);
-  }
-  for (const materialPrices of [[roofPrice, roofPrice], [{ ...roofPrice, item: "" }], [{ ...roofPrice, material: "" }], [{ ...roofPrice, unit: "" }]]) {
-    assert.equal(houseDesignPatchSchema.safeParse({ materialPrices }).success, false);
-  }
-});
-
-test("status-only edits do not clear saved prices, and explicit resets are accepted", () => {
+test("default exterior material fields from an outdated page are ignored", () => {
+  const parsed = houseDesignInputSchema.parse({ ...designInput, defaultSelections: [0, 1], materialPrices: [] });
+  assert.equal("defaultSelections" in parsed, false);
+  assert.equal("materialPrices" in parsed, false);
   assert.deepEqual(houseDesignPatchSchema.parse({ status: "Draft" }), { status: "Draft" });
-  assert.deepEqual(houseDesignPatchSchema.parse({ materialPrices: [] }), { materialPrices: [] });
 });
 
-test("saved design DTOs expose price overrides and legacy records stay compatible", () => {
-  const legacy: HouseDesignDocument = {
+test("legacy records with saved materials and a text room setup stay compatible", () => {
+  const legacy = {
     ...houseDesignInputSchema.parse(designInput), bedrooms: undefined, bathrooms: undefined,
-    rooms: "4 bedrooms, 3 toilets", _id: new ObjectId(),
+    rooms: "4 bedrooms, 3 toilets", defaultSelections: [2, 1], materialPrices: [], _id: new ObjectId(),
     createdBy: new ObjectId(), createdByName: "Test Admin", createdAt: new Date(), updatedAt: new Date(),
-  };
-  assert.deepEqual(toHouseDesignDto(legacy).materialPrices, []);
-  assert.equal(toHouseDesignDto(legacy).bedrooms, 4);
-  assert.equal(toHouseDesignDto(legacy).bathrooms, 3);
-  const dto = toHouseDesignDto({ ...legacy, materialPrices: [roofPrice] });
-  const restored = JSON.parse(JSON.stringify(dto));
-  assert.equal(getExteriorEstimate(restored, restored.defaultSelections, materials).exteriorRows[0].unitPrice, 1675.25);
+  } as HouseDesignDocument;
+  const dto = toHouseDesignDto(legacy);
+  assert.equal(dto.bedrooms, 4);
+  assert.equal(dto.bathrooms, 3);
+  assert.equal("defaultSelections" in dto, false);
+  assert.equal(getDesignEstimate(dto).estimate, 2_000_000);
 });
 
 test("room counts are whole numbers saved together", () => {
@@ -124,7 +56,7 @@ test("room counts are whole numbers saved together", () => {
   assert.equal(formatRoomSetup(3, 2), "3 bedrooms, 2 bathrooms");
 });
 
-test("material prices display centavos without rounding them to whole pesos", () => {
+test("peso amounts display centavos without rounding them to whole pesos", () => {
   assert.equal(formatPeso(1675.25), "₱1,675.25");
   assert.equal(formatPeso(1450), "₱1,450");
   assert.equal(formatPeso(783_565.2), "₱783,565.20");

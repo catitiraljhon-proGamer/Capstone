@@ -54,6 +54,20 @@ export function HouseDesignGallery({
           onContextMenu={protectedView ? (event) => event.preventDefault() : undefined}
         >
           {protectedView ? <DesignWatermark /> : null}
+          {/* Photos are shown whole, never cropped; a blurred copy fills the space beside them. */}
+          {fit === "cover" ? (
+            <Image
+              key={`${activeImage}-backdrop`}
+              src={activeImage}
+              alt=""
+              aria-hidden="true"
+              fill
+              unoptimized={skipOptimizer(activeImage)}
+              draggable={false}
+              className="scale-110 object-cover opacity-60 blur-2xl"
+              sizes="(min-width: 1024px) 72vw, 100vw"
+            />
+          ) : null}
           <Image
             key={activeImage}
             src={activeImage}
@@ -62,7 +76,7 @@ export function HouseDesignGallery({
             priority
             unoptimized={skipOptimizer(activeImage)}
             draggable={!protectedView}
-            className={fit === "contain" ? "object-contain" : "object-cover"}
+            className="object-contain"
             sizes="(min-width: 1024px) 72vw, 100vw"
           />
         </div>

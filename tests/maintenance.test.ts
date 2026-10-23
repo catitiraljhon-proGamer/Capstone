@@ -61,7 +61,7 @@ beforeEach(async () => {
   await db.collection<HouseDesignDocument>("house_designs").insertOne({
     _id: designId, name: "Test design", area: 90, rooms: "2 bedrooms", rate: 25000,
     images: ["https://example.test/design.jpg"], notes: "", status: "Published",
-    defaultSelections: [], customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
+    customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
   });
 });
 afterEach(() => rm(backupFolder, { recursive: true, force: true }));
