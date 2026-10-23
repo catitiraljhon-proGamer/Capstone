@@ -35,6 +35,86 @@
     "customItems": []
   },
   {
+    "name": "Stonepier Courtyard House",
+    "style": "Bungalow",
+    "houseType": "Modern",
+    "area": 230,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 56000,
+    "images": [
+      "/House/modern/stonepier-courtyard-house.webp"
+    ],
+    "notes": "Single-storey home with rough stone piers, a timber garage door, a full-glass living wing, and lit garden steps.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Garden Wall Residence",
+    "style": "Two-Storey with Carport",
+    "houseType": "Modern",
+    "area": 210,
+    "bedrooms": 3,
+    "bathrooms": 3,
+    "rooms": "3 bedrooms, 3 bathrooms",
+    "rate": 55000,
+    "images": [
+      "/House/modern/garden-wall-residence.webp"
+    ],
+    "notes": "Limestone-textured volumes with a two-car carport, a tall timber door, and a flowering vertical garden wall.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Palm Court Bungalow",
+    "style": "Bungalow",
+    "houseType": "Modern",
+    "area": 190,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 52000,
+    "images": [
+      "/House/modern/palm-court-bungalow.webp"
+    ],
+    "notes": "Long flat-roofed bungalow with a two-car carport, a timber pivot door, green wall accents, and slatted panels.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Stonefront Carport House",
+    "style": "Bungalow",
+    "houseType": "Modern",
+    "area": 160,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 50000,
+    "images": [
+      "/House/modern/stonefront-carport-house.webp"
+    ],
+    "notes": "Compact home with a fieldstone feature wall, a slatted timber entry, a dark canopy carport, and a lit pylon.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Cypress Slat Residence",
+    "style": "Bungalow",
+    "houseType": "Modern",
+    "area": 180,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 52000,
+    "images": [
+      "/House/modern/cypress-slat-residence.webp"
+    ],
+    "notes": "Warm render home with a floating roof plane, a stone chimney, timber slat screens, and a timber garage door.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
     "name": "Contemporary Family",
     "style": "Contemporary",
     "houseType": "Contemporary",
