@@ -417,5 +417,85 @@
     "notes": "Fieldstone ground floor with timber gables above, a full-width balcony, tall glass windows, and a side porch.",
     "status": "Published",
     "customItems": []
+  },
+  {
+    "name": "Stonegable Porch House",
+    "style": "One-and-a-Half Storey",
+    "houseType": "Ranch",
+    "area": 170,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 50000,
+    "images": [
+      "/House/ranch/stonegable-porch-house.webp"
+    ],
+    "notes": "Stone-clad front gable with a dormer loft, dark trim, black-framed windows, and a covered front porch.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Timber Truss Ranch",
+    "style": "Bungalow",
+    "houseType": "Ranch",
+    "area": 210,
+    "bedrooms": 3,
+    "bathrooms": 3,
+    "rooms": "3 bedrooms, 3 bathrooms",
+    "rate": 54000,
+    "images": [
+      "/House/ranch/timber-truss-ranch.webp"
+    ],
+    "notes": "Wide single-storey home with exposed timber trusses, stone piers, glass walls, and a deck with a plunge pool.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Glass Gable Farmhouse",
+    "style": "Two-Storey",
+    "houseType": "Ranch",
+    "area": 240,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 56000,
+    "images": [
+      "/House/ranch/glass-gable-farmhouse.webp"
+    ],
+    "notes": "White farmhouse with a tall glass gable, stone chimney, black window frames, and roof terraces on both wings.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Cedar Ledge Residence",
+    "style": "Two-Storey",
+    "houseType": "Ranch",
+    "area": 220,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 55000,
+    "images": [
+      "/House/ranch/cedar-ledge-residence.webp"
+    ],
+    "notes": "Cedar and dark panel cladding with a stone corner, deep overhangs, large windows, and a front deck.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Fieldstone Ranch House",
+    "style": "Bungalow",
+    "houseType": "Ranch",
+    "area": 200,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 52000,
+    "images": [
+      "/House/ranch/fieldstone-ranch-house.webp"
+    ],
+    "notes": "Low stone ranch home with an arched glass gable, a dormer, a stone chimney, and a covered back patio.",
+    "status": "Published",
+    "customItems": []
   }
 ]
