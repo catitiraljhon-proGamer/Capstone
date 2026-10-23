@@ -4,6 +4,7 @@ import {
   type HouseDesignDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
+import { formatRoomSetup } from "@/lib/house-design-data";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import { readSession } from "@/lib/server/session";
@@ -43,7 +44,15 @@ export async function PATCH(
       .collection<HouseDesignDocument>(collections.houseDesigns)
       .findOneAndUpdate(
         { _id: new ObjectId(id) },
-        { $set: { ...changes, updatedAt: now } },
+        {
+          $set: {
+            ...changes,
+            ...(changes.bedrooms !== undefined && changes.bathrooms !== undefined
+              ? { rooms: formatRoomSetup(changes.bedrooms, changes.bathrooms) }
+              : {}),
+            updatedAt: now,
+          },
+        },
         { returnDocument: "after" },
       );
 

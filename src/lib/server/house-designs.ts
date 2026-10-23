@@ -4,6 +4,7 @@ import {
   type HouseDesignDocument,
   type HouseTypeDocument,
 } from "@/lib/database/collections";
+import { maxRoomCount } from "@/lib/design-request-limit";
 import defaultHouseTypes from "../../../database/seeds/house-types.json";
 import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
@@ -34,7 +35,8 @@ export const houseDesignInputSchema = z.object({
   style: z.string().trim().max(80).optional(),
   houseType: z.string().trim().min(1, "Select a house type.").max(80),
   area: z.number().finite().positive().max(100_000),
-  rooms: z.string().trim().min(1).max(200),
+  bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
+  bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
   rate: z.number().finite().nonnegative().max(100_000_000),
   images: z.array(z.string().min(1).max(2_100_000)).min(1).max(6),
   notes: z.string().trim().max(4_000),
@@ -48,7 +50,17 @@ export const houseDesignPatchSchema = houseDesignInputSchema
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
     message: "At least one field must be supplied.",
+  })
+  // The readable room setup is rebuilt from both counts, so they are saved together.
+  .refine((value) => (value.bedrooms === undefined) === (value.bathrooms === undefined), {
+    message: "Send the number of bedrooms and bathrooms together.",
   });
+
+/** Reads a count such as the 3 in "3 bedrooms, 2 toilets" from designs saved before the counts had their own fields. */
+function countFromRoomSetup(rooms: string, pattern: RegExp) {
+  const match = rooms.match(pattern);
+  return match ? Number(match[1]) : 0;
+}
 
 /**
  * Active house types in their saved order. An empty collection (a new database, or a backup taken
@@ -104,6 +116,8 @@ export function toHouseDesignDto(
     style: document.style,
     houseType: document.houseType,
     area: document.area,
+    bedrooms: document.bedrooms ?? countFromRoomSetup(document.rooms, /(\d+)\s*bed/i),
+    bathrooms: document.bathrooms ?? countFromRoomSetup(document.rooms, /(\d+)\s*(?:bath|toilet|t&b|cr\b)/i),
     rooms: document.rooms,
     rate: document.rate,
     images: document.images,

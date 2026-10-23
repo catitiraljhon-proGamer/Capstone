@@ -4,6 +4,7 @@ import {
   type HouseDesignDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
+import { formatRoomSetup } from "@/lib/house-design-data";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { canViewFullDesignImages } from "@/lib/server/account-terms";
 import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     const document: HouseDesignDocument = {
       _id: new ObjectId(),
       ...input,
+      rooms: formatRoomSetup(input.bedrooms, input.bathrooms),
       createdAt: now,
       createdBy: new ObjectId(session.id),
       createdByName: session.name,

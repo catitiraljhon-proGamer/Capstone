@@ -23,7 +23,7 @@ import { requireAccountTerms } from "@/lib/server/account-terms";
 import { customerDesignDto } from "@/lib/server/design-requests";
 import { embeddedImageSchema, embeddedImagesSchema } from "@/lib/server/embedded-images";
 import { isActiveHouseType } from "@/lib/server/house-designs";
-import { finishLevels } from "@/lib/house-design-data";
+import { finishLevels, formatRoomSetup } from "@/lib/house-design-data";
 import type { SessionUser } from "@/types/domain";
 
 const preferredDate = z.iso.date("Choose a Preferred Date after today.");
@@ -100,7 +100,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
       projectId: project?._id, houseDesignId: project?.houseDesignId,
       houseType: input.houseType, finish: input.finish,
       floorArea: input.floorArea, bedrooms: input.bedrooms, bathrooms: input.bathrooms,
-      rooms: `${input.bedrooms} bedroom${input.bedrooms === 1 ? "" : "s"}, ${input.bathrooms} bathroom${input.bathrooms === 1 ? "" : "s"}`,
+      rooms: formatRoomSetup(input.bedrooms, input.bathrooms),
       notes: input.notes,
     };
   }

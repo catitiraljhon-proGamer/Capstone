@@ -81,6 +81,9 @@ export type HouseDesign = {
   /** Missing on designs saved while house types were turned off; the Admin assigns one when editing. */
   houseType?: string;
   area: number;
+  bedrooms: number;
+  bathrooms: number;
+  /** Readable room setup built from the bedroom and bathroom counts, copied onto design requests. */
   rooms: string;
   rate: number;
   /** First image is the cover shown on cards. */
@@ -96,6 +99,10 @@ export type HouseDesign = {
   createdAt: string;
   createdBy: string;
 };
+
+/** "3 bedrooms, 2 bathrooms", the wording used by design requests too. */
+export const formatRoomSetup = (bedrooms: number, bathrooms: number) =>
+  `${bedrooms} bedroom${bedrooms === 1 ? "" : "s"}, ${bathrooms} bathroom${bathrooms === 1 ? "" : "s"}`;
 
 export const createDefaultSelections = (items: ExteriorItemChoice[]) =>
   items.map(() => 0);

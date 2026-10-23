@@ -4,7 +4,9 @@
     "style": "Modern",
     "houseType": "Modern",
     "area": 150,
-    "rooms": "3 bedrooms, 2 toilets",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
     "rate": 40000,
     "images": [
       "/House/image.png",
@@ -29,7 +31,9 @@
     "style": "Modern",
     "houseType": "Modern",
     "area": 165,
-    "rooms": "3 bedrooms, 3 toilets",
+    "bedrooms": 3,
+    "bathrooms": 3,
+    "rooms": "3 bedrooms, 3 bathrooms",
     "rate": 45000,
     "images": [
       "/House/Screenshot%202026-07-29%20003940.png",
@@ -53,7 +57,9 @@
     "style": "Contemporary",
     "houseType": "Contemporary",
     "area": 180,
-    "rooms": "4 bedrooms, 3 toilets",
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
     "rate": 48000,
     "images": [
       "/House/Screenshot%202026-07-29%20003940.png"
@@ -76,7 +82,9 @@
     "style": "Contemporary",
     "houseType": "Contemporary",
     "area": 145,
-    "rooms": "3 bedrooms, 2 toilets",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
     "rate": 42000,
     "images": [
       "/House/Screenshot%202026-07-29%20011237.png"
@@ -95,11 +103,138 @@
     "customItems": []
   },
   {
+    "name": "Noir Timber Residence",
+    "style": "Two-Storey",
+    "houseType": "Contemporary",
+    "area": 260,
+    "bedrooms": 4,
+    "bathrooms": 4,
+    "rooms": "4 bedrooms, 4 bathrooms",
+    "rate": 52000,
+    "images": [
+      "/House/contemporary/noir-timber-residence.webp"
+    ],
+    "notes": "Two-storey home in dark granite cladding with warm-lit timber slat panels, a double-height entry, and parking for two cars.",
+    "status": "Published",
+    "defaultSelections": [
+      2,
+      2,
+      2,
+      1,
+      1,
+      2,
+      1
+    ],
+    "customItems": []
+  },
+  {
+    "name": "Skyline Slope Bungalow",
+    "style": "Bungalow",
+    "houseType": "Contemporary",
+    "area": 110,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 40000,
+    "images": [
+      "/House/contemporary/skyline-slope-bungalow.webp"
+    ],
+    "notes": "Single-storey home with a sloped skillion roof, a timber-slat entry wall, stone accents, and a covered carport.",
+    "status": "Published",
+    "defaultSelections": [
+      1,
+      1,
+      1,
+      1,
+      2,
+      0,
+      1
+    ],
+    "customItems": []
+  },
+  {
+    "name": "Prism Fin Villa",
+    "style": "Villa with Pool",
+    "houseType": "Contemporary",
+    "area": 340,
+    "bedrooms": 5,
+    "bathrooms": 5,
+    "rooms": "5 bedrooms, 5 bathrooms",
+    "rate": 62000,
+    "images": [
+      "/House/contemporary/prism-fin-villa.webp"
+    ],
+    "notes": "Bold angular facade with tall glass fins, a perforated privacy screen, a reflecting pool, and a two-car garage.",
+    "status": "Published",
+    "defaultSelections": [
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      2
+    ],
+    "customItems": []
+  },
+  {
+    "name": "Terrace Glow Residence",
+    "style": "Three-Storey",
+    "houseType": "Contemporary",
+    "area": 300,
+    "bedrooms": 5,
+    "bathrooms": 4,
+    "rooms": "5 bedrooms, 4 bathrooms",
+    "rate": 56000,
+    "images": [
+      "/House/contemporary/terrace-glow-residence.webp"
+    ],
+    "notes": "Three-level home with deep terraces, glass balconies, stone-clad walls, and an enclosed garage.",
+    "status": "Published",
+    "defaultSelections": [
+      2,
+      2,
+      2,
+      2,
+      1,
+      2,
+      1
+    ],
+    "customItems": []
+  },
+  {
+    "name": "Hearthstone Pool Villa",
+    "style": "Two-Storey with Pool",
+    "houseType": "Contemporary",
+    "area": 280,
+    "bedrooms": 4,
+    "bathrooms": 4,
+    "rooms": "4 bedrooms, 4 bathrooms",
+    "rate": 58000,
+    "images": [
+      "/House/contemporary/hearthstone-pool-villa.webp"
+    ],
+    "notes": "Symmetrical two-storey home around a stone fireplace column, with glass balconies and an infinity pool.",
+    "status": "Published",
+    "defaultSelections": [
+      2,
+      1,
+      2,
+      2,
+      1,
+      2,
+      1
+    ],
+    "customItems": []
+  },
+  {
     "name": "Compact Bungalow",
     "style": "Minimalist",
     "houseType": "Minimalist",
     "area": 120,
-    "rooms": "2 bedrooms, 2 toilets",
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "rooms": "2 bedrooms, 2 bathrooms",
     "rate": 35000,
     "images": [
       "/House/Screenshot%202026-07-29%20003957.png"
@@ -122,7 +257,9 @@
     "style": "Minimalist",
     "houseType": "Minimalist",
     "area": 135,
-    "rooms": "3 bedrooms, 2 toilets",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
     "rate": 39000,
     "images": [
       "/House/image.png"

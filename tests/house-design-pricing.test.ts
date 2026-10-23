@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { ObjectId } from "mongodb";
 import {
   formatPeso,
+  formatRoomSetup,
   getExteriorEstimate,
   type ExteriorItemChoice,
   type MaterialPriceOverride,
@@ -24,7 +25,7 @@ const roofPrice: MaterialPriceOverride = {
 };
 const designInput = {
   name: "Test House", houseType: "Bungalow", area: 100,
-  rooms: "3 bedrooms", rate: 20000, images: ["/test-house.jpg"], notes: "",
+  bedrooms: 3, bathrooms: 2, rate: 20000, images: ["/test-house.jpg"], notes: "",
   status: "Published", defaultSelections: [0, 0], customItems: [],
 };
 
@@ -102,13 +103,25 @@ test("status-only edits do not clear saved prices, and explicit resets are accep
 
 test("saved design DTOs expose price overrides and legacy records stay compatible", () => {
   const legacy: HouseDesignDocument = {
-    ...houseDesignInputSchema.parse(designInput), _id: new ObjectId(),
+    ...houseDesignInputSchema.parse(designInput), bedrooms: undefined, bathrooms: undefined,
+    rooms: "4 bedrooms, 3 toilets", _id: new ObjectId(),
     createdBy: new ObjectId(), createdByName: "Test Admin", createdAt: new Date(), updatedAt: new Date(),
   };
   assert.deepEqual(toHouseDesignDto(legacy).materialPrices, []);
+  assert.equal(toHouseDesignDto(legacy).bedrooms, 4);
+  assert.equal(toHouseDesignDto(legacy).bathrooms, 3);
   const dto = toHouseDesignDto({ ...legacy, materialPrices: [roofPrice] });
   const restored = JSON.parse(JSON.stringify(dto));
   assert.equal(getExteriorEstimate(restored, restored.defaultSelections, materials).exteriorRows[0].unitPrice, 1675.25);
+});
+
+test("room counts are whole numbers saved together", () => {
+  assert.equal(houseDesignInputSchema.safeParse({ ...designInput, bedrooms: 2.5 }).success, false);
+  assert.equal(houseDesignInputSchema.safeParse({ ...designInput, bathrooms: 101 }).success, false);
+  assert.equal(houseDesignPatchSchema.safeParse({ bedrooms: 4 }).success, false);
+  assert.deepEqual(houseDesignPatchSchema.parse({ bedrooms: 4, bathrooms: 3 }), { bedrooms: 4, bathrooms: 3 });
+  assert.equal(formatRoomSetup(1, 1), "1 bedroom, 1 bathroom");
+  assert.equal(formatRoomSetup(3, 2), "3 bedrooms, 2 bathrooms");
 });
 
 test("material prices display centavos without rounding them to whole pesos", () => {

@@ -13,7 +13,7 @@ import {
   type HouseDesign,
   type HouseDesignStatus,
 } from "@/lib/house-design-data";
-import { ProjectExteriorEstimatePanel } from "@/components/house-designs/project-exterior-estimate-panel";
+import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import {
@@ -689,6 +689,8 @@ export function AdminHouseDesignManager() {
             </div>
           </div>
 
+          <HouseDesignSpecs design={selectedDesign} className="mt-5" />
+
           {!selectedDesign.houseType ? (
             <p className="mt-5 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -701,18 +703,6 @@ export function AdminHouseDesignManager() {
               <CompletedProjectPanel source={selectedDesign.sourceProject} />
             </div>
           ) : null}
-
-          <div className="mt-6">
-            <ProjectExteriorEstimatePanel
-              design={selectedDesign}
-              selections={normalizeSelections(
-                selectedDesign.defaultSelections,
-                catalog.exteriorItems,
-              )}
-              exteriorItems={catalog.exteriorItems}
-              editorRole="Admin"
-            />
-          </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-stone-200 pt-5">
             <Button type="button" onClick={() => goToStep("edit")}>

@@ -4,6 +4,7 @@ import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { PesoInput } from "@/components/ui/peso-input";
+import { maxRoomCount } from "@/lib/design-request-limit";
 import { amountError, numberError, textError } from "@/lib/form-validation";
 import {
   createDefaultSelections,
@@ -40,7 +41,8 @@ type FieldName =
   | "houseType"
   | "area"
   | "rate"
-  | "rooms"
+  | "bedrooms"
+  | "bathrooms"
   | "images"
   | "materialPrices"
   | "customItems";
@@ -52,7 +54,8 @@ type FormValues = {
   houseType: string;
   area: string;
   rate: string;
-  rooms: string;
+  bedrooms: string;
+  bathrooms: string;
 };
 
 const fieldOrder: FieldName[] = [
@@ -60,7 +63,8 @@ const fieldOrder: FieldName[] = [
   "houseType",
   "area",
   "rate",
-  "rooms",
+  "bedrooms",
+  "bathrooms",
   "images",
   "materialPrices",
   "customItems",
@@ -71,7 +75,8 @@ const fieldLabels: Record<FieldName, string> = {
   houseType: "House Type",
   area: "Floor Area",
   rate: "Cost Rate",
-  rooms: "Room Setup",
+  bedrooms: "Bedrooms",
+  bathrooms: "Bathrooms",
   images: "Design Images",
   materialPrices: "Material Prices",
   customItems: "Custom Exterior Items",
@@ -82,7 +87,8 @@ const fieldIds: Record<FieldName, string> = {
   houseType: "design-house-type",
   area: "design-area",
   rate: "design-rate",
-  rooms: "design-rooms",
+  bedrooms: "design-bedrooms",
+  bathrooms: "design-bathrooms",
   images: "design-images",
   materialPrices: "design-material-prices",
   customItems: "design-custom-items",
@@ -174,12 +180,11 @@ function validate(
   const rateMessage = amountError(values.rate, { label: "Cost rate", max: maxUnitPrice });
   if (rateMessage) errors.rate = rateMessage;
 
-  const roomsMessage = textError(values.rooms, { label: "Room setup", max: 200 });
-  if (roomsMessage) {
-    errors.rooms = values.rooms.trim()
-      ? roomsMessage
-      : "Describe the room setup, for example 3 bedrooms, 2 toilets.";
-  }
+  const bedroomsMessage = numberError(values.bedrooms, { label: "Number of bedrooms", integer: true, min: 0, max: maxRoomCount });
+  if (bedroomsMessage) errors.bedrooms = bedroomsMessage;
+
+  const bathroomsMessage = numberError(values.bathrooms, { label: "Number of bathrooms", integer: true, min: 0, max: maxRoomCount });
+  if (bathroomsMessage) errors.bathrooms = bathroomsMessage;
 
   if (images.length === 0) {
     errors.images = "Upload at least one design image.";
@@ -273,7 +278,8 @@ export function HouseDesignForm({
     houseType: design?.houseType ?? defaultHouseType ?? "",
     area: design ? String(design.area) : "",
     rate: design ? String(design.rate) : "",
-    rooms: design?.rooms ?? "",
+    bedrooms: design ? String(design.bedrooms) : "",
+    bathrooms: design ? String(design.bathrooms) : "",
   });
   const [style, setStyle] = useState(design?.style ?? "");
   const [status, setStatus] = useState<HouseDesignStatus>(
@@ -494,7 +500,8 @@ export function HouseDesignForm({
       style: style.trim() || undefined,
       houseType: values.houseType,
       area: areaValue,
-      rooms: values.rooms.trim(),
+      bedrooms: Number(values.bedrooms),
+      bathrooms: Number(values.bathrooms),
       rate: rateValue,
       images,
       notes: notes.trim(),
@@ -680,25 +687,58 @@ export function HouseDesignForm({
               </Field>
 
               <Field
-                htmlFor={fieldIds.rooms}
-                label={fieldLabels.rooms}
+                htmlFor={fieldIds.bedrooms}
+                label={fieldLabels.bedrooms}
                 required
-                error={errors.rooms}
+                error={errors.bedrooms}
               >
                 <input
-                  id={fieldIds.rooms}
-                  name="rooms"
-                  className={`${inputClass} ${errors.rooms ? invalidInputClass : ""}`}
-                  value={values.rooms}
-                  onChange={(event) => setValue("rooms", event.target.value)}
-                  onBlur={() => handleBlur("rooms")}
-                  aria-invalid={Boolean(errors.rooms)}
+                  id={fieldIds.bedrooms}
+                  name="bedrooms"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max={maxRoomCount}
+                  step="1"
+                  className={`${inputClass} tabular-nums ${errors.bedrooms ? invalidInputClass : ""}`}
+                  value={values.bedrooms}
+                  onChange={(event) => setValue("bedrooms", event.target.value)}
+                  onBlur={() => handleBlur("bedrooms")}
+                  aria-invalid={Boolean(errors.bedrooms)}
                   aria-describedby={describedBy(
-                    fieldIds.rooms,
+                    fieldIds.bedrooms,
                     false,
-                    Boolean(errors.rooms),
+                    Boolean(errors.bedrooms),
                   )}
-                  placeholder="3 bedrooms, 2 toilets"
+                  placeholder="3"
+                />
+              </Field>
+
+              <Field
+                htmlFor={fieldIds.bathrooms}
+                label={fieldLabels.bathrooms}
+                required
+                error={errors.bathrooms}
+              >
+                <input
+                  id={fieldIds.bathrooms}
+                  name="bathrooms"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  max={maxRoomCount}
+                  step="1"
+                  className={`${inputClass} tabular-nums ${errors.bathrooms ? invalidInputClass : ""}`}
+                  value={values.bathrooms}
+                  onChange={(event) => setValue("bathrooms", event.target.value)}
+                  onBlur={() => handleBlur("bathrooms")}
+                  aria-invalid={Boolean(errors.bathrooms)}
+                  aria-describedby={describedBy(
+                    fieldIds.bathrooms,
+                    false,
+                    Boolean(errors.bathrooms),
+                  )}
+                  placeholder="2"
                 />
               </Field>
 

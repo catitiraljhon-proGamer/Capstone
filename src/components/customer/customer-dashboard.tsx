@@ -15,6 +15,7 @@ import {
   type HouseDesign,
 } from "@/lib/house-design-data";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
+import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { CustomerDesignRequests } from "@/components/customer/customer-design-requests";
 import { CustomerDreamHouse } from "@/components/customer/customer-dream-house";
 import { CustomerNotificationBell } from "@/components/customer/customer-notification-bell";
@@ -475,32 +476,7 @@ function FinishedDesignsBrowser() {
                 <p className="mt-1 text-sm text-stone-600">
                   {selectedDesign.notes}
                 </p>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-                  <div className="rounded-lg border border-stone-200 p-4">
-                    <dt className="text-xs font-semibold uppercase text-stone-500">
-                      House Type
-                    </dt>
-                    <dd className="mt-1 font-semibold text-stone-950">
-                      {selectedDesign.houseType ?? "Not assigned"}
-                    </dd>
-                  </div>
-                  <div className="rounded-lg border border-stone-200 p-4">
-                    <dt className="text-xs font-semibold uppercase text-stone-500">
-                      Floor Area
-                    </dt>
-                    <dd className="mt-1 font-semibold text-stone-950">
-                      {selectedDesign.area} sqm
-                    </dd>
-                  </div>
-                  <div className="rounded-lg border border-stone-200 p-4">
-                    <dt className="text-xs font-semibold uppercase text-stone-500">
-                      Rooms
-                    </dt>
-                    <dd className="mt-1 font-semibold text-stone-950">
-                      {selectedDesign.rooms}
-                    </dd>
-                  </div>
-                </dl>
+                <HouseDesignSpecs design={selectedDesign} className="mt-4" />
               </div>
 
               <div className="mt-6 flex flex-col gap-4 border-t border-stone-200 pt-5 sm:flex-row sm:items-end sm:justify-between">

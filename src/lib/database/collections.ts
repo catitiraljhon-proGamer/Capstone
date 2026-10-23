@@ -105,6 +105,9 @@ export type HouseDesignDocument = {
   /** Missing on designs saved while house types were turned off. */
   houseType?: string;
   area: number;
+  /** Missing on designs saved before the counts had their own fields; read from `rooms` instead. */
+  bedrooms?: number;
+  bathrooms?: number;
   rooms: string;
   rate: number;
   images: string[];

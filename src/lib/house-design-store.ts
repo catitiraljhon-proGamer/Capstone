@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 export type NewHouseDesignInput = Omit<
   HouseDesign,
-  "id" | "createdAt" | "createdBy" | "sourceProject"
+  "id" | "rooms" | "createdAt" | "createdBy" | "sourceProject"
 >;
 
 const emptyCatalog: HouseDesignCatalog = {
