@@ -497,5 +497,70 @@
     "notes": "Low stone ranch home with an arched glass gable, a dormer, a stone chimney, and a covered back patio.",
     "status": "Published",
     "customItems": []
+  },
+  {
+    "name": "Corten Garden Residence",
+    "style": "Two-Storey",
+    "houseType": "Prairie",
+    "area": 280,
+    "bedrooms": 4,
+    "bathrooms": 4,
+    "rooms": "4 bedrooms, 4 bathrooms",
+    "rate": 60000,
+    "images": [
+      "/House/prairie/corten-garden-residence.webp"
+    ],
+    "notes": "Weathered-steel volumes over a glass ground floor, planted terraces, and a garden courtyard.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Timber Eave Residence",
+    "style": "Two-Storey",
+    "houseType": "Prairie",
+    "area": 260,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 58000,
+    "images": [
+      "/House/prairie/timber-eave-residence.webp",
+      "/House/prairie/timber-eave-residence-2.webp"
+    ],
+    "notes": "Low hipped roofs with deep timber eaves, stone-panel piers, vertical wood slats, and a glass-railed balcony.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Classic Prairie House",
+    "style": "Two-Storey",
+    "houseType": "Prairie",
+    "area": 220,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 56000,
+    "images": [
+      "/House/prairie/classic-prairie-house.webp"
+    ],
+    "notes": "Prairie-style brick home with flat overhanging roofs, tall leaded window bands, and a stone-planter entry.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Concrete Canopy Retreat",
+    "style": "Two-Storey with Pool",
+    "houseType": "Prairie",
+    "area": 320,
+    "bedrooms": 5,
+    "bathrooms": 4,
+    "rooms": "5 bedrooms, 4 bathrooms",
+    "rate": 64000,
+    "images": [
+      "/House/prairie/concrete-canopy-retreat.webp"
+    ],
+    "notes": "Board-formed concrete tower beside a cantilevered timber canopy, a planted terrace, and reflecting pools.",
+    "status": "Published",
+    "customItems": []
   }
 ]
