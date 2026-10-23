@@ -337,5 +337,85 @@
     "notes": "Half-timbered gables over brick and stone walls, leaded windows, and an arched stone entry.",
     "status": "Published",
     "customItems": []
+  },
+  {
+    "name": "Cedar Deck Chalet",
+    "style": "Two-Storey",
+    "houseType": "Tudor",
+    "area": 140,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 48000,
+    "images": [
+      "/House/tudor/cedar-deck-chalet.webp"
+    ],
+    "notes": "Steep standing-seam roof over cedar walls, a gable balcony, glass sliding doors, and a wraparound wood deck.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Glass Gable Retreat",
+    "style": "Two-Storey",
+    "houseType": "Tudor",
+    "area": 170,
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "rooms": "3 bedrooms, 2 bathrooms",
+    "rate": 55000,
+    "images": [
+      "/House/tudor/glass-gable-retreat.webp"
+    ],
+    "notes": "Tall glass A-frame gable beside a stone chimney, with an upper terrace and open-plan living on a low deck.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Stonecrest Woodland House",
+    "style": "Two-Storey",
+    "houseType": "Tudor",
+    "area": 230,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 58000,
+    "images": [
+      "/House/tudor/stonecrest-woodland-house.webp"
+    ],
+    "notes": "Stacked stone chimney wall between double-height glass and wood-clad wings, with a stone garden path.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Half-Timber Grand Residence",
+    "style": "Three-Storey with Garage",
+    "houseType": "Tudor",
+    "area": 340,
+    "bedrooms": 5,
+    "bathrooms": 4,
+    "rooms": "5 bedrooms, 4 bathrooms",
+    "rate": 62000,
+    "images": [
+      "/House/tudor/half-timber-grand-residence.webp"
+    ],
+    "notes": "Classic half-timbered gables over a stone ground floor, a brick chimney, leaded windows, and a two-car garage.",
+    "status": "Published",
+    "customItems": []
+  },
+  {
+    "name": "Fieldstone Lodge",
+    "style": "Two-Storey",
+    "houseType": "Tudor",
+    "area": 280,
+    "bedrooms": 4,
+    "bathrooms": 3,
+    "rooms": "4 bedrooms, 3 bathrooms",
+    "rate": 57000,
+    "images": [
+      "/House/tudor/fieldstone-lodge.webp"
+    ],
+    "notes": "Fieldstone ground floor with timber gables above, a full-width balcony, tall glass windows, and a side porch.",
+    "status": "Published",
+    "customItems": []
   }
 ]
