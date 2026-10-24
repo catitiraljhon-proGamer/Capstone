@@ -143,7 +143,7 @@ function CompleteProjectDialog({
           Save It as a House Design
         </h2>
         <p id={`complete-${project.id}-description`} className="mt-1 text-sm leading-6 text-stone-600">
-          The finished house is saved to House Design with its cost estimate and design images.
+          The finished house is saved to House Design under its house type, with its cost estimate and design images.
         </p>
 
         <label htmlFor={`complete-${project.id}-name`} className="mt-5 block text-sm font-semibold text-stone-950">
@@ -183,7 +183,7 @@ function CompleteProjectDialog({
         {typeError ? <p id={`complete-${project.id}-type-error`} className="mt-1 text-sm text-red-700">{typeError}</p> : null}
 
         <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
-          Saved as a draft. Customers see it only after you publish it in House Design.
+          Saved as a draft {houseType ? `under ${houseType} ` : ""}in House Design. Customers see it only after you publish it.
         </p>
 
         {error ? <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p> : null}

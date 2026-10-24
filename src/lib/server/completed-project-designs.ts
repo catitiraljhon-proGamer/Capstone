@@ -10,6 +10,7 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { formatPeso, getDesignEstimate } from "@/lib/house-design-data";
+import { listHouseTypes } from "@/lib/server/house-designs";
 import type { SessionUser } from "@/types/domain";
 
 const maxImages = 6;
@@ -147,11 +148,37 @@ async function createDesignFromProject(
 }
 
 /**
+ * Designs from projects completed before the Admin chose a house type are filed under the type the customer
+ * requested (or the type of the design they picked), when that type is still offered. The rest stay without a type.
+ */
+async function fileUntypedProjectDesigns(db: Db) {
+  const designs = db.collection<HouseDesignDocument>(collections.houseDesigns);
+  const untyped = await designs
+    .find({ "sourceProject.projectId": { $exists: true }, houseType: { $exists: false } }, { projection: { sourceProject: 1 } })
+    .limit(500).toArray();
+  if (!untyped.length) return;
+  const offered = new Set((await listHouseTypes(db)).map((houseType) => houseType.heading));
+  for (const design of untyped) {
+    const project = await db.collection<ProjectDocument>(collections.projects)
+      .findOne({ _id: design.sourceProject!.projectId }, { projection: { designRequestId: 1, houseDesignId: 1 } });
+    const request = project?.designRequestId
+      ? await db.collection<DesignRequestDocument>(collections.designRequests)
+        .findOne({ _id: project.designRequestId }, { projection: { houseType: 1, houseDesignId: 1 } })
+      : null;
+    const sourceDesignId = project?.houseDesignId ?? request?.houseDesignId;
+    const sourceDesign = sourceDesignId ? await designs.findOne({ _id: sourceDesignId }, { projection: { houseType: 1 } }) : null;
+    const houseType = [request?.houseType, sourceDesign?.houseType].find((type) => type && offered.has(type));
+    if (houseType) await designs.updateOne({ _id: design._id, houseType: { $exists: false } }, { $set: { houseType } });
+  }
+}
+
+/**
  * Every completed construction project gets a draft house design holding its floor area, design images,
- * and accepted cost estimate, so the Admin can review and publish it as a finished design.
- * Projects whose design was removed are skipped.
+ * and accepted cost estimate, filed under its house type so the Admin can review and publish it as a finished
+ * design. Projects whose design was removed are skipped.
  */
 export async function syncCompletedProjectDesigns(db: Db, actor: Pick<SessionUser, "id" | "name" | "role">) {
+  await fileUntypedProjectDesigns(db);
   const completed = await db.collection<ProjectDocument>(collections.projects)
     .find({ status: "Completed", completedDesignRemovedAt: { $exists: false } })
     .sort({ completedAt: 1, updatedAt: 1 }).limit(500).toArray();

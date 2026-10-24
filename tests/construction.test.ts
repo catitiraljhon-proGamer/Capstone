@@ -624,6 +624,11 @@ test("an admin controls project status, and completion waits until every milesto
   // Running the sync again (as the House Design page does) does not duplicate it.
   assert.deepEqual(await syncCompletedProjectDesigns(db, admin), []);
   assert.equal(await db.collection("house_designs").countDocuments({ "sourceProject.projectId": new ObjectId(projectId) }), 1);
+
+  // A design saved from a project completed before a house type was chosen is filed under the client's choice.
+  await db.collection<HouseDesignDocument>("house_designs").updateOne({ _id: design._id }, { $unset: { houseType: "" } });
+  await syncCompletedProjectDesigns(db, admin);
+  assert.equal((await db.collection<HouseDesignDocument>("house_designs").findOne({ _id: design._id }))?.houseType, "Ranch");
 });
 
 test("legacy projects without a payment schedule keep their existing billing rules", async () => {

@@ -2,7 +2,7 @@
 
 import { BackButton } from "@/components/ui/back-button";
 import { Button } from "@/components/ui/button";
-import HouseTypeCards, { HouseTypeCard, houseTypeGridClass } from "@/components/house-designs/house-type-cards";
+import HouseTypeCards from "@/components/house-designs/house-type-cards";
 import { HouseDesignForm } from "@/components/house-designs/house-design-form";
 import { HouseDesignGallery } from "@/components/house-designs/house-design-gallery";
 import {
@@ -29,34 +29,33 @@ import { useState } from "react";
 
 type Step = "types" | "designs" | "create" | "details" | "edit";
 
-/** The designs listed after a card is chosen: one house type, the completed projects, or designs without a type. */
+/**
+ * The designs listed after a card is chosen: one house type, or designs without a current house type. A completed
+ * project's design is listed under its own house type, like any other design.
+ */
 type DesignGroup =
   | { kind: "house-type"; houseType: string }
-  | { kind: "completed-projects" }
   | { kind: "unassigned" };
 
 function groupTitle(group: DesignGroup | null) {
   if (!group) return "House Designs";
-  if (group.kind === "house-type") return `${group.houseType} House Designs`;
-  return group.kind === "completed-projects" ? "Completed Projects" : "Designs Without a House Type";
+  return group.kind === "house-type" ? `${group.houseType} House Designs` : "Designs Without a House Type";
 }
 
 function groupDescription(group: DesignGroup | null) {
   if (!group) {
     return "Choose a house type, then manage the designs and exterior materials under that category.";
   }
-  if (group.kind === "completed-projects") {
-    return "Each completed project is saved here as a draft design with its cost estimate. Assign a house type and publish it to show customers.";
-  }
   return group.kind === "unassigned"
     ? "Edit each design and select a house type so customers can find it."
-    : "Select a design to review and edit its details and custom items.";
+    : "Select a design to review and edit its details and custom items. Completed projects of this house type are saved here as drafts with their cost estimate.";
 }
 
-function isInGroup(design: HouseDesign, group: DesignGroup | null) {
+function isInGroup(design: HouseDesign, group: DesignGroup | null, offeredTypes: ReadonlySet<string>) {
   if (!group) return false;
   if (group.kind === "house-type") return design.houseType === group.houseType;
-  return group.kind === "completed-projects" ? Boolean(design.sourceProject) : !design.houseType;
+  // A type that is no longer offered has no card, so its designs are listed here instead of nowhere.
+  return !design.houseType || (offeredTypes.size > 0 && !offeredTypes.has(design.houseType));
 }
 
 function CompletedProjectPanel({
@@ -251,19 +250,18 @@ export function AdminHouseDesignManager() {
     selectedGroup?.kind === "house-type" ? selectedGroup.houseType : null;
   const selectedDesign =
     designs.find((design) => design.id === selectedDesignId) ?? null;
+  const offeredTypes = new Set(catalog.houseTypes.map((houseType) => houseType.heading));
   const filteredDesigns = designs.filter(
     (design) =>
-      isInGroup(design, selectedGroup) &&
+      isInGroup(design, selectedGroup, offeredTypes) &&
       (showArchived ? true : design.status !== "Archived"),
   );
   const archivedCount = designs.filter(
     (design) =>
-      isInGroup(design, selectedGroup) && design.status === "Archived",
+      isInGroup(design, selectedGroup, offeredTypes) && design.status === "Archived",
   ).length;
-  const projectDesigns = designs.filter((design) => design.sourceProject);
-  const projectCover = projectDesigns.find((design) => design.images[0])?.images[0] ?? "";
   const unassignedCount = designs.filter(
-    (design) => !design.houseType && design.status !== "Archived",
+    (design) => isInGroup(design, { kind: "unassigned" }, offeredTypes) && design.status !== "Archived",
   ).length;
 
   const openGroup = (group: DesignGroup) => {
@@ -389,25 +387,6 @@ export function AdminHouseDesignManager() {
             houseTypes={catalog.houseTypes}
             onSelect={(houseType) => openGroup({ kind: "house-type", houseType })}
           />
-          {projectDesigns.length > 0 ? (
-            <div className="mt-6">
-              <h2 className="text-base font-semibold tracking-tight text-stone-950">
-                From Completed Projects
-              </h2>
-              <p className="mt-1 text-sm text-stone-600">
-                Every completed construction project is saved here as a draft design with its cost estimate.
-              </p>
-              <div className={`mt-4 ${houseTypeGridClass}`}>
-                <HouseTypeCard
-                  heading="Completed Projects"
-                  description={`${projectDesigns.length} finished ${projectDesigns.length === 1 ? "build" : "builds"} with ${projectDesigns.length === 1 ? "its" : "their"} cost estimate.`}
-                  imgSrc={projectCover}
-                  ariaLabel="Choose designs from completed projects"
-                  onSelect={() => openGroup({ kind: "completed-projects" })}
-                />
-              </div>
-            </div>
-          ) : null}
           {unassignedCount > 0 ? (
             <div className="mt-5 flex flex-col gap-3 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="flex items-start gap-2 text-sm text-stone-700">
@@ -528,6 +507,12 @@ export function AdminHouseDesignManager() {
                           : ""}
                         <span className="tabular-nums">{design.area}</span> sqm
                       </p>
+                      {design.sourceProject ? (
+                        <p className="mt-1 flex items-center gap-1 text-xs font-medium text-red-700">
+                          <HardHat className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          From completed project {design.sourceProject.projectReference}
+                        </p>
+                      ) : null}
                     </div>
                   </button>
 
