@@ -17,6 +17,7 @@ import {
   recordRateLimitFailure,
 } from "@/lib/server/rate-limit";
 import { getSystemSettings, requirePasswordPolicy } from "@/lib/server/maintenance";
+import { requireCurrentTerms } from "@/lib/server/account-terms";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     // The whole sign-up form is checked first, so a code is sent only for details that can register.
-    const { email, password } = registrationDetailsSchema.parse(await request.json());
+    const { email, password, termsVersion } = registrationDetailsSchema.parse(await request.json());
     if (!isEmailConfigured() && process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { error: "Email verification is not available right now. Please register with Google or try again later." },
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       );
     }
     const db = await getDatabase();
+    await requireCurrentTerms(db, termsVersion);
     await requirePasswordPolicy(db, password);
     const settings = await getSystemSettings(db);
     const limits = [

@@ -3,6 +3,7 @@
 import { AdminMaintenanceBackups } from "@/components/admin/admin-maintenance-backups";
 import { AdminMaintenanceContact } from "@/components/admin/admin-maintenance-contact";
 import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
+import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
 import { Button } from "@/components/ui/button";
 import {
   settingFields,
@@ -12,10 +13,10 @@ import {
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Lock, Mail, Phone, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Lock, Mail, Phone, ScrollText, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Section = "mode" | "security" | "email" | "notifications" | "contact" | "backup";
+type Section = "mode" | "security" | "email" | "notifications" | "contact" | "terms" | "backup";
 type SettingGroup = { title: string; description?: string; keys: SettingKey[] };
 
 const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
@@ -38,6 +39,7 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
     ],
   },
   { id: "contact", label: "Contact Us", icon: Phone, groups: [] },
+  { id: "terms", label: "Terms and Conditions", icon: ScrollText, groups: [] },
   {
     id: "backup", label: "Backup", icon: DatabaseBackup, groups: [
       { title: "Automatic backups", description: "Runs every night at 1:00 AM.", keys: ["autoBackup", "keepAutomaticBackups"] },
@@ -186,6 +188,7 @@ export function AdminMaintenance() {
         ) : null}
 
         {section === "contact" ? <AdminMaintenanceContact onError={setError} onSuccess={setSuccess} /> : null}
+        {section === "terms" ? <AdminMaintenanceTerms onError={setError} onSuccess={setSuccess} /> : null}
         {section === "backup" ? <AdminMaintenanceBackups onError={setError} onSuccess={setSuccess} /> : null}
 
         {changedKeys.length ? (

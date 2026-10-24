@@ -1,6 +1,5 @@
-import { accountTerms } from "@/lib/account-terms";
 import { getDatabase } from "@/lib/database/mongodb";
-import { recordAccountTerms } from "@/lib/server/account-terms";
+import { getCurrentTerms, recordAccountTerms } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
 import { signInDestination } from "@/lib/server/clients";
 import { resolveGoogleAccount } from "@/lib/server/google-accounts";
@@ -87,8 +86,10 @@ export async function GET(request: NextRequest) {
       new URL(signInDestination(user), origin),
     );
     const sessionUser = await startSession(response, user, flow.rememberMe);
-    if (flow.termsAccepted && user.role === "customer") {
-      await recordAccountTerms(db, sessionUser, accountTerms.version);
+    if (flow.termsVersion && user.role === "customer") {
+      // If a newer version was published meanwhile, the customer agrees to it after signing in instead.
+      const terms = await getCurrentTerms(db);
+      if (flow.termsVersion === terms.version) await recordAccountTerms(db, sessionUser, terms);
     }
     stage = "audit";
     await recordAuditLog({

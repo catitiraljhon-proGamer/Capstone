@@ -1,30 +1,20 @@
 "use client";
 
-import { FileCheck2, LoaderCircle, type LucideIcon } from "lucide-react";
+import { FileCheck2, LoaderCircle, ShieldAlert } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-
-export type TermsContent = {
-  version: string;
-  title: string;
-  introduction: string;
-  sections: readonly { title: string; body: string }[];
-  /** Optional list of specific prohibited acts with the law and consequence for each. */
-  cases?: {
-    heading: string;
-    introduction: string;
-    items: readonly { act: string; law: string; consequence: string }[];
-  };
-  acknowledgment: string;
-};
+import type { AccountTermsContent } from "@/lib/account-terms";
 
 type TermsDialogProps<T> = {
-  terms: TermsContent;
-  notice: { title: string; body: string; icon: LucideIcon };
+  /** Null while the current terms are loading. */
+  terms: AccountTermsContent | null;
+  /** The terms could not be loaded; shows a Try Again button that calls `onRetry`. */
+  loadFailed?: boolean;
+  onRetry?: () => void;
   /** POST endpoint that records `{ accepted: true, version }` and returns `{ acceptance }`. */
   acceptUrl?: string;
-  /** Called instead of posting to `acceptUrl` when the agreement is saved later, such as with a new account. */
-  onAgree?: () => void;
+  /** Called with the version read instead of posting to `acceptUrl` when the agreement is saved later, such as with a new account. */
+  onAgree?: (version: string) => void;
   /** Label for the agree button; defaults to "Yes, I have read and agree". */
   agreeLabel?: string;
   declineLabel: string;
@@ -38,7 +28,8 @@ type TermsDialogProps<T> = {
 
 export function TermsDialog<T>({
   terms,
-  notice,
+  loadFailed = false,
+  onRetry,
   acceptUrl,
   onAgree,
   agreeLabel = "Yes, I Have Read and Agree",
@@ -57,7 +48,6 @@ export function TermsDialog<T>({
   const casesId = useId();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const NoticeIcon = notice.icon;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -73,7 +63,8 @@ export function TermsDialog<T>({
   }, []);
 
   async function accept() {
-    if (onAgree) return onAgree();
+    if (!terms) return;
+    if (onAgree) return onAgree(terms.version);
     if (requestPending.current || !acceptUrl) return;
     requestPending.current = true;
     setIsSaving(true);
@@ -114,33 +105,37 @@ export function TermsDialog<T>({
           <FileCheck2 aria-hidden="true" className="h-4 w-4" /> G4 Builders Inc
         </p>
         <h2 ref={headingRef} tabIndex={-1} id={titleId} className="mt-2 text-xl font-semibold tracking-tight outline-none">
-          {terms.title}
+          {terms?.title ?? "G4 Builders Inc Terms and Conditions"}
         </h2>
-        <p id={descriptionId} className="mt-2 text-sm leading-6 text-stone-600">{terms.introduction}</p>
+        <p id={descriptionId} className="mt-2 text-sm leading-6 text-stone-600">
+          {terms?.introduction ?? "Please read these terms before continuing."}
+        </p>
       </header>
 
       <div tabIndex={0} aria-label="Terms and conditions details" className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-600 sm:px-6">
+        {terms ? (
+        <>
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4">
           <p className="flex items-center gap-2 text-sm font-semibold text-red-900">
-            <NoticeIcon aria-hidden="true" className="h-4 w-4 shrink-0" /> {notice.title}
+            <ShieldAlert aria-hidden="true" className="h-4 w-4 shrink-0" /> {terms.noticeTitle}
           </p>
-          <p className="mt-2 text-sm leading-6 text-red-900">{notice.body}</p>
+          <p className="mt-2 text-sm leading-6 text-red-900">{terms.notice}</p>
         </div>
         <ol className="mt-5 space-y-5">
           {terms.sections.map((section, index) => (
-            <li key={section.title}>
+            <li key={`${index}-${section.title}`}>
               <h3 className="text-sm font-semibold">{index + 1}. {section.title}</h3>
               <p className="mt-1 text-sm leading-6 text-stone-600">{section.body}</p>
             </li>
           ))}
         </ol>
-        {terms.cases ? (
+        {terms.cases.items.length ? (
           <section aria-labelledby={casesId} className="mt-6 border-t border-stone-200 pt-5">
             <h3 id={casesId} className="text-base font-semibold tracking-tight">{terms.cases.heading}</h3>
             <p className="mt-1 text-sm leading-6 text-stone-600">{terms.cases.introduction}</p>
             <ol className="mt-4 space-y-3">
               {terms.cases.items.map((item, index) => (
-                <li key={item.act} className="rounded-lg border border-stone-200 p-4">
+                <li key={`${index}-${item.act}`} className="rounded-lg border border-stone-200 p-4">
                   <p className="text-sm font-semibold text-stone-950">
                     <span className="mr-2 rounded bg-red-700 px-1.5 py-0.5 text-xs text-white">Case {index + 1}</span>
                     {item.act}
@@ -163,6 +158,17 @@ export function TermsDialog<T>({
         <p className="mt-6 border-t border-stone-200 pt-4 text-xs leading-5 text-stone-500">
           Terms version {terms.version}. Your agreement is recorded with your customer profile identity, the terms version, and the date and time of acceptance.
         </p>
+        </>
+        ) : loadFailed ? (
+          <div role="alert" className="rounded-lg bg-red-50 p-4 text-sm leading-6 text-red-700">
+            The Terms and Conditions could not be loaded. Check your connection and try again.
+            {onRetry ? <Button type="button" variant="outline" onClick={onRetry} className="mt-3 flex">Try Again</Button> : null}
+          </div>
+        ) : (
+          <p role="status" className="flex items-center gap-2 text-sm text-stone-600">
+            <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> Loading the Terms and Conditions…
+          </p>
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-stone-200 bg-white px-5 py-4 sm:px-6">
@@ -170,11 +176,11 @@ export function TermsDialog<T>({
           <Button type="button" variant="outline" onClick={onClose} className="w-full">{closeLabel}</Button>
         ) : (
           <>
-            <p className="text-sm leading-6 text-stone-600">{terms.acknowledgment}</p>
-            {error ? <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {terms ? <p className="mb-4 text-sm leading-6 text-stone-600">{terms.acknowledgment}</p> : null}
+            {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button type="button" variant="outline" disabled={isSaving} onClick={onDecline} className="h-11">{declineLabel}</Button>
-              <Button type="button" disabled={isSaving} onClick={() => void accept()} className="h-11">
+              <Button type="button" disabled={isSaving || !terms} onClick={() => void accept()} className="h-11">
                 {isSaving ? <LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {isSaving ? "Recording agreement…" : agreeLabel}
               </Button>

@@ -5,7 +5,7 @@ import {
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
-import { accountTermsRecords } from "@/lib/server/account-terms";
+import { accountTermsRecords, requireCurrentTerms } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
 import { billingTransaction } from "@/lib/server/billing";
 import { signInDestination, toClientDetails } from "@/lib/server/clients";
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     const { name, email, password, verificationCode, termsVersion, ...input } = registrationSchema.parse(await request.json());
     const clientDetails = toClientDetails(input);
     const db = await getDatabase();
+    const currentTerms = await requireCurrentTerms(db, termsVersion);
     await requirePasswordPolicy(db, password);
     // Every attempt from a network address counts, which limits both
     // automated sign-ups and probing which emails already have accounts.
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     const now = new Date();
     const userId = new ObjectId();
     // The Terms and Conditions agreement is saved with the account, so an account never exists without it.
-    const terms = accountTermsRecords({ id: userId.toHexString(), name, role: "customer" }, termsVersion, now);
+    const terms = accountTermsRecords({ id: userId.toHexString(), name, role: "customer" }, currentTerms, now);
     const user: UserDocument = {
       _id: userId,
       name,

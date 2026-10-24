@@ -1,25 +1,26 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { TermsDialog } from "@/components/customer/terms-dialog";
-import { accountTerms } from "@/lib/account-terms";
-
-const notice = { title: "Protected Designs · Only the Blueprint Is Paid", body: accountTerms.notice, icon: ShieldAlert };
+import { useAccountTerms } from "@/lib/use-account-terms";
 
 /** Read-only Terms and Conditions, opened from the login page or a design request. */
 export function AccountTermsDialog({ onClose }: { onClose: () => void }) {
-  return <TermsDialog terms={accountTerms} notice={notice} declineLabel="Close" helperText="" onDecline={onClose} onClose={onClose} />;
+  const { terms, failed, retry } = useAccountTerms();
+  return (
+    <TermsDialog terms={terms} loadFailed={failed} onRetry={retry} declineLabel="Close" helperText="" onDecline={onClose} onClose={onClose} />
+  );
 }
 
 /**
  * Opens first on the register page: the sign-up form can be filled in only after the customer agrees. The agreement
  * is saved with the new account, so these terms are never asked again.
  */
-export function AccountTermsConsent({ onAgree, onDecline }: { onAgree: () => void; onDecline: () => void }) {
+export function AccountTermsConsent({ onAgree, onDecline }: { onAgree: (version: string) => void; onDecline: () => void }) {
+  const { terms, failed, retry } = useAccountTerms();
   return (
     <TermsDialog
-      terms={accountTerms} notice={notice} onAgree={onAgree} onDecline={onDecline}
+      terms={terms} loadFailed={failed} onRetry={retry} onAgree={onAgree} onDecline={onDecline}
       agreeLabel="I Agree, Continue to Sign Up" declineLabel="Go Back"
       helperText="You only agree once. Next, fill in your details to create your account."
     />

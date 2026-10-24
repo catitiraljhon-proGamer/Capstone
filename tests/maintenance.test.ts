@@ -29,6 +29,15 @@ import {
 import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
 import { getContactDetails, updateContactDetails } from "@/lib/server/contact-details";
 import { defaultContactDetails, phoneHref } from "@/lib/contact-details";
+import { accountTerms, termsText, type AccountTermsContent } from "@/lib/account-terms";
+import {
+  acceptAccountTerms,
+  getAccountTermsVersion,
+  getCurrentTerms,
+  publishAccountTerms,
+  requireAccountTerms,
+  requireCurrentTerms,
+} from "@/lib/server/account-terms";
 import { defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
 import type { SessionUser } from "@/types/domain";
 
@@ -114,6 +123,67 @@ test("the Admin edits the Contact Us details, which are checked, stamped, and au
   assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
   assert.equal(phoneHref("(043) 407 3561"), "tel:+63434073561");
   assert.equal(phoneHref("+63 917 555 0142"), "tel:+639175550142");
+});
+
+/** The editable parts of a version: what the Maintenance editor sends. */
+const termsContent = (terms: AccountTermsContent) => Object.fromEntries(Object.entries(terms).filter(([key]) => key !== "version"));
+const withNewSection = (terms: AccountTermsContent, title: string) => ({
+  ...termsContent(terms),
+  sections: [...terms.sections, { title, body: `${title} applies to every request submitted through the portal.` }],
+});
+
+test("the Admin publishes edited Terms and Conditions as new versions, and earlier versions never change", async () => {
+  assert.deepEqual(await getCurrentTerms(db), accountTerms);
+  const morning = new Date("2026-10-24T02:00:00.000Z");
+  await assert.rejects(publishAccountTerms(db, clerk, withNewSection(accountTerms, "Site Visits")), isStatus(403));
+  await assert.rejects(publishAccountTerms(db, admin, termsContent(accountTerms), morning), isStatus(400));
+  for (const bad of [{ sections: [] }, { title: "" }, { version: "2099-01-01" }]) {
+    await assert.rejects(publishAccountTerms(db, admin, { ...termsContent(accountTerms), ...bad }, morning), ZodError);
+  }
+
+  const first = await publishAccountTerms(db, admin, withNewSection(accountTerms, "Site Visits"), morning);
+  assert.equal(first.current.version, "2026-10-24");
+  assert.equal(first.current.sections.at(-1)?.title, "Site Visits");
+  // A second version on the same day gets its own number.
+  const second = await publishAccountTerms(db, admin, withNewSection(first.current, "Warranty"), new Date("2026-10-24T09:00:00.000Z"));
+  assert.equal(second.current.version, "2026-10-24.2");
+  assert.deepEqual(second.versions.map((item) => [item.version, item.publishedBy]), [
+    ["2026-10-24.2", "Admin"], ["2026-10-24", "Admin"], [accountTerms.version, null],
+  ]);
+
+  assert.deepEqual(await getCurrentTerms(db), second.current);
+  assert.deepEqual(await getAccountTermsVersion(db, "2026-10-24"), first.current);
+  assert.deepEqual(await getAccountTermsVersion(db, accountTerms.version), accountTerms);
+  await assert.rejects(getAccountTermsVersion(db, "1999-01-01"), isStatus(404));
+  const logs = await db.collection("audit_logs").find({ action: "Published Terms and Conditions" }).sort({ createdAt: 1 }).toArray();
+  assert.deepEqual(logs.map((log) => log.details.Version), ["2026-10-24", "2026-10-24.2"]);
+  assert.equal(logs[1].details.termsSnapshot, termsText(second.current));
+  // The other settings stored beside the terms are untouched.
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+});
+
+test("customers who already agreed keep their agreement after a new version; new agreements need the current one", async () => {
+  const [agreed, newcomer] = ["Agreed Customer", "New Customer"].map((name): SessionUser => ({
+    id: new ObjectId().toHexString(), name, email: `${name.split(" ")[0].toLowerCase()}@example.test`, role: "customer",
+  }));
+  const now = new Date();
+  await db.collection<UserDocument>("users").insertMany([agreed, newcomer].map((customer) => ({
+    _id: new ObjectId(customer.id), name: customer.name, email: customer.email, role: "customer" as const, status: "active" as const,
+    authVersion: 0, createdAt: now, updatedAt: now,
+  })));
+  await acceptAccountTerms(db, agreed, { accepted: true, version: accountTerms.version });
+
+  const { current } = await publishAccountTerms(db, admin, withNewSection(accountTerms, "Site Visits"));
+  assert.equal((await requireAccountTerms(db, agreed)).version, accountTerms.version);
+  // Agreeing again keeps the first agreement; the customer is not asked to agree to the new version.
+  assert.equal((await acceptAccountTerms(db, agreed, { accepted: true, version: current.version })).version, accountTerms.version);
+
+  await assert.rejects(acceptAccountTerms(db, newcomer, { accepted: true, version: accountTerms.version }), ZodError);
+  await assert.rejects(requireCurrentTerms(db, accountTerms.version), ZodError);
+  assert.equal((await acceptAccountTerms(db, newcomer, { accepted: true, version: current.version })).version, current.version);
+  const record = await db.collection("audit_logs").findOne({ action: "account.terms-accepted", actorId: new ObjectId(newcomer.id) });
+  assert.equal(record?.details.termsSnapshot, termsText(current));
+  assert.match(String(record?.details.termsSnapshot), /Site Visits/);
 });
 
 test("new passwords follow the Admin's password rules", async () => {

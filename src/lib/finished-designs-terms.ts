@@ -1,4 +1,4 @@
-// Keep published versions unchanged; bump the version whenever the terms change.
+// Part of the built-in Terms and Conditions (lib/account-terms); the Admin publishes newer versions in Maintenance.
 export const finishedDesignsTerms = {
   version: "2026-10-16",
   title: "Finished Designs Terms and Conditions",

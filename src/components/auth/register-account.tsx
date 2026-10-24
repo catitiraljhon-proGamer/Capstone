@@ -2,7 +2,7 @@
 
 import { AccountTermsConsent } from "@/components/auth/account-terms";
 import { BackButton } from "@/components/ui/back-button";
-import { accountTerms } from "@/lib/account-terms";
+import { refreshAccountTerms } from "@/lib/use-account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { useClientFormValidation } from "@/components/clients/client-information-form";
@@ -51,7 +51,7 @@ type ApiPayload = {
   redirectTo?: string;
 };
 
-function readRegistrationDetails(form: HTMLFormElement): RegistrationDetails {
+function readRegistrationDetails(form: HTMLFormElement, termsVersion: string): RegistrationDetails {
   const formData = new FormData(form);
   const value = (key: string) => String(formData.get(key) ?? "").trim();
   return {
@@ -61,9 +61,12 @@ function readRegistrationDetails(form: HTMLFormElement): RegistrationDetails {
     contactNumber: value("contactNumber"),
     addressDetails: readAddressDetails(formData),
     occupation: value("occupation"),
-    termsVersion: accountTerms.version,
+    termsVersion,
   };
 }
+
+/** The server only accepts the current terms; the Admin published newer ones while this form was open. */
+const isOutdatedTerms = (payload: ApiPayload) => Boolean(payload.issues?.some((issue) => issue.path?.[0] === "termsVersion"));
 
 async function postJson(url: string, body: unknown) {
   const response = await fetch(url, {
@@ -130,8 +133,10 @@ export function RegisterAccountPage({
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
-  /** The Terms and Conditions open first; the form can be filled in only after the customer agrees. */
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  /** The Terms and Conditions open first; the form can be filled in only after the customer agrees to a version. */
+  const [agreedVersion, setAgreedVersion] = useState<string | null>(null);
+  /** Newer terms were published while the form was open: they open again on top of it, keeping what was typed. */
+  const [termsUpdated, setTermsUpdated] = useState(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const emailField = describe("email");
@@ -154,6 +159,19 @@ export function RegisterAccountPage({
 
   const focusCode = () => setTimeout(() => codeRef.current?.focus(), 0);
 
+  const askTermsAgain = () => {
+    refreshAccountTerms();
+    setTermsUpdated(true);
+    setErrorMessage("The Terms and Conditions were just updated. Read and agree to the new version, then try again.");
+  };
+
+  const agreeToTerms = (version: string) => {
+    setAgreedVersion(version);
+    setDetails((current) => (current ? { ...current, termsVersion: version } : current));
+    setTermsUpdated(false);
+    setErrorMessage("");
+  };
+
   /** Step 1: the server checks every detail, then emails the code. Nothing is saved to an account yet. */
   const handleContinue = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -166,7 +184,7 @@ export function RegisterAccountPage({
     // Show every message under its field and focus the first invalid one.
     if (!validation.validate(event.currentTarget)) return;
 
-    const next = readRegistrationDetails(event.currentTarget);
+    const next = readRegistrationDetails(event.currentTarget, agreedVersion ?? "");
     setIsSendingCode(true);
     try {
       const { response, payload } = await postJson("/api/auth/register/send-code", next);
@@ -179,7 +197,9 @@ export function RegisterAccountPage({
         setCodeError("");
       } else {
         const message = payloadMessage(payload, "Unable to send the verification code.");
-        if (response.status === 409 || payload.issues?.[0]?.path?.[0] === "email") {
+        if (isOutdatedTerms(payload)) {
+          askTermsAgain();
+        } else if (response.status === 409 || payload.issues?.[0]?.path?.[0] === "email") {
           setSendCodeError(message);
           emailRef.current?.focus();
         } else {
@@ -206,6 +226,7 @@ export function RegisterAccountPage({
     try {
       const { response, payload } = await postJson("/api/auth/register/send-code", details);
       if (!response.ok) {
+        if (isOutdatedTerms(payload)) return askTermsAgain();
         setErrorMessage(payloadMessage(payload, "Unable to send the verification code."));
         if (payload.retryAfterSeconds) setResendIn(payload.retryAfterSeconds);
         return;
@@ -246,7 +267,9 @@ export function RegisterAccountPage({
       const { response, payload } = await postJson("/api/auth/register", { ...details, verificationCode });
       if (!response.ok || !payload.redirectTo) {
         const message = payloadMessage(payload, "Unable to create your account.");
-        if (/verification code|6-digit code/i.test(message)) {
+        if (isOutdatedTerms(payload)) {
+          askTermsAgain();
+        } else if (/verification code|6-digit code/i.test(message)) {
           setCodeError(message);
           codeRef.current?.focus();
         } else if (response.status === 400 && payload.issues) {
@@ -304,7 +327,7 @@ export function RegisterAccountPage({
             </p>
           </div>
 
-          {agreedToTerms ? (
+          {agreedVersion ? (
           <>
           {step === "details" ? (
           <div className="mt-8 max-w-xl space-y-6">
@@ -320,7 +343,7 @@ export function RegisterAccountPage({
               mode="register"
               disabled={isSendingCode}
               onClick={() => {
-                const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: accountTerms.version });
+                const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: agreedVersion });
                 window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
               }}
             />
@@ -647,9 +670,9 @@ export function RegisterAccountPage({
           </div>
         </aside>
       </main>
-      {!agreedToTerms && (
+      {(!agreedVersion || termsUpdated) && (
         <AccountTermsConsent
-          onAgree={() => setAgreedToTerms(true)}
+          onAgree={agreeToTerms}
           onDecline={() => window.location.assign(backHref)}
         />
       )}

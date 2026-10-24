@@ -23,6 +23,7 @@ import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 import type { SettingKey, SystemSettings } from "@/lib/system-settings";
 import type { ContactDetails, ContactField } from "@/lib/contact-details";
+import type { AccountTermsContent } from "@/lib/account-terms";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -559,6 +560,14 @@ export type ContactDetailsDocument = {
   _id: "contact";
   values: Partial<ContactDetails>;
   changes: Partial<Record<ContactField, { by: string; at: Date }>>;
+  updatedAt: Date;
+};
+
+/** Terms and Conditions versions the Admin published (Maintenance > Terms and Conditions); none yet means the built-in terms. */
+export type TermsDocument = {
+  _id: "terms";
+  /** Oldest first; the last one is current. A published version is never changed. */
+  versions: { terms: AccountTermsContent; publishedById: ObjectId; publishedBy: string; publishedAt: Date }[];
   updatedAt: Date;
 };
 
