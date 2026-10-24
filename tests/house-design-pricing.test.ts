@@ -8,6 +8,7 @@ import {
 } from "@/lib/house-design-data";
 import { houseDesignInputSchema, houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import type { HouseDesignDocument } from "@/lib/database/collections";
+import { minimumFloorArea, roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 
 const fence = { id: "fence", item: "Fence", material: "Steel", unit: "lm", quantity: 2.5, unitPrice: 10.25 };
 const designInput = {
@@ -54,6 +55,29 @@ test("room counts are whole numbers saved together", () => {
   assert.deepEqual(houseDesignPatchSchema.parse({ bedrooms: 4, bathrooms: 3 }), { bedrooms: 4, bathrooms: 3 });
   assert.equal(formatRoomSetup(1, 1), "1 bedroom, 1 bathroom");
   assert.equal(formatRoomSetup(3, 2), "3 bedrooms, 2 bathrooms");
+});
+
+test("the room-space guide only warns when the floor area is too small for the rooms", () => {
+  // (bedrooms × 6 + bathrooms × 1.2 + kitchen 3 + living 6) × 1.2, rounded up to whole sqm.
+  assert.equal(minimumFloorArea(2, 2), 29);
+  assert.equal(minimumFloorArea(3, 2), 36);
+  assert.equal(minimumFloorArea(6, 4), 60);
+  assert.equal(minimumFloorArea(0, 0), 11);
+
+  // A big house with few rooms is fine; there is never a minimum number of rooms.
+  assert.equal(roomSpaceShortfall(300, 2, 2), null);
+  assert.equal(roomSpaceShortfall(60, 3, 2), null);
+  assert.equal(roomSpaceShortfall(36, 3, 2), null);
+  assert.equal(roomSpaceShortfall(35, 3, 2), 36);
+  assert.equal(roomSpaceShortfall(30, 6, 4), 60);
+
+  // Unusable numbers give no warning; the form's own checks handle them.
+  assert.equal(roomSpaceShortfall(0, 3, 2), null);
+  assert.equal(roomSpaceShortfall(Number.NaN, 3, 2), null);
+  assert.equal(roomSpaceShortfall(30, -1, 2), null);
+
+  assert.equal(roomsPhrase(1, 1), "1 bedroom and 1 bathroom");
+  assert.equal(roomsPhrase(3, 2), "3 bedrooms and 2 bathrooms");
 });
 
 test("peso amounts display centavos without rounding them to whole pesos", () => {

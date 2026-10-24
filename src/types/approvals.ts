@@ -34,6 +34,8 @@ export type ApprovalDto = {
   completedAt?: string;
   preferredDate?: string;
   neededBy?: string;
+  /** Custom design requests whose floor area looks too small for the rooms asked for; a guide for the review. */
+  roomSpaceNote?: string;
   amount?: number;
   createdAt: string;
   reviewedAt?: string;

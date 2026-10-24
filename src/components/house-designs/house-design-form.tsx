@@ -20,7 +20,8 @@ import {
   type NewHouseDesignInput,
 } from "@/lib/house-design-store";
 import type { ManagedProfessional } from "@/lib/professionals";
-import { AlertCircle, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
+import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
+import { AlertCircle, AlertTriangle, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import {
   useRef,
@@ -330,6 +331,10 @@ export function HouseDesignForm({
   };
 
   const areaValue = Number(values.area);
+  // A warning only; the Admin may still save the design.
+  const roomShortfall = values.area.trim() && values.bedrooms.trim() && values.bathrooms.trim()
+    ? roomSpaceShortfall(areaValue, Number(values.bedrooms), Number(values.bathrooms))
+    : null;
   const costValue = Number.isFinite(Number(values.cost)) ? Number(values.cost) : 0;
   // The Admin keeps the project cost current; the per-sqm rate is worked out from it and the floor area.
   const rateValue = Number.isFinite(areaValue) && areaValue > 0 ? costValue / areaValue : 0;
@@ -744,6 +749,16 @@ export function HouseDesignForm({
                 </select>
               </Field>
             </div>
+
+            {roomShortfall ? (
+              <p role="status" className="mt-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                <AlertTriangle className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {roomsPhrase(Number(values.bedrooms), Number(values.bathrooms))} usually need at least {roomShortfall} sqm
+                  of floor area, but this design is {values.area.trim()} sqm. Check the floor area or the number of rooms.
+                </span>
+              </p>
+            ) : null}
 
             <div className="mt-5">
               <Field

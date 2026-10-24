@@ -13,6 +13,7 @@ import {
   type ApprovalSummary,
 } from "@/types/approvals";
 import {
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
@@ -300,6 +301,12 @@ function ApprovalReviewDialog({
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-stone-700">
               {approval.description}
             </p>
+            {approval.roomSpaceNote ? (
+              <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                <AlertTriangle className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{approval.roomSpaceNote}</span>
+              </p>
+            ) : null}
             {approval.amount !== undefined ? (
               <p className="mt-3 text-2xl font-semibold tracking-tight text-red-700">
                 {formatPeso(approval.amount)}

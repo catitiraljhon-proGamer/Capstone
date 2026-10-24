@@ -15,9 +15,11 @@ import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { finishLevelDescriptions, finishLevels, type FinishLevel } from "@/lib/house-design-data";
+import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import Link from "next/link";
 import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
+  AlertTriangle,
   Hourglass,
   ImagePlus,
   Send,
@@ -91,6 +93,10 @@ function DesignRequestForm({ houseDesignId }: {
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
+  // A warning only: the request can still be sent, and the Admin checks the size during the feasibility review.
+  const roomShortfall = hasDesignSelection || !floorArea.trim() || !bedrooms.trim() || !bathrooms.trim()
+    ? null
+    : roomSpaceShortfall(Number(floorArea), Number(bedrooms), Number(bathrooms));
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [neededBy, setNeededBy] = useState("");
@@ -508,6 +514,15 @@ function DesignRequestForm({ houseDesignId }: {
               <FieldError id={`${fieldIds.bathrooms}-error`} message={showError("bathrooms")} />
             </div>
           </div>
+          {roomShortfall ? (
+            <p role="status" className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              <AlertTriangle className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                {roomsPhrase(Number(bedrooms), Number(bathrooms))} usually need at least {roomShortfall} sqm of floor area.
+                You can still send this request. The Admin checks the size during review.
+              </span>
+            </p>
+          ) : null}
           </>
           )}
 

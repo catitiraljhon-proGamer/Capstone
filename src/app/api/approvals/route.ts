@@ -8,6 +8,7 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
+import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { syncPendingWorkflowApprovals } from "@/lib/server/approvals";
 import { readSession } from "@/lib/server/session";
@@ -28,6 +29,7 @@ type ApprovalSource = Pick<
   | "completedAt"
   | "preferredDate"
   | "neededBy"
+  | "roomSpaceNote"
   | "amount"
 >;
 
@@ -37,6 +39,19 @@ const missingSource: ApprovalSource = {
   sourceStatus: null,
   sourceAvailable: false,
 };
+
+/** A note for custom requests whose floor area looks too small for the rooms; published designs and older requests get none. */
+function roomSpaceNote(request: DesignRequestDocument): Pick<ApprovalDto, "roomSpaceNote"> {
+  if (request.selectedDesign || request.bedrooms === undefined || request.bathrooms === undefined) return {};
+  const needed = roomSpaceShortfall(request.floorArea, request.bedrooms, request.bathrooms);
+  return needed
+    ? {
+        roomSpaceNote:
+          `${roomsPhrase(request.bedrooms, request.bathrooms)} usually need at least ${needed} sqm of floor area, ` +
+          `but this request is for ${request.floorArea.toLocaleString("en-PH")} sqm. Check whether the rooms fit before approving.`,
+      }
+    : {};
+}
 
 function uniqueIds(approvals: ApprovalDocument[], recordType: ApprovalRecordType) {
   return approvals
@@ -146,6 +161,7 @@ export async function GET() {
         completedAt: source.completedAt?.toISOString(),
         preferredDate: source.preferredDate?.toISOString().slice(0, 10),
         neededBy: source.neededBy?.toISOString().slice(0, 10),
+        ...roomSpaceNote(source),
       });
     }
     for (const source of estimates) {
