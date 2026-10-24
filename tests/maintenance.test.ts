@@ -29,6 +29,7 @@ import {
 import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
 import { getContactDetails, updateContactDetails } from "@/lib/server/contact-details";
 import { defaultContactDetails, phoneHref } from "@/lib/contact-details";
+import { getHomeSlides, updateHomeSlideshow } from "@/lib/server/home-slideshow";
 import { accountTerms, termsText, type AccountTermsContent } from "@/lib/account-terms";
 import {
   acceptAccountTerms,
@@ -184,6 +185,47 @@ test("customers who already agreed keep their agreement after a new version; new
   const record = await db.collection("audit_logs").findOne({ action: "account.terms-accepted", actorId: new ObjectId(newcomer.id) });
   assert.equal(record?.details.termsSnapshot, termsText(current));
   assert.match(String(record?.details.termsSnapshot), /Site Visits/);
+});
+
+test("the Admin picks the home page slideshow designs in order, and unpublished designs drop out", async () => {
+  const designs = db.collection<HouseDesignDocument>("house_designs");
+  const base = (await designs.findOne({ _id: designId }))!;
+  const design = (name: string, day: number, extra: Partial<HouseDesignDocument> = {}): HouseDesignDocument => ({
+    ...base, _id: new ObjectId(), name, createdAt: new Date(Date.UTC(2026, 9, day)),
+    images: [`https://example.test/${day}.jpg`, `https://example.test/${day}-side.jpg`], ...extra,
+  });
+  const numbered = [1, 2, 3, 4, 5].map((day) => design(`Design ${day}`, day));
+  const first = numbered[0];
+  const draft = design("Draft design", 20, { status: "Draft" });
+  const noPhoto = design("No photo", 21, { images: [] });
+  await designs.insertMany([...numbered, draft, noPhoto]);
+  const names = async () => (await getHomeSlides(db)).map((slide) => slide.name);
+
+  // Nothing picked: the newest Published designs with a photo, one cover photo each.
+  assert.deepEqual(await names(), ["Test design", "Design 5", "Design 4", "Design 3"]);
+  assert.equal((await getHomeSlides(db))[1].image, "https://example.test/5.jpg");
+
+  const ids = (...picked: HouseDesignDocument[]) => ({ designIds: picked.map((item) => item._id.toHexString()) });
+  await assert.rejects(updateHomeSlideshow(db, clerk, ids(first)), isStatus(403));
+  for (const bad of [ids(...numbered), ids(first, first), { designIds: ["not-an-id"] }, { designIds: [], extra: true }]) {
+    await assert.rejects(updateHomeSlideshow(db, admin, bad), ZodError);
+  }
+  await assert.rejects(updateHomeSlideshow(db, admin, ids(draft)), isStatus(400));
+  await assert.rejects(updateHomeSlideshow(db, admin, ids(noPhoto)), isStatus(400));
+
+  const view = await updateHomeSlideshow(db, admin, { designIds: [first._id.toHexString(), designId.toHexString()] });
+  assert.deepEqual(view.chosen, [first._id.toHexString(), designId.toHexString()]);
+  assert.equal(view.changedBy, "Admin");
+  assert.deepEqual(await names(), ["Design 1", "Test design"]);
+  const log = await db.collection("audit_logs").findOne({ action: "Updated home page slideshow" });
+  assert.deepEqual(log?.details, { Slideshow: "Newest published designs → Design 1, Test design" });
+
+  await designs.updateOne({ _id: first._id }, { $set: { status: "Archived" } });
+  assert.deepEqual(await names(), ["Test design"]);
+  await designs.updateOne({ _id: designId }, { $set: { status: "Archived" } });
+  assert.deepEqual(await names(), ["Design 5", "Design 4", "Design 3", "Design 2"]);
+  // The other settings stored beside the slideshow are untouched.
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
 });
 
 test("new passwords follow the Admin's password rules", async () => {

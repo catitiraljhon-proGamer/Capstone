@@ -571,6 +571,14 @@ export type TermsDocument = {
   updatedAt: Date;
 };
 
+/** The designs the Admin picked for the home page slideshow, in order (Maintenance > Home Page Slideshow). */
+export type HomeSlideshowDocument = {
+  _id: "home-slideshow";
+  designIds: ObjectId[];
+  changedBy: string;
+  updatedAt: Date;
+};
+
 export type MaintenanceModeDocument = {
   _id: "maintenance-mode";
   endsAt: Date;

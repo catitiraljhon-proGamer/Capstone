@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { AccountTermsDialog } from "@/components/auth/account-terms";
 import { PublicHeader } from "@/components/landing/public-header";
 import { BrandLogo } from "@/components/ui/brand-logo";
-import { useHouseDesigns } from "@/lib/house-design-store";
+import type { HomeSlide } from "@/lib/home-slideshow";
 
 type StatProps = {
   label: string;
@@ -61,28 +61,42 @@ function BlueprintMark() {
   );
 }
 
+/** The designs the Admin picked in Maintenance (or the newest Published ones), one cover photo each. */
 function SwappingHouseShowcase() {
-  const { designs, isLoading } = useHouseDesigns();
-  const projectImages = Array.from(
-    new Set(designs.flatMap((design) => design.images)),
-  ).slice(0, 4);
+  const [slides, setSlides] = useState<HomeSlide[] | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const slideCount = slides?.length ?? 0;
 
   useEffect(() => {
-    if (projectImages.length < 2) return;
+    let active = true;
+    fetch("/api/settings/home-slideshow", { cache: "no-store" })
+      .then((response) => (response.ok ? (response.json() as Promise<{ slides: HomeSlide[] }>) : { slides: [] }))
+      .then((payload) => {
+        if (active) setSlides(payload.slides);
+      })
+      .catch(() => {
+        if (active) setSlides([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (slideCount < 2) return;
     const interval = window.setInterval(() => {
-      setActiveIndex((current) => (current + 1) % projectImages.length);
+      setActiveIndex((current) => (current + 1) % slideCount);
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, [projectImages.length]);
+  }, [slideCount]);
 
-  const activeImage = projectImages[activeIndex % projectImages.length];
+  const activeSlide = slides?.[activeIndex % slideCount];
 
-  if (!activeImage) {
+  if (!activeSlide) {
     return (
       <div className="grid aspect-[1.42/1] place-items-center rounded-xl border border-dashed border-stone-200 bg-stone-50 text-sm text-stone-500">
-        {isLoading ? "Loading published designs…" : "No published designs yet."}
+        {slides ? "No published designs yet." : "Loading published designs…"}
       </div>
     );
   }
@@ -90,7 +104,7 @@ function SwappingHouseShowcase() {
   return (
     <div className="space-y-4">
       <motion.div
-        key={activeImage}
+        key={activeSlide.designId}
         initial={{ opacity: 0.35, scale: 0.985 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.45 }}
@@ -101,17 +115,17 @@ function SwappingHouseShowcase() {
         <div
           className="h-full w-full bg-cover bg-center"
           style={{
-            backgroundImage: `url(${activeImage})`,
+            backgroundImage: `url(${activeSlide.image})`,
           }}
-          aria-label={`House design ${activeIndex + 1}`}
+          aria-label={activeSlide.name}
           role="img"
         />
       </motion.div>
 
       <div className="grid grid-cols-4 gap-2">
-        {projectImages.map((imageSrc, index) => (
+        {slides.map((slide, index) => (
           <button
-            key={imageSrc}
+            key={slide.designId}
             type="button"
             onClick={() => setActiveIndex(index)}
             className={[
@@ -120,12 +134,12 @@ function SwappingHouseShowcase() {
                 ? "border-red-700 ring-2 ring-red-700/20"
                 : "border-stone-200 hover:border-stone-300",
             ].join(" ")}
-            aria-label={`Show house design ${index + 1}`}
+            aria-label={`Show ${slide.name}`}
           >
             <span
               className="block h-full w-full bg-cover bg-center"
               style={{
-                backgroundImage: `url(${imageSrc})`,
+                backgroundImage: `url(${slide.image})`,
               }}
             />
           </button>
