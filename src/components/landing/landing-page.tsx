@@ -213,14 +213,6 @@ export default function LandingPage({ content }: { content: AboutUsContent }) {
               Browse some of our house designs. Create an account to request
               one as it is or with your changes, or to ask for a custom design.
             </p>
-            <div className="mt-8">
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
-              >
-                Request a Design <ArrowUpRight className="ml-1 h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
           </div>
 
           <SwappingHouseShowcase />
