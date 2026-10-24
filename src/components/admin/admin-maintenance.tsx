@@ -1,9 +1,9 @@
 "use client";
 
+import { AdminMaintenanceAboutUs } from "@/components/admin/admin-maintenance-about-us";
 import { AdminMaintenanceBackups } from "@/components/admin/admin-maintenance-backups";
 import { AdminMaintenanceContact } from "@/components/admin/admin-maintenance-contact";
 import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
-import { AdminMaintenanceProfessionals } from "@/components/admin/admin-maintenance-professionals";
 import { AdminMaintenanceSlideshow } from "@/components/admin/admin-maintenance-slideshow";
 import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,10 @@ import {
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Images, Lock, Mail, Phone, ScrollText, UsersRound, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, ScrollText, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Section = "mode" | "security" | "email" | "notifications" | "contact" | "terms" | "slideshow" | "professionals" | "backup";
+type Section = "mode" | "security" | "email" | "notifications" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
 type SettingGroup = { title: string; description?: string; keys: SettingKey[] };
 
 const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
@@ -43,7 +43,7 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
   { id: "contact", label: "Contact Us", icon: Phone, groups: [] },
   { id: "terms", label: "Terms and Conditions", icon: ScrollText, groups: [] },
   { id: "slideshow", label: "Home Page Slideshow", icon: Images, groups: [] },
-  { id: "professionals", label: "Architects and Engineers", icon: UsersRound, groups: [] },
+  { id: "about-us", label: "About Us", icon: Info, groups: [] },
   {
     id: "backup", label: "Backup", icon: DatabaseBackup, groups: [
       { title: "Automatic backups", description: "Runs every night at 1:00 AM.", keys: ["autoBackup", "keepAutomaticBackups"] },
@@ -194,7 +194,7 @@ export function AdminMaintenance() {
         {section === "contact" ? <AdminMaintenanceContact onError={setError} onSuccess={setSuccess} /> : null}
         {section === "terms" ? <AdminMaintenanceTerms onError={setError} onSuccess={setSuccess} /> : null}
         {section === "slideshow" ? <AdminMaintenanceSlideshow onError={setError} onSuccess={setSuccess} /> : null}
-        {section === "professionals" ? <AdminMaintenanceProfessionals onError={setError} onSuccess={setSuccess} /> : null}
+        {section === "about-us" ? <AdminMaintenanceAboutUs onError={setError} onSuccess={setSuccess} /> : null}
         {section === "backup" ? <AdminMaintenanceBackups onError={setError} onSuccess={setSuccess} /> : null}
 
         {changedKeys.length ? (

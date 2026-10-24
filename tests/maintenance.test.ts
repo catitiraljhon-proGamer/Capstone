@@ -30,6 +30,8 @@ import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
 import { getContactDetails, updateContactDetails } from "@/lib/server/contact-details";
 import { defaultContactDetails, phoneHref } from "@/lib/contact-details";
 import { getHomeSlides, updateHomeSlideshow } from "@/lib/server/home-slideshow";
+import { getAboutUsContent, getAboutUsView, updateAboutUsContent } from "@/lib/server/about-us";
+import { defaultAboutUs } from "@/lib/about-us";
 import {
   createProfessional,
   getAboutUsProfessionals,
@@ -235,6 +237,37 @@ test("the Admin picks the home page slideshow designs in order, and unpublished 
   await designs.updateOne({ _id: designId }, { $set: { status: "Archived" } });
   assert.deepEqual(await names(), ["Design 5", "Design 4", "Design 3", "Design 2"]);
   // The other settings stored beside the slideshow are untouched.
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+});
+
+test("the Admin edits the About Us text; the built-in text shows until then", async () => {
+  assert.deepEqual(await getAboutUsContent(db), defaultAboutUs);
+  await assert.rejects(getAboutUsView(db, clerk), isStatus(403));
+  assert.equal((await getAboutUsView(db, admin)).changedBy, null);
+
+  const edited = {
+    ...defaultAboutUs,
+    intro: "  G4 Builders Incorporated designs and builds houses in the province.  ",
+    services: defaultAboutUs.services.map((service, index) => (index === 2 ? { ...service, title: "Plans and Blueprints" } : service)),
+  };
+  await assert.rejects(updateAboutUsContent(db, clerk, edited), isStatus(403));
+  for (const bad of [
+    { ...edited, tagline: " " }, { ...edited, intro: "Too short" }, { ...edited, services: edited.services.slice(1) },
+    { ...edited, services: [...edited.services.slice(1), { title: "X", text: "Too short" }] }, { ...edited, extra: true },
+  ]) {
+    await assert.rejects(updateAboutUsContent(db, admin, bad), ZodError);
+  }
+
+  const view = await updateAboutUsContent(db, admin, edited);
+  assert.equal(view.content.intro, "G4 Builders Incorporated designs and builds houses in the province.");
+  assert.equal(view.changedBy, "Admin");
+  assert.equal((await getAboutUsContent(db)).services[2].title, "Plans and Blueprints");
+  const log = await db.collection("audit_logs").findOne({ action: "Updated the About Us page" });
+  assert.deepEqual(log?.details, { Changed: "Introduction, What We Do item 3" });
+
+  // Saving the same text again changes nothing and logs nothing; the other settings beside it are untouched.
+  await updateAboutUsContent(db, admin, edited);
+  assert.equal(await db.collection("audit_logs").countDocuments({ action: "Updated the About Us page" }), 1);
   assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
 });
 

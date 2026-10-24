@@ -25,6 +25,7 @@ import type { SettingKey, SystemSettings } from "@/lib/system-settings";
 import type { ContactDetails, ContactField } from "@/lib/contact-details";
 import type { AccountTermsContent } from "@/lib/account-terms";
 import type { ProfessionalRole } from "@/lib/professionals";
+import type { AboutUsContent } from "@/lib/about-us";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -596,6 +597,14 @@ export type ProfessionalDocument = {
   visible: boolean;
   order: number;
   createdAt: Date;
+  updatedAt: Date;
+};
+
+/** The About Us page text the Admin saved (Maintenance > About Us); none yet means the built-in text. */
+export type AboutUsDocument = {
+  _id: "about-us";
+  content: AboutUsContent;
+  changedBy: string;
   updatedAt: Date;
 };
 
