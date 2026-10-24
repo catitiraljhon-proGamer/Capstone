@@ -16,10 +16,10 @@ const panel = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
 const field =
   "mt-1.5 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600";
 
-const fieldDetails: Record<ContactField, { icon: LucideIcon; hint: string }> = {
-  phone: { icon: Phone, hint: "Tapping it on a phone starts a call." },
-  email: { icon: Mail, hint: "Tapping it opens a new email." },
-  address: { icon: MapPin, hint: "Opens in Maps for walk-in inquiries." },
+const fieldDetails: Record<ContactField, { icon: LucideIcon; hint: string; placeholder: string }> = {
+  phone: { icon: Phone, hint: "Tapping it on a phone starts a call.", placeholder: "Enter phone number" },
+  email: { icon: Mail, hint: "Tapping it opens a new email.", placeholder: "Enter email address" },
+  address: { icon: MapPin, hint: "Opens in Maps for walk-in inquiries.", placeholder: "Enter office address" },
 };
 
 /** Same rules as the server, so mistakes show before saving. */
@@ -127,13 +127,14 @@ export function AdminMaintenanceContact({ onError, onSuccess }: {
       </p>
       <div className="mt-3 divide-y divide-stone-200 border-t border-stone-200">
         {contactFields.map((name) => {
-          const { icon: Icon, hint } = fieldDetails[name];
+          const { icon: Icon, hint, placeholder } = fieldDetails[name];
           const id = `contact-${name}`;
           const error = errors[name];
           const changedBy = changedLine(view, name);
           const props = {
             id,
             value: draft[name],
+            placeholder,
             "aria-invalid": error ? true : undefined,
             "aria-describedby": `${id}-hint${error ? ` ${id}-error` : ""}`,
             className: field,

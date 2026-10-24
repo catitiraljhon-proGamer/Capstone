@@ -178,6 +178,7 @@ export function SignInPage({
                       id="email"
                       name="email"
                       type="email"
+                      placeholder="Enter your email address"
                       autoComplete="email"
                       defaultValue={googleLinkEmail ?? ""}
                       readOnly={Boolean(googleLinkEmail)}
@@ -200,6 +201,7 @@ export function SignInPage({
                         id="password"
                         name="password"
                         type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
                         autoComplete="current-password"
                         required
                         className="w-full rounded-xl bg-transparent p-4 pr-12 text-sm text-stone-950 outline-none placeholder:text-stone-400"

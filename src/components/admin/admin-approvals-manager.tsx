@@ -366,6 +366,7 @@ function ApprovalReviewDialog({
                   value={note}
                   disabled={isSaving || !approval.sourceAvailable}
                   onChange={(event) => setNote(event.target.value)}
+                  placeholder="Enter review note"
                   className="mt-2 w-full resize-none rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100"
                 />
               </label>

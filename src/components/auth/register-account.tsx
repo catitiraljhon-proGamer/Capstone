@@ -383,6 +383,7 @@ export function RegisterAccountPage({
                 minLength={2}
                 maxLength={100}
                 required
+                placeholder="Enter full name"
                 {...describe("name")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
@@ -404,6 +405,7 @@ export function RegisterAccountPage({
                 autoComplete="email"
                 maxLength={254}
                 required
+                placeholder="Enter Gmail address"
                 onChange={() => setSendCodeError("")}
                 aria-invalid={emailField["aria-invalid"] ?? (sendCodeMessage ? true : undefined)}
                 aria-describedby={[emailField["aria-describedby"], sendCodeMessage ? "send-code-error" : undefined, "email-hint"]
@@ -425,6 +427,7 @@ export function RegisterAccountPage({
               <ContactNumberInput
                 id="contactNumber"
                 required
+                placeholder="Enter contact number"
                 {...describe("contactNumber")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
@@ -447,6 +450,7 @@ export function RegisterAccountPage({
                 name="occupation"
                 type="text"
                 maxLength={100}
+                placeholder="Enter your occupation"
                 {...describe("occupation")}
                 className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
               />
@@ -470,6 +474,7 @@ export function RegisterAccountPage({
                     minLength={passwordPolicy.passwordMinLength}
                     maxLength={72}
                     required
+                    placeholder="Enter password"
                     {...describe("password")}
                     aria-describedby={[describe("password")["aria-describedby"], "password-hint"].filter(Boolean).join(" ")}
                     className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 pr-11 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
@@ -508,6 +513,7 @@ export function RegisterAccountPage({
                   minLength={passwordPolicy.passwordMinLength}
                   maxLength={72}
                   required
+                  placeholder="Re-enter password"
                   {...describe("confirmPassword")}
                   className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-stone-400 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 aria-invalid:border-red-600"
                 />
@@ -570,6 +576,7 @@ export function RegisterAccountPage({
                 autoComplete="one-time-code"
                 maxLength={6}
                 required
+                placeholder="Enter 6-digit code"
                 value={verificationCode}
                 onChange={(event) => {
                   setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));

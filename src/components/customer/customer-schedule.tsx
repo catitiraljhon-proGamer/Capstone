@@ -192,7 +192,7 @@ export function CustomerSchedule() {
           <form onSubmit={submitRequest} className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-stone-700">
               What is the meeting about?
-              <input required minLength={3} maxLength={120} value={form.topic} onChange={(event) => setForm({ ...form, topic: event.target.value })} className={fieldClass} />
+              <input required minLength={3} maxLength={120} value={form.topic} onChange={(event) => setForm({ ...form, topic: event.target.value })} placeholder="Enter meeting topic" className={fieldClass} />
             </label>
             <label className="text-sm font-medium text-stone-700">
               Project (optional)
@@ -263,6 +263,7 @@ export function CustomerSchedule() {
                 maxLength={1000}
                 value={form.details}
                 onChange={(event) => setForm({ ...form, details: event.target.value })}
+                placeholder="Enter anything the team should prepare"
                 className="mt-1.5 min-h-24 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
               />
             </label>

@@ -155,10 +155,10 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         <p className="mt-2 text-xs font-normal leading-5 text-stone-500">{project?.status === "Awaiting downpayment" ? "Only the downpayment can be billed until it is paid and the project is scheduled." : "Each milestone is billed once, for the exact amount in the accepted payment schedule."}</p>
       </label>{fields.error("milestone", messages.milestone)}</div>}
       <div><label className="block text-sm font-medium">Billing Stage
-        <input required maxLength={160} className={invalidField} {...fields.props("label", messages.label)} value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />
+        <input required maxLength={160} className={invalidField} {...fields.props("label", messages.label)} placeholder="Enter billing stage" value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />
       </label>{fields.error("label", messages.label)}</div>
       <div><label className="block text-sm font-medium">Billing Basis / Approved Reference
-        <textarea required maxLength={2000} rows={3} className={invalidField} {...fields.props("basis", messages.basis)} value={form.basis} onChange={(event) => setForm({ ...form, basis: event.target.value })} />
+        <textarea required maxLength={2000} rows={3} className={invalidField} {...fields.props("basis", messages.basis)} placeholder="Enter billing basis or approved reference" value={form.basis} onChange={(event) => setForm({ ...form, basis: event.target.value })} />
       </label>{fields.error("basis", messages.basis)}</div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div><label className="text-sm font-medium">Amount (PHP)<PesoInput required readOnly={Boolean(milestone)} min="0.01" max="1000000000" step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
@@ -208,17 +208,17 @@ function PaymentProofField({ label, attached, disabled, onChange, onUploading }:
 }
 
 const customerMethodText: Record<CustomerPaymentMethod, {
-  title: string; detail: string; date: string; reference: string; help: string; proof: string; footnote: string;
+  title: string; detail: string; date: string; reference: string; placeholder: string; help: string; proof: string; footnote: string;
 }> = {
   "Bank transfer": {
     title: "Bank transfer or deposit", detail: "InstaPay, PESONet or over the counter",
-    date: "Transfer or deposit date", reference: "Bank reference no.",
+    date: "Transfer or deposit date", reference: "Bank reference no.", placeholder: "Enter bank reference no.",
     help: "From your transfer confirmation or deposit slip.", proof: "Deposit slip or transfer screenshot",
     footnote: "The Billing Clerk matches your reference number with G4 Builders Inc bank records before the balance changes and a receipt becomes available.",
   },
   Cheque: {
     title: "Cheque", detail: "Payable to G4 Builders Inc",
-    date: "Cheque date", reference: "Cheque no.",
+    date: "Cheque date", reference: "Cheque no.", placeholder: "Enter cheque no.",
     help: "Include the issuing bank so the Billing Clerk can match the cheque.", proof: "Photo of the cheque",
     footnote: "Make the cheque payable to G4 Builders Inc. The balance changes and a receipt becomes available once the Billing Clerk confirms the cheque has cleared.",
   },
@@ -275,7 +275,7 @@ export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOn
       <div className="grid gap-4 sm:grid-cols-2">
         <div><label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice.balance} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
         <div><label className="text-sm font-medium">{text.date}<input required type="date" max={manilaDate()} value={form.paidAt} className={invalidField} {...fields.props("paidAt", messages.paidAt)} onChange={(event) => setForm({ ...form, paidAt: event.target.value })} /></label>{fields.error("paidAt", messages.paidAt)}</div>
-        <div className="sm:col-span-2"><label className="text-sm font-medium">{text.reference}<input required maxLength={120} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}<p className="mt-1.5 text-xs text-stone-500">{text.help}</p></div>
+        <div className="sm:col-span-2"><label className="text-sm font-medium">{text.reference}<input required maxLength={120} placeholder={text.placeholder} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}<p className="mt-1.5 text-xs text-stone-500">{text.help}</p></div>
       </div>
       <PaymentProofField label={text.proof} attached={Boolean(form.proofImage)} disabled={busy || uploading} onUploading={setUploading} onChange={(proofImage) => { setError(null); setForm((previous) => ({ ...previous, proofImage })); }} />
       <label className="block text-sm font-medium">Notes (optional)<textarea rows={2} maxLength={1000} value={form.notes} className={field} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>

@@ -377,6 +377,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               {...fieldProps("name")}
               value={values.name}
               maxLength={80}
+              placeholder="Enter full name with title"
               onChange={(event) => set("name", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -403,6 +404,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               id="professional-specialization"
               value={values.specialization}
               maxLength={80}
+              placeholder="Enter specialization"
               onChange={(event) => set("specialization", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -415,6 +417,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               inputMode="numeric"
               value={values.licenseNumber}
               maxLength={10}
+              placeholder="Enter PRC license number"
               onChange={(event) => set("licenseNumber", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -431,6 +434,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               max={70}
               step={1}
               value={values.yearsOfExperience}
+              placeholder="Enter years of experience"
               onChange={(event) => set("yearsOfExperience", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -444,6 +448,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               rows={4}
               value={values.bio}
               maxLength={maxBioLength}
+              placeholder="Enter short bio"
               onChange={(event) => set("bio", event.target.value)}
               aria-describedby="professional-bio-count"
               className={`mt-1.5 resize-y ${inputClass}`}

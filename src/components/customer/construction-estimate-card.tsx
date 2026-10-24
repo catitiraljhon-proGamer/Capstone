@@ -190,6 +190,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
                 onBlur={() => setReasonTouched(true)}
                 aria-invalid={shownReasonError ? true : undefined}
                 aria-describedby={shownReasonError ? "estimate-revision-reason-error" : undefined}
+                placeholder="Enter reason for revision"
                 className={`${constructionFieldClass} aria-invalid:border-red-600`}
               />
               {shownReasonError

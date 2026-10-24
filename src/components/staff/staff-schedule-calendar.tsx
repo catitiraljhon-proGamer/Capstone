@@ -264,7 +264,7 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
           <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Title
-              <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={fieldClass} />
+              <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Enter title" className={fieldClass} />
             </label>
             <div className="text-sm font-medium text-stone-700 sm:col-span-2">
               <label htmlFor="schedule-client">Client</label>
@@ -314,13 +314,14 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
               <input
                 value={form.location}
                 onChange={(event) => setForm({ ...form, location: event.target.value })}
+                placeholder={role === "admin" ? "Enter location or meeting link" : "Enter phone number or channel"}
                 className={fieldClass}
               />
             </label>
             {role === "admin" ? statusField : null}
             <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Notes (optional, staff only)
-              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className={textareaClass} />
+              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Enter notes" className={textareaClass} />
             </label>
             <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">
               <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsFormOpen(false)}>Cancel</Button>

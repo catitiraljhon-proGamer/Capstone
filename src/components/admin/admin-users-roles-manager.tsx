@@ -408,6 +408,7 @@ export function AdminUsersRolesManager() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, name: event.target.value }))
                 }
+                placeholder="Enter full name"
                 className={fieldClass}
               />
             </label>
@@ -422,6 +423,7 @@ export function AdminUsersRolesManager() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, email: event.target.value }))
                 }
+                placeholder="Enter email address"
                 className={fieldClass}
               />
             </label>
@@ -481,6 +483,7 @@ export function AdminUsersRolesManager() {
                       password: event.target.value,
                     }))
                   }
+                  placeholder={editingUser ? "Enter new temporary password" : "Enter temporary password"}
                   className={`${fieldClass} pl-9`}
                 />
               </span>

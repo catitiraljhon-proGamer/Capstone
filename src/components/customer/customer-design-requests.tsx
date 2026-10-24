@@ -456,6 +456,7 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setFloorArea(event.target.value)}
                   onBlur={() => touch("floorArea")}
                   required
+                  placeholder="Enter floor area"
                   {...describe("floorArea")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -477,6 +478,7 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setBedrooms(event.target.value)}
                   onBlur={() => touch("bedrooms")}
                   required
+                  placeholder="Enter number of bedrooms"
                   {...describe("bedrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -498,6 +500,7 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setBathrooms(event.target.value)}
                   onBlur={() => touch("bathrooms")}
                   required
+                  placeholder="Enter number of bathrooms"
                   {...describe("bathrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -522,6 +525,7 @@ function DesignRequestForm({ houseDesignId }: {
                 onBlur={() => touch("notes")}
                 required={!hasDesignSelection}
                 maxLength={4000}
+                placeholder={hasDesignSelection ? "Enter preferred materials, items, or changes" : "Enter description"}
                 {...describe("notes")}
                 className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600 aria-invalid:border-red-600"
               />

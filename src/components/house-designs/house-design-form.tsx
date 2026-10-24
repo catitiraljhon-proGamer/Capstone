@@ -523,6 +523,7 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.name),
                   )}
+                  placeholder="Enter design name"
                 />
               </Field>
 
@@ -568,6 +569,7 @@ export function HouseDesignForm({
                   value={style}
                   onChange={(event) => setStyle(event.target.value)}
                   aria-describedby="design-style-hint"
+                  placeholder="Enter style label"
                 />
               </Field>
 
@@ -594,6 +596,7 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.area),
                   )}
+                  placeholder="Enter floor area"
                 />
               </Field>
 
@@ -623,6 +626,7 @@ export function HouseDesignForm({
                     true,
                     Boolean(errors.cost),
                   )}
+                  placeholder="Enter estimated project cost"
                 />
               </Field>
 
@@ -650,6 +654,7 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.bedrooms),
                   )}
+                  placeholder="Enter number of bedrooms"
                 />
               </Field>
 
@@ -677,6 +682,7 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.bathrooms),
                   )}
+                  placeholder="Enter number of bathrooms"
                 />
               </Field>
 
@@ -738,6 +744,7 @@ export function HouseDesignForm({
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   aria-describedby="design-notes-hint"
+                  placeholder="Enter notes"
                 />
               </Field>
             </div>
@@ -800,6 +807,7 @@ export function HouseDesignForm({
                                 item: event.target.value,
                               })
                             }
+                            placeholder="Enter item name"
                           />
                         </Field>
                         <Field
@@ -818,6 +826,7 @@ export function HouseDesignForm({
                                 material: event.target.value,
                               })
                             }
+                            placeholder="Enter material"
                           />
                         </Field>
                         <Field
@@ -836,6 +845,7 @@ export function HouseDesignForm({
                                 unit: event.target.value,
                               })
                             }
+                            placeholder="Enter unit"
                           />
                         </Field>
                         <Field

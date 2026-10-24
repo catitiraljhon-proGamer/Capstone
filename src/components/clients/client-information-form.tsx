@@ -188,14 +188,14 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
             Full Name <RequiredIndicator />
-            <input name="name" autoComplete="name" required minLength={2} maxLength={100} defaultValue={client?.name ?? ""} className={fieldClass} {...describe("name")} />
+            <input name="name" autoComplete="name" required minLength={2} maxLength={100} placeholder="Enter full name" defaultValue={client?.name ?? ""} className={fieldClass} {...describe("name")} />
           </label>
           <FieldError id={errorId("name")} message={fieldError("name")} />
         </div>
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
             Email address {creating && <RequiredIndicator />}
-            <input name="email" type="email" autoComplete="email" required maxLength={254} readOnly={!creating} defaultValue={client?.email ?? ""} className={fieldClass} {...describe("email")} />
+            <input name="email" type="email" autoComplete="email" required maxLength={254} placeholder="Enter email address" readOnly={!creating} defaultValue={client?.email ?? ""} className={fieldClass} {...describe("email")} />
             {!creating && <span className="mt-1 block text-xs font-normal text-stone-500">This is the email used to sign in.</span>}
           </label>
           <FieldError id={errorId("email")} message={fieldError("email")} />
@@ -203,7 +203,7 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         <div className="min-w-0">
           <label className="block text-sm font-medium text-stone-700">
             Contact Number <RequiredIndicator />
-            <ContactNumberInput required defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
+            <ContactNumberInput required placeholder="Enter contact number" defaultValue={client?.contactNumber ?? ""} className={fieldClass} {...describe("contactNumber")} />
             <span className="mt-1 block text-xs font-normal text-stone-500">Philippine mobile number: {phContactNumberExample}.</span>
           </label>
           <FieldError id={errorId("contactNumber")} message={fieldError("contactNumber")} />
@@ -220,14 +220,14 @@ export function ClientInformationForm({ client, creating = false, submitLabel, o
         <div className="min-w-0 sm:col-span-2">
           <label className="block text-sm font-medium text-stone-700">
             Occupation (optional)
-            <input name="occupation" maxLength={100} defaultValue={client?.occupation ?? ""} className={fieldClass} {...describe("occupation")} />
+            <input name="occupation" maxLength={100} placeholder="Enter occupation (optional)" defaultValue={client?.occupation ?? ""} className={fieldClass} {...describe("occupation")} />
           </label>
           <FieldError id={errorId("occupation")} message={fieldError("occupation")} />
         </div>
         {creating && <div className="min-w-0 sm:col-span-2">
           <label className="block text-sm font-medium text-stone-700">
             Initial Account Password <RequiredIndicator />
-            <input name="password" type="password" autoComplete="new-password" required minLength={passwordPolicy.passwordMinLength} maxLength={72} className={fieldClass} {...describe("password")} />
+            <input name="password" type="password" autoComplete="new-password" required minLength={passwordPolicy.passwordMinLength} maxLength={72} placeholder="Enter initial account password" className={fieldClass} {...describe("password")} />
             <span className="mt-1 block text-xs font-normal text-stone-500">{passwordPolicyHint(passwordPolicy)} The new account will have client access.</span>
           </label>
           <FieldError id={errorId("password")} message={fieldError("password")} />

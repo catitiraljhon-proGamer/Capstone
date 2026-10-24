@@ -123,6 +123,7 @@ export function AdminMaintenanceAboutUs({ onError, onSuccess }: {
                 <input
                   id="about-tagline"
                   value={draft.tagline}
+                  placeholder="Enter tagline"
                   maxLength={aboutUsLimits.tagline}
                   onChange={(event) => update({ ...draft, tagline: event.target.value })}
                   className={inputClass}
@@ -136,6 +137,7 @@ export function AdminMaintenanceAboutUs({ onError, onSuccess }: {
                   id="about-intro"
                   rows={4}
                   value={draft.intro}
+                  placeholder="Enter introduction"
                   maxLength={aboutUsLimits.intro}
                   onChange={(event) => update({ ...draft, intro: event.target.value })}
                   aria-describedby="about-intro-count"
@@ -168,6 +170,7 @@ export function AdminMaintenanceAboutUs({ onError, onSuccess }: {
                     <input
                       id={`about-service-${index}-title`}
                       value={service.title}
+                      placeholder="Enter title"
                       maxLength={aboutUsLimits.serviceTitle}
                       onChange={(event) => updateService(index, "title", event.target.value)}
                       className={inputClass}
@@ -179,6 +182,7 @@ export function AdminMaintenanceAboutUs({ onError, onSuccess }: {
                       id={`about-service-${index}-text`}
                       rows={3}
                       value={service.text}
+                      placeholder="Enter description"
                       maxLength={aboutUsLimits.serviceText}
                       onChange={(event) => updateService(index, "text", event.target.value)}
                       className={`resize-y ${inputClass}`}

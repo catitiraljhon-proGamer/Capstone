@@ -101,6 +101,7 @@ export function ResetPasswordPage({ token }: { token: string }) {
               name="password"
               type={showPasswords ? "text" : "password"}
               autoComplete="new-password"
+              placeholder="Enter new password"
               minLength={passwordPolicy.passwordMinLength}
               maxLength={72}
               value={password}
@@ -132,6 +133,7 @@ export function ResetPasswordPage({ token }: { token: string }) {
             name="confirmPassword"
             type={showPasswords ? "text" : "password"}
             autoComplete="new-password"
+            placeholder="Re-enter new password"
             maxLength={72}
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}

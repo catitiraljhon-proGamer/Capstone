@@ -78,6 +78,7 @@ function ReviewActions({ design, onChanged }: { design: DesignRequestDto; onChan
             id={`changes-${design.id}`} rows={4} maxLength={1_000} value={note} disabled={busy}
             onChange={(event) => { setNote(event.target.value); setError(null); }}
             aria-invalid={noteError ? true : undefined}
+            placeholder="Enter the changes you want"
             className={`${constructionFieldClass} resize-y aria-invalid:border-red-600`}
           />
           {noteError && <p className="mt-1.5 text-sm text-red-700">{noteError}</p>}
