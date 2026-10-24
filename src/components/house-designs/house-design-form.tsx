@@ -254,6 +254,8 @@ export function HouseDesignForm({
   onSubmit: (design: NewHouseDesignInput) => void;
 }) {
   const isEditing = Boolean(design);
+  // A design added from inside a house type belongs to that type; editing keeps the choice so a design can be moved.
+  const fixedHouseType = !isEditing && defaultHouseType ? defaultHouseType : null;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [values, setValues] = useState<FormValues>({
@@ -530,31 +532,44 @@ export function HouseDesignForm({
               <Field
                 htmlFor={fieldIds.houseType}
                 label={fieldLabels.houseType}
-                hint="Controls which category card shows this design."
+                hint={fixedHouseType
+                  ? "Set by the house type you opened."
+                  : "Controls which category card shows this design."}
                 required
                 error={errors.houseType}
               >
-                <select
-                  id={fieldIds.houseType}
-                  name="houseType"
-                  className={`${inputClass} ${errors.houseType ? invalidInputClass : ""}`}
-                  value={values.houseType}
-                  onChange={(event) => setValue("houseType", event.target.value)}
-                  onBlur={() => handleBlur("houseType")}
-                  aria-invalid={Boolean(errors.houseType)}
-                  aria-describedby={describedBy(
-                    fieldIds.houseType,
-                    true,
-                    Boolean(errors.houseType),
-                  )}
-                >
-                  <option value="">Select a house type</option>
-                  {houseTypes.map((type) => (
-                    <option key={type.heading} value={type.heading}>
-                      {type.heading}
-                    </option>
-                  ))}
-                </select>
+                {fixedHouseType ? (
+                  <input
+                    id={fieldIds.houseType}
+                    name="houseType"
+                    readOnly
+                    className={`${inputClass} cursor-default bg-stone-50 font-medium focus:border-stone-200 focus:ring-0`}
+                    value={fixedHouseType}
+                    aria-describedby={`${fieldIds.houseType}-hint`}
+                  />
+                ) : (
+                  <select
+                    id={fieldIds.houseType}
+                    name="houseType"
+                    className={`${inputClass} ${errors.houseType ? invalidInputClass : ""}`}
+                    value={values.houseType}
+                    onChange={(event) => setValue("houseType", event.target.value)}
+                    onBlur={() => handleBlur("houseType")}
+                    aria-invalid={Boolean(errors.houseType)}
+                    aria-describedby={describedBy(
+                      fieldIds.houseType,
+                      true,
+                      Boolean(errors.houseType),
+                    )}
+                  >
+                    <option value="">Select a house type</option>
+                    {houseTypes.map((type) => (
+                      <option key={type.heading} value={type.heading}>
+                        {type.heading}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </Field>
 
               <Field
