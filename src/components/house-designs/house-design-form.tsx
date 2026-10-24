@@ -704,6 +704,16 @@ export function HouseDesignForm({
                   )}
                   placeholder="Enter number of bathrooms"
                 />
+                {/* Right under the room counts, so it is seen while they are typed. */}
+                {roomShortfall ? (
+                  <p role="status" className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      {roomsPhrase(Number(values.bedrooms), Number(values.bathrooms))} usually need at least {roomShortfall} sqm
+                      of floor area, but this design is {values.area.trim()} sqm. Check the floor area or the number of rooms.
+                    </span>
+                  </p>
+                ) : null}
               </Field>
 
               <Field
@@ -749,16 +759,6 @@ export function HouseDesignForm({
                 </select>
               </Field>
             </div>
-
-            {roomShortfall ? (
-              <p role="status" className="mt-5 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                <AlertTriangle className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  {roomsPhrase(Number(values.bedrooms), Number(values.bathrooms))} usually need at least {roomShortfall} sqm
-                  of floor area, but this design is {values.area.trim()} sqm. Check the floor area or the number of rooms.
-                </span>
-              </p>
-            ) : null}
 
             <div className="mt-5">
               <Field
