@@ -203,7 +203,6 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
               onBlur={() => touch("notes")}
               aria-invalid={notesMessage ? true : undefined}
               aria-describedby={notesMessage ? "request-notes-error" : undefined}
-              placeholder="Access to the lot, existing structures, preferred materials, or anything else we should know."
               className={`${constructionFieldClass} aria-invalid:border-red-600`}
             />
             {notesMessage

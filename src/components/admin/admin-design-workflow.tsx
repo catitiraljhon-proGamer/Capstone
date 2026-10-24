@@ -139,7 +139,6 @@ function VersionUpload({ designId, revision, onUploaded }: { designId: string; r
       <label className="mt-4 block text-sm font-semibold text-stone-700">
         Note to the Customer <span className="font-normal text-stone-500">(optional)</span>
         <textarea rows={3} maxLength={1_000} value={note} disabled={busy} onChange={(event) => setNote(event.target.value)}
-          placeholder={revision ? "Explain what changed in this version." : "Describe the design and floor plan."}
           className="mt-2 w-full resize-y rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15" />
       </label>
       <div className="mt-3 flex justify-end">

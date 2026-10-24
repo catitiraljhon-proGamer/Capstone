@@ -408,7 +408,6 @@ export function AdminUsersRolesManager() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, name: event.target.value }))
                 }
-                placeholder="Juan Dela Cruz"
                 className={fieldClass}
               />
             </label>
@@ -423,7 +422,6 @@ export function AdminUsersRolesManager() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, email: event.target.value }))
                 }
-                placeholder="name@example.com"
                 className={fieldClass}
               />
             </label>
@@ -483,9 +481,11 @@ export function AdminUsersRolesManager() {
                       password: event.target.value,
                     }))
                   }
-                  placeholder={editingUser ? "Leave unchanged" : "At least 8 characters"}
                   className={`${fieldClass} pl-9`}
                 />
+              </span>
+              <span className="mt-1 block text-xs font-normal text-stone-500">
+                {editingUser ? "Leave blank to keep the current password." : "At least 8 characters."}
               </span>
             </label>
 

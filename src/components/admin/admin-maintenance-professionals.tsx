@@ -377,7 +377,6 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               {...fieldProps("name")}
               value={values.name}
               maxLength={80}
-              placeholder="Arch. Juan Dela Cruz"
               onChange={(event) => set("name", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -404,7 +403,6 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               id="professional-specialization"
               value={values.specialization}
               maxLength={80}
-              placeholder={values.role === "Architect" ? "Residential design" : "Structural design"}
               onChange={(event) => set("specialization", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -417,7 +415,6 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               inputMode="numeric"
               value={values.licenseNumber}
               maxLength={10}
-              placeholder="0012345"
               onChange={(event) => set("licenseNumber", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -434,7 +431,6 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               max={70}
               step={1}
               value={values.yearsOfExperience}
-              placeholder="10"
               onChange={(event) => set("yearsOfExperience", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />
@@ -448,7 +444,6 @@ function ProfessionalForm({ editing, onClose, onSave }: {
               rows={4}
               value={values.bio}
               maxLength={maxBioLength}
-              placeholder="Education, background, and the kind of houses they design."
               onChange={(event) => set("bio", event.target.value)}
               aria-describedby="professional-bio-count"
               className={`mt-1.5 resize-y ${inputClass}`}

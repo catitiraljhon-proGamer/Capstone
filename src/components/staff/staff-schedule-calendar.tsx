@@ -51,8 +51,6 @@ const roleCopy: Record<StaffRole, {
   managed: ScheduleEventType;
   newLabel: string;
   formDescription: string;
-  titlePlaceholder: string;
-  notesPlaceholder: string;
   subtitle: string;
   emptyHint: string;
 }> = {
@@ -60,8 +58,6 @@ const roleCopy: Record<StaffRole, {
     managed: "Client meeting",
     newLabel: "New Meeting",
     formDescription: "Arrange a client meeting and record its agenda. The client is notified.",
-    titlePlaceholder: "Example: Contract review meeting",
-    notesPlaceholder: "Agenda, reminders, or preparation notes (staff only)",
     subtitle: "Client meetings and customer payment dates in one calendar.",
     emptyHint: "Use New Meeting above to add one to this date.",
   },
@@ -69,8 +65,6 @@ const roleCopy: Record<StaffRole, {
     managed: "Payment follow-up",
     newLabel: "New Follow-Up",
     formDescription: "Plan a call or reminder about a customer payment. Follow-ups are internal; customers do not see them.",
-    titlePlaceholder: "Example: Call about the downpayment",
-    notesPlaceholder: "What to discuss or check (staff only)",
     subtitle: "Customer payment dates, your follow-ups, and client meetings.",
     emptyHint: "Use New Follow-Up above to add one to this date.",
   },
@@ -270,7 +264,7 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
           <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Title
-              <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder={copy.titlePlaceholder} className={fieldClass} />
+              <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className={fieldClass} />
             </label>
             <div className="text-sm font-medium text-stone-700 sm:col-span-2">
               <label htmlFor="schedule-client">Client</label>
@@ -320,14 +314,13 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
               <input
                 value={form.location}
                 onChange={(event) => setForm({ ...form, location: event.target.value })}
-                placeholder={role === "admin" ? "Office, project site, or video-call link" : "Example: Phone call, Messenger, or email"}
                 className={fieldClass}
               />
             </label>
             {role === "admin" ? statusField : null}
             <label className="text-sm font-medium text-stone-700 sm:col-span-2">
-              Notes (optional)
-              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder={copy.notesPlaceholder} className={textareaClass} />
+              Notes (optional, staff only)
+              <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className={textareaClass} />
             </label>
             <div className="flex flex-wrap justify-end gap-3 sm:col-span-2">
               <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsFormOpen(false)}>Cancel</Button>

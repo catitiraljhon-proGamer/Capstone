@@ -516,7 +516,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
                 return (
                   <tr key={row.key} className="align-top">
                     <td className="min-w-64 px-2 py-2">
-                      <input aria-label={`Scope of work ${index + 1}`} maxLength={160} placeholder="Masonry works" className={inputClass} value={row.scope} onChange={(event) => updateLine(row.key, { scope: event.target.value })} {...field(scopeId, scopeMessage)} />
+                      <input aria-label={`Scope of work ${index + 1}`} maxLength={160} className={inputClass} value={row.scope} onChange={(event) => updateLine(row.key, { scope: event.target.value })} {...field(scopeId, scopeMessage)} />
                       <FieldError id={`${scopeId}-error`} message={scopeMessage} />
                     </td>
                     <td className="w-48 px-2 py-2">

@@ -190,7 +190,6 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
                 onBlur={() => setReasonTouched(true)}
                 aria-invalid={shownReasonError ? true : undefined}
                 aria-describedby={shownReasonError ? "estimate-revision-reason-error" : undefined}
-                placeholder="Example: Please use a lower-cost roofing material."
                 className={`${constructionFieldClass} aria-invalid:border-red-600`}
               />
               {shownReasonError

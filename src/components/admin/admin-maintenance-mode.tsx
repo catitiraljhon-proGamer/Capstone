@@ -147,12 +147,12 @@ export function AdminMaintenanceMode({ onError, onSuccess }: { onError: (message
         {duration === "custom" ? (
           <label className="block text-sm font-medium text-stone-700">
             Hours
-            <input required type="number" min="0.25" max="24" step="0.25" className={field} value={customHours} onChange={(event) => setCustomHours(event.target.value)} placeholder="Example: 1.5" />
+            <input required type="number" min="0.25" max="24" step="0.25" className={field} value={customHours} onChange={(event) => setCustomHours(event.target.value)} />
           </label>
         ) : null}
         <label className="block text-sm font-medium text-stone-700 md:col-span-2">
           Message to Users (optional)
-          <textarea maxLength={300} className={`${field} h-20 py-2`} value={message} onChange={(event) => setMessage(event.target.value)} placeholder="We're upgrading the payment system. Your records are safe." />
+          <textarea maxLength={300} className={`${field} h-20 py-2`} value={message} onChange={(event) => setMessage(event.target.value)} />
         </label>
       </div>
       <div className="mt-5 flex justify-end">

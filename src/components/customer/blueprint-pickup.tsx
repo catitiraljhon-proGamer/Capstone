@@ -162,7 +162,6 @@ export function BlueprintPickup({ design, onChanged }: { design: DesignRequestDt
             Note for the admin (optional)
             <input
               maxLength={500} value={details} disabled={busy} onChange={(event) => setDetails(event.target.value)}
-              placeholder="Example: My brother will pick it up for me."
               className={constructionFieldClass}
             />
           </label>

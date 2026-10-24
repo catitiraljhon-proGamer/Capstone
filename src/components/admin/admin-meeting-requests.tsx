@@ -109,7 +109,6 @@ function MeetingRequestCard({ request, onAnswered }: { request: MeetingRequestDt
           <input
             value={location}
             onChange={(event) => setLocation(event.target.value)}
-            placeholder={request.mode === "Online" ? "Enter video-call link" : "G4 Builders Inc office"}
             className={fieldClass}
             disabled={isSaving}
           />
@@ -122,7 +121,6 @@ function MeetingRequestCard({ request, onAnswered }: { request: MeetingRequestDt
           <textarea
             value={reason}
             onChange={(event) => setReason(event.target.value)}
-            placeholder="Example: Our office is closed that week. Please choose other dates."
             className="mt-1.5 min-h-20 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15"
             disabled={isSaving}
           />

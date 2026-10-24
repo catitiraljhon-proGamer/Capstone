@@ -456,7 +456,6 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setFloorArea(event.target.value)}
                   onBlur={() => touch("floorArea")}
                   required
-                  placeholder="Enter floor area"
                   {...describe("floorArea")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -478,7 +477,6 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setBedrooms(event.target.value)}
                   onBlur={() => touch("bedrooms")}
                   required
-                  placeholder={`0 to ${maxRoomCount} bedrooms`}
                   {...describe("bedrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -500,7 +498,6 @@ function DesignRequestForm({ houseDesignId }: {
                   onChange={(event) => setBathrooms(event.target.value)}
                   onBlur={() => touch("bathrooms")}
                   required
-                  placeholder={`0 to ${maxRoomCount} bathrooms`}
                   {...describe("bathrooms")}
                   className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-red-600 aria-invalid:border-red-600"
                 />
@@ -514,6 +511,9 @@ function DesignRequestForm({ houseDesignId }: {
           <div className="mt-5">
             <label className="block text-sm font-semibold">
               {hasDesignSelection ? "Preferred materials, items, or changes (optional)" : "Description"}
+              {hasDesignSelection ? (
+                <span className="mt-1 block text-xs font-normal text-stone-500">Leave blank to request the design as shown.</span>
+              ) : null}
               <textarea
                 id={fieldIds.notes}
                 rows={5}
@@ -522,7 +522,6 @@ function DesignRequestForm({ houseDesignId }: {
                 onBlur={() => touch("notes")}
                 required={!hasDesignSelection}
                 maxLength={4000}
-                placeholder={hasDesignSelection ? "Leave blank to request the design as shown, or suggest what you want, such as stone-coated steel roofing, uPVC windows, a solid wood entry door, or a perimeter fence." : "Describe the style, layout, preferred materials, colors, and budget concerns."}
                 {...describe("notes")}
                 className="mt-2 w-full resize-none rounded-lg border border-stone-200 px-3 py-3 text-sm font-normal outline-none placeholder:text-stone-400 focus:border-red-600 aria-invalid:border-red-600"
               />

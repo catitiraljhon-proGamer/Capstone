@@ -523,7 +523,6 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.name),
                   )}
-                  placeholder="Modern Courtyard"
                 />
               </Field>
 
@@ -569,7 +568,6 @@ export function HouseDesignForm({
                   value={style}
                   onChange={(event) => setStyle(event.target.value)}
                   aria-describedby="design-style-hint"
-                  placeholder="Two-storey, corner lot"
                 />
               </Field>
 
@@ -596,7 +594,6 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.area),
                   )}
-                  placeholder="150"
                 />
               </Field>
 
@@ -626,7 +623,6 @@ export function HouseDesignForm({
                     true,
                     Boolean(errors.cost),
                   )}
-                  placeholder="6000000"
                 />
               </Field>
 
@@ -654,7 +650,6 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.bedrooms),
                   )}
-                  placeholder="3"
                 />
               </Field>
 
@@ -682,7 +677,6 @@ export function HouseDesignForm({
                     false,
                     Boolean(errors.bathrooms),
                   )}
-                  placeholder="2"
                 />
               </Field>
 
@@ -744,7 +738,6 @@ export function HouseDesignForm({
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   aria-describedby="design-notes-hint"
-                  placeholder="Clean layout for subdivision-ready residential builds."
                 />
               </Field>
             </div>
@@ -807,7 +800,6 @@ export function HouseDesignForm({
                                 item: event.target.value,
                               })
                             }
-                            placeholder="Perimeter fence"
                           />
                         </Field>
                         <Field
@@ -826,7 +818,6 @@ export function HouseDesignForm({
                                 material: event.target.value,
                               })
                             }
-                            placeholder="CHB with steel gate"
                           />
                         </Field>
                         <Field
@@ -845,7 +836,6 @@ export function HouseDesignForm({
                                 unit: event.target.value,
                               })
                             }
-                            placeholder="sqm, lm, set"
                           />
                         </Field>
                         <Field
