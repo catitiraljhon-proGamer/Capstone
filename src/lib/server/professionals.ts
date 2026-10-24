@@ -26,13 +26,13 @@ const seededId = "professionals-seeded";
 const professionalsCollection = (db: Db) => db.collection<ProfessionalDocument>(collections.professionals);
 const designsCollection = (db: Db) => db.collection<HouseDesignDocument>(collections.houseDesigns);
 
-const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/, "Choose an architect or engineer from the list.");
+const objectIdSchema = z.string().regex(/^[a-f0-9]{24}$/, "Choose a team member from the list.");
 
 const profileSchema = z.object({
   name: z.string().trim()
-    .min(3, "Enter the full name with the title, such as Arch. or Engr.")
+    .min(3, "Enter the full name.")
     .max(80, "Keep the name under 80 characters."),
-  role: z.enum(professionalRoles, { error: "Choose Architect or Engineer." }),
+  role: z.enum(professionalRoles, { error: "Choose a profession from the list." }),
   specialization: z.string().trim().max(80, "Keep the specialization under 80 characters."),
   licenseNumber: z.string().trim().regex(/^\d{0,10}$/, "Enter the PRC license number using digits only, up to 10."),
   yearsOfExperience: z.number({ error: "Enter the years of experience as a number." })
@@ -65,11 +65,11 @@ const fieldLabels: Record<keyof ProfessionalInput, string> = {
 };
 
 function requireAdmin(actor: SessionUser) {
-  if (actor.role !== "admin") throw new MaintenanceError("Only the Admin can change the architects and engineers.", 403);
+  if (actor.role !== "admin") throw new MaintenanceError("Only the Admin can change the team.", 403);
 }
 
 /**
- * The first read adds the starting architects and engineers once. After that the Admin's list is kept as it is,
+ * The first read adds the starting team once. After that the Admin's list is kept as it is,
  * even when every person was removed.
  */
 async function addStartingProfessionals(db: Db) {
@@ -148,7 +148,7 @@ export async function getManagedProfessionals(db: Db, actor: SessionUser) {
 async function findProfessional(db: Db, rawId: unknown) {
   const id = objectIdSchema.safeParse(rawId);
   const document = id.success ? await professionalsCollection(db).findOne({ _id: new ObjectId(id.data) }) : null;
-  if (!document) throw new MaintenanceError("This architect or engineer was removed. Reload the page.", 404);
+  if (!document) throw new MaintenanceError("This team member was removed. Reload the page.", 404);
   return document;
 }
 
@@ -165,7 +165,7 @@ export async function createProfessional(db: Db, actor: SessionUser, raw: unknow
   };
   await professionalsCollection(db).insertOne(document);
   await recordAuditLog({
-    db, actor, action: "Added an architect or engineer", entityType: "Professional", entityId: document._id, createdAt: now,
+    db, actor, action: "Added a team member", entityType: "Professional", entityId: document._id, createdAt: now,
     details: { Name: document.name, Profession: document.role },
   });
   return readProfessionals(db);
@@ -179,7 +179,7 @@ export async function updateProfessional(db: Db, actor: SessionUser, rawId: unkn
   if (changed.length) {
     await professionalsCollection(db).updateOne({ _id: current._id }, { $set: { ...changes, updatedAt: now } });
     await recordAuditLog({
-      db, actor, action: "Updated an architect or engineer", entityType: "Professional", entityId: current._id, createdAt: now,
+      db, actor, action: "Updated a team member", entityType: "Professional", entityId: current._id, createdAt: now,
       details: { Name: changes.name ?? current.name, Changed: changed.map((key) => fieldLabels[key]).join(", ") },
     });
   }
@@ -193,7 +193,7 @@ export async function removeProfessional(db: Db, actor: SessionUser, rawId: unkn
   await professionalsCollection(db).deleteOne({ _id: current._id });
   await designsCollection(db).updateMany({ designedBy: current._id }, { $unset: { designedBy: "" } });
   await recordAuditLog({
-    db, actor, action: "Removed an architect or engineer", entityType: "Professional", entityId: current._id, createdAt: now,
+    db, actor, action: "Removed a team member", entityType: "Professional", entityId: current._id, createdAt: now,
     details: { Name: current.name, Profession: current.role },
   });
   return readProfessionals(db);
@@ -212,7 +212,7 @@ export async function reorderProfessionals(db: Db, actor: SessionUser, raw: unkn
     await professionalsCollection(db).bulkWrite(ids.map((id, order) => ({
       updateOne: { filter: { _id: new ObjectId(id) }, update: { $set: { order, updatedAt: now } } },
     })));
-    await recordAuditLog({ db, actor, action: "Reordered the architects and engineers", entityType: "Professional", createdAt: now });
+    await recordAuditLog({ db, actor, action: "Reordered the team", entityType: "Professional", createdAt: now });
   }
   return readProfessionals(db);
 }
@@ -220,7 +220,7 @@ export async function reorderProfessionals(db: Db, actor: SessionUser, raw: unkn
 /** The newest Published designs credited to a person shown on About Us, one cover photo each. */
 export async function getProfessionalDesigns(db: Db, rawId: unknown): Promise<ProfessionalDesign[]> {
   const professional = await findProfessional(db, rawId);
-  if (!professional.visible) throw new MaintenanceError("This architect or engineer was removed. Reload the page.", 404);
+  if (!professional.visible) throw new MaintenanceError("This team member was removed. Reload the page.", 404);
   const designs = await designsCollection(db)
     .find(
       { status: "Published", designedBy: professional._id, "images.0": { $exists: true } },
@@ -235,6 +235,6 @@ export async function getProfessionalDesigns(db: Db, rawId: unknown): Promise<Pr
 /** The person a house design is credited to; throws when the id does not name anyone in the list. */
 export async function requireProfessionalId(db: Db, rawId: string) {
   const document = await findProfessional(db, rawId).catch(() => null);
-  if (!document) throw new MaintenanceError("The chosen architect or engineer was removed. Choose another one under Designed By.");
+  if (!document) throw new MaintenanceError("The chosen team member was removed. Choose another one under Designed By.");
   return document._id;
 }

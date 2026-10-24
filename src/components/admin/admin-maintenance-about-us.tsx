@@ -28,7 +28,7 @@ function firstProblem(content: AboutUsContent): { message: string; fieldId: stri
   return null;
 }
 
-/** Maintenance > About Us: the page text, then the architects and engineers listed on it. */
+/** Maintenance > About Us: the page text, then the team listed on it. */
 export function AdminMaintenanceAboutUs({ onError, onSuccess }: {
   onError: (message: string | null) => void;
   onSuccess: (message: string | null) => void;

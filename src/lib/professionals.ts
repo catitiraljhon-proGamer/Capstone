@@ -1,5 +1,5 @@
-/** The architects and engineers on the About Us page (Maintenance > Architects and Engineers). */
-export const professionalRoles = ["Architect", "Engineer"] as const;
+/** The G4 team on the About Us page, by profession (Maintenance > About Us). */
+export const professionalRoles = ["Architect", "Engineer", "Designer", "Contractor"] as const;
 export type ProfessionalRole = (typeof professionalRoles)[number];
 
 /** Photos are cropped square and shrunk to this many pixels on each side before they are saved. */

@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 const roleTint: Record<ProfessionalRole, string> = {
   Architect: "bg-rose-50 text-red-700",
   Engineer: "bg-stone-100 text-stone-600",
+  Designer: "bg-rose-100 text-rose-800",
+  Contractor: "bg-stone-200 text-stone-700",
 };
 
 /** The person's square photo, or their initials on a tint when no photo was uploaded. Size it with `className`. */
@@ -33,7 +35,7 @@ export function ProfessionalPhoto({
   );
 }
 
-/** "Architect" or "Engineer" as a small tag. */
+/** The person's profession as a small tag. */
 export function ProfessionalRoleBadge({ role }: { role: ProfessionalRole }) {
   return (
     <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-semibold", roleTint[role])}>

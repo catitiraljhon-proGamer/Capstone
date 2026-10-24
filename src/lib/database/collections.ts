@@ -117,7 +117,7 @@ export type HouseDesignDocument = {
   notes: string;
   status: HouseDesignStatus;
   customItems: CustomExteriorItem[];
-  /** The architect or engineer the design is credited to on the About Us page. */
+  /** The team member the design is credited to on the About Us page. */
   designedBy?: ObjectId;
   /** The completed project this design was created from, with a snapshot of its accepted estimate. */
   sourceProject?: {
@@ -584,7 +584,7 @@ export type HomeSlideshowDocument = {
   updatedAt: Date;
 };
 
-/** An architect or engineer on the About Us page, in the Admin's order (Maintenance > Architects and Engineers). */
+/** A team member on the About Us page, in the Admin's order (Maintenance > About Us). */
 export type ProfessionalDocument = {
   _id: ObjectId;
   name: string;
@@ -608,7 +608,7 @@ export type AboutUsDocument = {
   updatedAt: Date;
 };
 
-/** Written once the starting architects and engineers were added, so a list the Admin emptied stays empty. */
+/** Written once the starting team was added, so a list the Admin emptied stays empty. */
 export type ProfessionalsSeedDocument = {
   _id: "professionals-seeded";
   seededAt: Date;

@@ -271,7 +271,7 @@ test("the Admin edits the About Us text; the built-in text shows until then", as
   assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
 });
 
-test("the Admin keeps the About Us architects and engineers, and designs are credited to them", async () => {
+test("the Admin keeps the About Us team, and designs are credited to them", async () => {
   // The first read adds the starting list once.
   assert.deepEqual((await getAboutUsProfessionals(db)).map((person) => [person.name, person.role]), [
     ["Arch. Sherwin Macalalad", "Architect"],
@@ -286,14 +286,18 @@ test("the Admin keeps the About Us architects and engineers, and designs are cre
   };
   await assert.rejects(createProfessional(db, clerk, input), isStatus(403));
   for (const bad of [
-    { ...input, role: "Contractor" }, { ...input, licenseNumber: "12-34" }, { ...input, name: "A" },
+    { ...input, role: "Plumber" }, { ...input, licenseNumber: "12-34" }, { ...input, name: "A" },
     { ...input, photo: "https://example.test/photo.jpg" }, { ...input, yearsOfExperience: 2.5 }, { ...input, extra: true },
   ]) {
     await assert.rejects(createProfessional(db, admin, bad), ZodError);
   }
+  // Designers and contractors are listed too.
+  for (const role of ["Designer", "Contractor"]) {
+    assert.equal((await createProfessional(db, admin, { ...input, name: `Test ${role}`, role })).at(-1)?.role, role);
+  }
   let list = await createProfessional(db, admin, input);
   const added = list.at(-1)!;
-  assert.equal(list.length, 4);
+  assert.equal(list.length, 6);
   assert.deepEqual({ ...added, id: "" }, { ...input, id: "", designCount: 0 });
 
   // A Published design credited to the person counts and shows in their profile, cover photo only.
@@ -305,9 +309,9 @@ test("the Admin keeps the About Us architects and engineers, and designs are cre
 
   // Hidden people leave the About Us page, and so do their designs.
   list = await updateProfessional(db, admin, added.id, { visible: false });
-  assert.equal((await getAboutUsProfessionals(db)).length, 3);
+  assert.equal((await getAboutUsProfessionals(db)).length, 5);
   await assert.rejects(getProfessionalDesigns(db, added.id), isStatus(404));
-  assert.ok(await db.collection("audit_logs").findOne({ action: "Updated an architect or engineer", "details.Changed": "Shown on About Us" }));
+  assert.ok(await db.collection("audit_logs").findOne({ action: "Updated a team member", "details.Changed": "Shown on About Us" }));
 
   // The order needs every person exactly once.
   const ids = list.map((person) => person.id);

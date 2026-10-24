@@ -53,7 +53,7 @@ function toFormValues(professional: ManagedProfessional): FormValues {
 
 function validate(values: FormValues): FormErrors {
   const errors: FormErrors = {};
-  if (values.name.trim().length < 3) errors.name = "Enter the full name with the title, such as Arch. or Engr.";
+  if (values.name.trim().length < 3) errors.name = "Enter the full name.";
   if (!/^\d{0,10}$/.test(values.licenseNumber.trim())) errors.licenseNumber = "Enter the PRC license number using digits only, up to 10.";
   const years = values.yearsOfExperience.trim();
   if (years && (!/^\d+$/.test(years) || Number(years) > 70)) errors.yearsOfExperience = "Enter whole years from 0 to 70.";
@@ -94,13 +94,13 @@ export function AdminMaintenanceProfessionals({ onError, onSuccess }: {
     fetch("/api/maintenance/professionals", { cache: "no-store" })
       .then(async (response) => {
         const payload = (await response.json().catch(() => ({}))) as { professionals?: ManagedProfessional[]; error?: string };
-        if (!response.ok || !payload.professionals) throw new Error(payload.error ?? "Unable to load the architects and engineers.");
+        if (!response.ok || !payload.professionals) throw new Error(payload.error ?? "Unable to load the team.");
         if (active) setProfessionals(payload.professionals);
       })
       .catch((loadError: unknown) => {
         if (!active) return;
         setLoadFailed(true);
-        onError(loadError instanceof Error ? loadError.message : "Unable to load the architects and engineers.");
+        onError(loadError instanceof Error ? loadError.message : "Unable to load the team.");
       });
     return () => {
       active = false;
@@ -108,7 +108,7 @@ export function AdminMaintenanceProfessionals({ onError, onSuccess }: {
   }, [onError]);
 
   if (!professionals) {
-    return <div className={`${panel} text-sm text-stone-500`}>{loadFailed ? "The architects and engineers are unavailable." : "Loading the architects and engineers…"}</div>;
+    return <div className={`${panel} text-sm text-stone-500`}>{loadFailed ? "The team is unavailable." : "Loading the team…"}</div>;
   }
 
   /** Runs one change; the server answers with the updated list. */
@@ -142,9 +142,9 @@ export function AdminMaintenanceProfessionals({ onError, onSuccess }: {
       <section className={panel}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 max-w-2xl">
-            <h2 className="text-base font-semibold tracking-tight">Architects and Engineers</h2>
+            <h2 className="text-base font-semibold tracking-tight">Our Team</h2>
             <p className="mt-1 text-sm text-stone-600">
-              The people listed on the About Us page, in this order. Hidden people stay here but are left off the page.
+              The architects, engineers, designers, and contractors listed on the About Us page, in this order. Hidden people stay here but are left off the page.
               To list a house design under someone, choose them under Designed By when you edit the design.
             </p>
           </div>
@@ -239,7 +239,7 @@ export function AdminMaintenanceProfessionals({ onError, onSuccess }: {
           </ol>
         ) : (
           <p className="mt-3 rounded-lg border border-dashed border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-600">
-            No one is listed yet, so the About Us page leaves this section out. Add an architect or engineer to show it.
+            No one is listed yet, so the About Us page leaves this section out. Add a team member to show it.
           </p>
         )}
       </section>
@@ -330,7 +330,7 @@ function ProfessionalForm({ editing, onClose, onSave }: {
 
   return (
     <FormDialog
-      title={editing.mode === "add" ? "Add Architect or Engineer" : `Edit ${editing.professional.name}`}
+      title={editing.mode === "add" ? "Add Team Member" : `Edit ${editing.professional.name}`}
       description="Shown on the About Us page. Only the name and profession are required."
       error={saveError}
       busy={isSaving}
@@ -371,13 +371,14 @@ function ProfessionalForm({ editing, onClose, onSave }: {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label htmlFor="professional-name" className="text-sm font-medium text-stone-950">
-              Full Name With Title <RequiredIndicator />
+              Full Name <RequiredIndicator />
             </label>
+            <p className="text-xs text-stone-500">Include the title, if any, such as Arch. or Engr.</p>
             <input
               {...fieldProps("name")}
               value={values.name}
               maxLength={80}
-              placeholder="Enter full name with title"
+              placeholder="Enter full name"
               onChange={(event) => set("name", event.target.value)}
               className={`mt-1.5 ${inputClass}`}
             />

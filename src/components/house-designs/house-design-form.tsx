@@ -247,7 +247,7 @@ export function HouseDesignForm({
   design?: HouseDesign | null;
   defaultHouseType?: string | null;
   houseTypes: HouseType[];
-  /** The architects and engineers a design can be credited to (Maintenance > Architects and Engineers). */
+  /** The team members a design can be credited to (Maintenance > About Us). */
   professionals: ManagedProfessional[];
   existingNames: string[];
   onCancel: () => void;

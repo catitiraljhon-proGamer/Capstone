@@ -9,7 +9,13 @@ import { useEffect, useState } from "react";
 
 type Filter = "All" | ProfessionalRole;
 
-const filterLabels: Record<Filter, string> = { All: "All", Architect: "Architects", Engineer: "Engineers" };
+const filterLabels: Record<Filter, string> = {
+  All: "All",
+  Architect: "Architects",
+  Engineer: "Engineers",
+  Designer: "Designers",
+  Contractor: "Contractors",
+};
 
 const designCountLabel = (count: number) => `${count} published design${count === 1 ? "" : "s"}`;
 
@@ -21,7 +27,7 @@ function credentials(professional: Professional) {
   ].filter(Boolean).join(" · ");
 }
 
-/** The architects and engineers the Admin lists in Maintenance; each card opens the person's profile. */
+/** The team the Admin lists in Maintenance; each card opens the person's profile. Only professions with people get a filter. */
 export function AboutProfessionals({ professionals }: { professionals: Professional[] }) {
   const [filter, setFilter] = useState<Filter>("All");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -34,8 +40,10 @@ export function AboutProfessionals({ professionals }: { professionals: Professio
 
   return (
     <section aria-labelledby="about-professionals" className="mt-10">
-      <h2 id="about-professionals" className="text-lg font-semibold tracking-tight">Our Architects and Engineers</h2>
-      <p className="mt-1 text-sm leading-6 text-stone-600">The people who design, check, and build every G4 house.</p>
+      <h2 id="about-professionals" className="text-lg font-semibold tracking-tight">Our Team</h2>
+      <p className="mt-1 text-sm leading-6 text-stone-600">
+        The architects, engineers, designers, and contractors who design and build every G4 house.
+      </p>
 
       {roles.length > 1 ? (
         <div role="group" aria-label="Show" className="mt-4 flex flex-wrap gap-2">

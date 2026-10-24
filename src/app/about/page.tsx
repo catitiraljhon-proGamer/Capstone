@@ -22,7 +22,7 @@ export default async function AboutPage() {
     const db = await getDatabase();
     [content, professionals] = await Promise.all([getAboutUsContent(db), getAboutUsProfessionals(db)]);
   } catch (error) {
-    // Without the database the page still shows the built-in text, just without the architects and engineers.
+    // Without the database the page still shows the built-in text, just without the team.
     console.error("Unable to load the About Us page", { errorType: error instanceof Error ? error.name : "UnknownError" });
   }
   return <AboutUsPage content={content} professionals={professionals} />;

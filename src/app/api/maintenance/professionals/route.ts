@@ -12,7 +12,7 @@ function failure(error: unknown) {
   return apiError(error);
 }
 
-/** Admin only: every architect and engineer, hidden ones included. */
+/** Admin only: every team member, hidden ones included. */
 export async function GET() {
   try {
     const session = await readSession();
