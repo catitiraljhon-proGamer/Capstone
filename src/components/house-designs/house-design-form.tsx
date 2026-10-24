@@ -19,6 +19,7 @@ import {
   createCustomItemId,
   type NewHouseDesignInput,
 } from "@/lib/house-design-store";
+import type { ManagedProfessional } from "@/lib/professionals";
 import { AlertCircle, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -237,6 +238,7 @@ export function HouseDesignForm({
   design,
   defaultHouseType,
   houseTypes,
+  professionals,
   existingNames,
   onCancel,
   onSubmit,
@@ -245,6 +247,8 @@ export function HouseDesignForm({
   design?: HouseDesign | null;
   defaultHouseType?: string | null;
   houseTypes: HouseType[];
+  /** The architects and engineers a design can be credited to (Maintenance > Architects and Engineers). */
+  professionals: ManagedProfessional[];
   existingNames: string[];
   onCancel: () => void;
   onSubmit: (design: NewHouseDesignInput) => void;
@@ -265,6 +269,7 @@ export function HouseDesignForm({
     design?.status ?? "Draft",
   );
   const [notes, setNotes] = useState(design?.notes ?? "");
+  const [designedBy, setDesignedBy] = useState(design?.designedBy ?? "");
   const [images, setImages] = useState<string[]>(design?.images ?? []);
   const [customItems, setCustomItems] = useState<CustomItemDraft[]>(() =>
     (design?.customItems ?? []).map((item) => ({
@@ -443,6 +448,7 @@ export function HouseDesignForm({
       notes: notes.trim(),
       status,
       customItems: customItems.map(toCustomItem),
+      designedBy: designedBy || null,
     });
   };
 
@@ -698,6 +704,28 @@ export function HouseDesignForm({
                   <option value="Draft">Draft</option>
                   <option value="Published">Published</option>
                   {isEditing ? <option value="Archived">Archived</option> : null}
+                </select>
+              </Field>
+
+              <Field
+                htmlFor="design-designed-by"
+                label="Designed By"
+                hint="Optional. The About Us page lists the design under this person once it is published."
+              >
+                <select
+                  id="design-designed-by"
+                  name="designedBy"
+                  className={inputClass}
+                  value={designedBy}
+                  onChange={(event) => setDesignedBy(event.target.value)}
+                  aria-describedby="design-designed-by-hint"
+                >
+                  <option value="">Not set</option>
+                  {professionals.map((professional) => (
+                    <option key={professional.id} value={professional.id}>
+                      {professional.name} ({professional.role}){professional.visible ? "" : ", hidden"}
+                    </option>
+                  ))}
                 </select>
               </Field>
             </div>

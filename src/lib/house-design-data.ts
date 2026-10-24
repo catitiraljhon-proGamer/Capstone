@@ -82,6 +82,8 @@ export type HouseDesign = {
   notes: string;
   status: HouseDesignStatus;
   customItems: CustomExteriorItem[];
+  /** Id of the architect or engineer the design is credited to on the About Us page. */
+  designedBy?: string;
   /** Set on designs created automatically when a construction project is completed. */
   sourceProject?: CompletedProjectSource;
   createdAt: string;

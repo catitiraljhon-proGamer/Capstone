@@ -1,4 +1,6 @@
+import { AboutProfessionals } from "@/components/landing/about-professionals";
 import { PublicHeader } from "@/components/landing/public-header";
+import type { Professional } from "@/lib/professionals";
 import { Calculator, FileText, HardHat, House, type LucideIcon } from "lucide-react";
 
 const services: { icon: LucideIcon; title: string; text: string }[] = [
@@ -8,7 +10,7 @@ const services: { icon: LucideIcon; title: string; text: string }[] = [
   { icon: HardHat, title: "Construction", text: "We build your house and bill by stage, so you pay as the work progresses." },
 ];
 
-export function AboutUsPage() {
+export function AboutUsPage({ professionals }: { professionals: Professional[] }) {
   return (
     <div className="min-h-screen bg-white text-stone-950">
       <PublicHeader />
@@ -37,6 +39,8 @@ export function AboutUsPage() {
             ))}
           </ul>
         </section>
+
+        <AboutProfessionals professionals={professionals} />
       </main>
     </div>
   );

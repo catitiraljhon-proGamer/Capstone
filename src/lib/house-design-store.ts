@@ -8,10 +8,11 @@ import type {
 } from "@/lib/house-design-data";
 import { useCallback, useEffect, useState } from "react";
 
+/** `designedBy: null` clears who the design is credited to. */
 export type NewHouseDesignInput = Omit<
   HouseDesign,
-  "id" | "rooms" | "createdAt" | "createdBy" | "sourceProject"
->;
+  "id" | "rooms" | "createdAt" | "createdBy" | "sourceProject" | "designedBy"
+> & { designedBy?: string | null };
 
 const emptyCatalog: HouseDesignCatalog = {
   houseTypes: [],

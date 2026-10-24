@@ -16,6 +16,7 @@ import { useDesignNavigation } from "@/lib/use-design-navigation";
 import { HouseDesignSpecs } from "@/components/house-designs/house-design-specs";
 import { AdminSectionPage } from "@/components/staff/staff-dashboard";
 import { useHouseDesigns } from "@/lib/house-design-store";
+import type { ManagedProfessional } from "@/lib/professionals";
 import {
   AlertCircle,
   ArchiveRestore,
@@ -25,7 +26,7 @@ import {
   ImageOff,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Step = "types" | "designs" | "create" | "details" | "edit";
 
@@ -245,11 +246,27 @@ export function AdminHouseDesignManager() {
   const [showArchived, setShowArchived] = useState(false);
   const [isConfirmingArchive, setIsConfirmingArchive] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  /** For the Designed By list; empty when it could not be loaded, which leaves designs uncredited. */
+  const [professionals, setProfessionals] = useState<ManagedProfessional[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/maintenance/professionals", { cache: "no-store" })
+      .then((response) => (response.ok ? (response.json() as Promise<{ professionals: ManagedProfessional[] }>) : { professionals: [] }))
+      .then((payload) => {
+        if (active) setProfessionals(payload.professionals);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const selectedHouseType =
     selectedGroup?.kind === "house-type" ? selectedGroup.houseType : null;
   const selectedDesign =
     designs.find((design) => design.id === selectedDesignId) ?? null;
+  const designer = professionals.find((professional) => professional.id === selectedDesign?.designedBy);
   const offeredTypes = new Set(catalog.houseTypes.map((houseType) => houseType.heading));
   const filteredDesigns = designs.filter(
     (design) =>
@@ -410,6 +427,7 @@ export function AdminHouseDesignManager() {
           defaultHouseType={selectedHouseType}
           existingNames={designs.map((design) => design.name)}
           houseTypes={catalog.houseTypes}
+          professionals={professionals}
           onCancel={() => goToStep("designs")}
           onSubmit={async (draft) => {
             try {
@@ -436,6 +454,7 @@ export function AdminHouseDesignManager() {
             .filter((design) => design.id !== selectedDesign.id)
             .map((design) => design.name)}
           houseTypes={catalog.houseTypes}
+          professionals={professionals}
           onCancel={() => goToStep("details")}
           onSubmit={async (changes) => {
             try {
@@ -661,6 +680,9 @@ export function AdminHouseDesignManager() {
                 Added by {selectedDesign.createdBy} on{" "}
                 {new Date(selectedDesign.createdAt).toLocaleDateString("en-PH")}
               </p>
+              {designer ? (
+                <p className="mt-1 text-xs text-stone-600">Designed by {designer.name}</p>
+              ) : null}
             </div>
             <div className="rounded-xl border border-stone-200 bg-white p-5 text-right shadow-sm">
               <p className="text-sm font-semibold text-stone-600">

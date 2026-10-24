@@ -24,6 +24,7 @@ import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 import type { SettingKey, SystemSettings } from "@/lib/system-settings";
 import type { ContactDetails, ContactField } from "@/lib/contact-details";
 import type { AccountTermsContent } from "@/lib/account-terms";
+import type { ProfessionalRole } from "@/lib/professionals";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -52,6 +53,7 @@ export const collections = {
   rateLimits: "rate_limits",
   emailVerifications: "email_verifications",
   backupUploads: "backup_uploads",
+  professionals: "professionals",
 } as const;
 
 export type UserDocument = {
@@ -114,6 +116,8 @@ export type HouseDesignDocument = {
   notes: string;
   status: HouseDesignStatus;
   customItems: CustomExteriorItem[];
+  /** The architect or engineer the design is credited to on the About Us page. */
+  designedBy?: ObjectId;
   /** The completed project this design was created from, with a snapshot of its accepted estimate. */
   sourceProject?: {
     projectId: ObjectId;
@@ -577,6 +581,28 @@ export type HomeSlideshowDocument = {
   designIds: ObjectId[];
   changedBy: string;
   updatedAt: Date;
+};
+
+/** An architect or engineer on the About Us page, in the Admin's order (Maintenance > Architects and Engineers). */
+export type ProfessionalDocument = {
+  _id: ObjectId;
+  name: string;
+  role: ProfessionalRole;
+  specialization: string;
+  licenseNumber: string;
+  yearsOfExperience: number | null;
+  bio: string;
+  photo: string;
+  visible: boolean;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Written once the starting architects and engineers were added, so a list the Admin emptied stays empty. */
+export type ProfessionalsSeedDocument = {
+  _id: "professionals-seeded";
+  seededAt: Date;
 };
 
 export type MaintenanceModeDocument = {

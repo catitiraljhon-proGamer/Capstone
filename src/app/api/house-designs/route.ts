@@ -9,6 +9,8 @@ import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { canViewFullDesignImages } from "@/lib/server/account-terms";
 import { syncCompletedProjectDesigns } from "@/lib/server/completed-project-designs";
 import { houseDesignInputSchema, toHouseDesignDto } from "@/lib/server/house-designs";
+import { MaintenanceError } from "@/lib/server/maintenance";
+import { requireProfessionalId } from "@/lib/server/professionals";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -55,12 +57,13 @@ export async function POST(request: Request) {
     if (!session) return unauthorized();
     if (session.role !== "admin") return forbidden();
 
-    const input = houseDesignInputSchema.parse(await request.json());
+    const { designedBy, ...input } = houseDesignInputSchema.parse(await request.json());
     const db = await getDatabase();
     const now = new Date();
     const document: HouseDesignDocument = {
       _id: new ObjectId(),
       ...input,
+      ...(designedBy ? { designedBy: await requireProfessionalId(db, designedBy) } : {}),
       rooms: formatRoomSetup(input.bedrooms, input.bathrooms),
       createdAt: now,
       createdBy: new ObjectId(session.id),
@@ -83,6 +86,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ design: toHouseDesignDto(document, { includeSource: true }) }, { status: 201 });
   } catch (error) {
+    if (error instanceof MaintenanceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return apiError(error);
   }
 }

@@ -11,12 +11,12 @@ const sessionCookieName = "g4_session";
 /** Roles locked out while maintenance mode is on; the Admin keeps full access. */
 const pausedRoles = new Set<UserRole>(["customer", "billing-clerk"]);
 /**
- * Signing in or out, reading the maintenance status, the public settings, Contact Us, the terms, and the home page
- * slideshow keep working during maintenance.
+ * Signing in or out, reading the maintenance status, the public settings, Contact Us, the terms, the home page
+ * slideshow, and the About Us designs keep working during maintenance.
  */
 const openApiPrefixes = [
   "/api/auth/", "/api/maintenance/mode", "/api/settings/public", "/api/settings/contact", "/api/settings/terms",
-  "/api/settings/home-slideshow",
+  "/api/settings/home-slideshow", "/api/public/professionals/",
 ];
 
 function requiredRole(pathname: string): UserRole | null {

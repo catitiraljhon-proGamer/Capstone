@@ -30,6 +30,16 @@ import { readMaintenanceMode } from "@/lib/server/maintenance-mode";
 import { getContactDetails, updateContactDetails } from "@/lib/server/contact-details";
 import { defaultContactDetails, phoneHref } from "@/lib/contact-details";
 import { getHomeSlides, updateHomeSlideshow } from "@/lib/server/home-slideshow";
+import {
+  createProfessional,
+  getAboutUsProfessionals,
+  getManagedProfessionals,
+  getProfessionalDesigns,
+  removeProfessional,
+  reorderProfessionals,
+  requireProfessionalId,
+  updateProfessional,
+} from "@/lib/server/professionals";
 import { accountTerms, termsText, type AccountTermsContent } from "@/lib/account-terms";
 import {
   acceptAccountTerms,
@@ -61,7 +71,7 @@ beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_maintenance_tests");
   backupFolder = await mkdtemp(path.join(tmpdir(), "g4-backups-"));
   process.env.BACKUP_LOCAL_DIR = backupFolder;
-  await Promise.all(["house_designs", "audit_logs", "rate_limits", "system_settings", "users", "backup_uploads"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["house_designs", "audit_logs", "rate_limits", "system_settings", "users", "backup_uploads", "professionals"].map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([admin, clerk].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active" as const,
@@ -226,6 +236,58 @@ test("the Admin picks the home page slideshow designs in order, and unpublished 
   assert.deepEqual(await names(), ["Design 5", "Design 4", "Design 3", "Design 2"]);
   // The other settings stored beside the slideshow are untouched.
   assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+});
+
+test("the Admin keeps the About Us architects and engineers, and designs are credited to them", async () => {
+  // The first read adds the starting list once.
+  assert.deepEqual((await getAboutUsProfessionals(db)).map((person) => [person.name, person.role]), [
+    ["Arch. Sherwin Macalalad", "Architect"],
+    ["Arch. Marlo Baral Diaz", "Architect"],
+    ["Engr. Gina R. Abellar", "Engineer"],
+  ]);
+  await assert.rejects(getManagedProfessionals(db, clerk), isStatus(403));
+
+  const input = {
+    name: "Engr. Test Person", role: "Engineer", specialization: "Structural design", licenseNumber: "0123456",
+    yearsOfExperience: 9, bio: "Checks every structural plan.", photo: "", visible: true,
+  };
+  await assert.rejects(createProfessional(db, clerk, input), isStatus(403));
+  for (const bad of [
+    { ...input, role: "Contractor" }, { ...input, licenseNumber: "12-34" }, { ...input, name: "A" },
+    { ...input, photo: "https://example.test/photo.jpg" }, { ...input, yearsOfExperience: 2.5 }, { ...input, extra: true },
+  ]) {
+    await assert.rejects(createProfessional(db, admin, bad), ZodError);
+  }
+  let list = await createProfessional(db, admin, input);
+  const added = list.at(-1)!;
+  assert.equal(list.length, 4);
+  assert.deepEqual({ ...added, id: "" }, { ...input, id: "", designCount: 0 });
+
+  // A Published design credited to the person counts and shows in their profile, cover photo only.
+  await db.collection<HouseDesignDocument>("house_designs").updateOne({ _id: designId }, { $set: { designedBy: new ObjectId(added.id) } });
+  assert.equal((await getAboutUsProfessionals(db)).at(-1)?.designCount, 1);
+  assert.deepEqual(await getProfessionalDesigns(db, added.id), [
+    { designId: designId.toHexString(), name: "Test design", image: "https://example.test/design.jpg" },
+  ]);
+
+  // Hidden people leave the About Us page, and so do their designs.
+  list = await updateProfessional(db, admin, added.id, { visible: false });
+  assert.equal((await getAboutUsProfessionals(db)).length, 3);
+  await assert.rejects(getProfessionalDesigns(db, added.id), isStatus(404));
+  assert.ok(await db.collection("audit_logs").findOne({ action: "Updated an architect or engineer", "details.Changed": "Shown on About Us" }));
+
+  // The order needs every person exactly once.
+  const ids = list.map((person) => person.id);
+  await assert.rejects(reorderProfessionals(db, admin, { ids: ids.slice(1) }), isStatus(409));
+  list = await reorderProfessionals(db, admin, { ids: [...ids].reverse() });
+  assert.deepEqual(list.map((person) => person.id), [...ids].reverse());
+
+  // Removing someone clears the credit on their designs, and a list the Admin emptied stays empty.
+  await removeProfessional(db, admin, added.id);
+  assert.equal((await db.collection<HouseDesignDocument>("house_designs").findOne({ _id: designId }))?.designedBy, undefined);
+  await assert.rejects(requireProfessionalId(db, added.id), isStatus(400));
+  for (const person of await getManagedProfessionals(db, admin)) await removeProfessional(db, admin, person.id);
+  assert.deepEqual(await getAboutUsProfessionals(db), []);
 });
 
 test("new passwords follow the Admin's password rules", async () => {

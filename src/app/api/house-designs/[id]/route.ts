@@ -7,6 +7,8 @@ import { getDatabase } from "@/lib/database/mongodb";
 import { formatRoomSetup } from "@/lib/house-design-data";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
+import { MaintenanceError } from "@/lib/server/maintenance";
+import { requireProfessionalId } from "@/lib/server/professionals";
 import { readSession } from "@/lib/server/session";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -25,7 +27,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid house-design id." }, { status: 400 });
     }
 
-    const changes = houseDesignPatchSchema.parse(await request.json());
+    const submitted = houseDesignPatchSchema.parse(await request.json());
+    const { designedBy, ...changes } = submitted;
     const db = await getDatabase();
     // Customers browse designs by house type, so a design needs one before it is published.
     if (changes.status === "Published" && !changes.houseType) {
@@ -40,6 +43,7 @@ export async function PATCH(
       }
     }
     const now = new Date();
+    const credit = designedBy ? { designedBy: await requireProfessionalId(db, designedBy) } : {};
     const document = await db
       .collection<HouseDesignDocument>(collections.houseDesigns)
       .findOneAndUpdate(
@@ -47,11 +51,13 @@ export async function PATCH(
         {
           $set: {
             ...changes,
+            ...credit,
             ...(changes.bedrooms !== undefined && changes.bathrooms !== undefined
               ? { rooms: formatRoomSetup(changes.bedrooms, changes.bathrooms) }
               : {}),
             updatedAt: now,
           },
+          ...(designedBy === null ? { $unset: { designedBy: "" as const } } : {}),
         },
         { returnDocument: "after" },
       );
@@ -68,12 +74,13 @@ export async function PATCH(
       action: "house-design.updated",
       entityType: "house_design",
       entityId: document._id,
-      details: { fields: Object.keys(changes).join(", ") },
+      details: { fields: Object.keys(submitted).join(", ") },
       createdAt: now,
     });
 
     return NextResponse.json({ design: toHouseDesignDto(document, { includeSource: true }) });
   } catch (error) {
+    if (error instanceof MaintenanceError) return NextResponse.json({ error: error.message }, { status: error.status });
     return apiError(error);
   }
 }

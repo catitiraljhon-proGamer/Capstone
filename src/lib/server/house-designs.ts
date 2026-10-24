@@ -30,6 +30,8 @@ export const houseDesignInputSchema = z.object({
   notes: z.string().trim().max(4_000),
   status: z.enum(["Draft", "Published", "Archived"]),
   customItems: z.array(customExteriorItemSchema).max(100),
+  /** The architect or engineer the design is credited to; null clears it. */
+  designedBy: z.string().regex(/^[a-f0-9]{24}$/, "Choose who designed it from the list.").nullable().optional(),
 });
 
 export const houseDesignPatchSchema = houseDesignInputSchema
@@ -110,6 +112,7 @@ export function toHouseDesignDto(
     notes: document.notes,
     status: document.status,
     customItems: document.customItems,
+    ...(document.designedBy ? { designedBy: document.designedBy.toHexString() } : {}),
     ...(includeSource && source
       ? {
           sourceProject: {
