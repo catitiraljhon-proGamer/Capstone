@@ -2,64 +2,23 @@
 
 import { DesignWatermark } from "@/components/ui/design-watermark";
 import { motion } from "framer-motion";
-import {
-  ArrowUpRight,
-  Building2,
-  Calculator,
-  ClipboardCheck,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AccountTermsDialog } from "@/components/auth/account-terms";
+import { aboutUsServiceIcons } from "@/components/landing/about-us-services";
 import { PublicHeader } from "@/components/landing/public-header";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import type { AboutUsContent } from "@/lib/about-us";
 import type { HomeSlide } from "@/lib/home-slideshow";
 
-type StatProps = {
-  label: string;
-  value: string;
-};
-
-const Stat = ({ label, value }: StatProps) => (
-  <div className="space-y-1">
-    <div className="text-3xl font-semibold tracking-tight text-stone-950">
-      {value}
-    </div>
-    <div className="text-sm text-stone-500">{label}</div>
-  </div>
-);
-
-function MiniBars() {
-  return (
-    <div className="mt-6 flex h-36 items-end gap-4 rounded-xl bg-gradient-to-b from-rose-50 to-white p-4">
-      {[22, 54, 78, 104].map((height, index) => (
-        <motion.div
-          key={height}
-          initial={{ height: 0, opacity: 0.7 }}
-          animate={{ height }}
-          transition={{ delay: 0.45 + index * 0.15, type: "spring" }}
-          className="w-10 rounded-xl bg-gradient-to-t from-rose-200 to-rose-400 shadow-inner"
-        />
-      ))}
-    </div>
-  );
-}
-
-function BlueprintMark() {
-  return (
-    <motion.div
-      initial={{ rotate: -6, scale: 0.96 }}
-      animate={{ rotate: 0, scale: 1 }}
-      transition={{ duration: 1.8, type: "spring" }}
-      className="grid h-52 w-52 place-items-center rounded-full border border-white/40 bg-white/10"
-    >
-      <div className="grid h-32 w-32 place-items-center rounded-2xl bg-white/20 shadow-2xl ring-1 ring-white/30">
-        <Building2 className="h-16 w-16 text-white" strokeWidth={1.5} />
-      </div>
-    </motion.div>
-  );
-}
+/** Card colors by position, alternating the dark red panel, the rose accent, and a white surface. */
+const serviceCardStyles = [
+  { card: "bg-gradient-to-b from-red-950 to-red-800 text-red-50", icon: "bg-red-600/60 ring-1 ring-white/10", text: "text-red-100" },
+  { card: "bg-gradient-to-b from-rose-600 to-rose-400 text-white", icon: "bg-white/20 ring-1 ring-white/30", text: "text-white/90" },
+  { card: "bg-white text-stone-950 ring-1 ring-stone-200", icon: "bg-rose-50 text-red-700", text: "text-stone-600" },
+  { card: "bg-gradient-to-b from-red-950 to-red-800 text-red-50", icon: "bg-red-600/60 ring-1 ring-white/10", text: "text-red-100" },
+];
 
 /** The designs the Admin picked in Maintenance (or the newest Published ones), one cover photo each. */
 function SwappingHouseShowcase() {
@@ -149,7 +108,7 @@ function SwappingHouseShowcase() {
   );
 }
 
-/** Footer with the brand and a working link to the Terms and Conditions; the site has no other public pages. */
+/** Footer with the brand and a working link to the Terms and Conditions. */
 function LandingFooter() {
   const [readingTerms, setReadingTerms] = useState(false);
   return (
@@ -158,9 +117,9 @@ function LandingFooter() {
         <div className="max-w-3xl">
           <BrandLogo />
           <p className="mt-6 text-sm leading-7 text-stone-600">
-            G4 Builders Inc helps project teams estimate construction costs,
-            review BOQ items, manage progress billing, and keep project reports
-            clear from site work to office approvals.
+            G4 Builders Incorporated designs and builds houses, from house
+            design and construction cost estimates to blueprints and
+            construction, with clear costs at every stage.
           </p>
         </div>
         {/* Kept on the left: the floating Contact Us button covers the bottom-right corner. */}
@@ -176,26 +135,11 @@ function LandingFooter() {
   );
 }
 
-export default function LandingPage() {
-  const [stats, setStats] = useState({
-    activeProjects: 0,
-    publishedDesigns: 0,
-    completedProjects: 0,
-  });
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/public/stats", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
-        if (active && payload) setStats(payload);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-
+/**
+ * The public home page shows the services G4 offers, never system details or live record counts. The tagline and the
+ * What We Do items come from Maintenance > About Us, so the Admin edits them in one place.
+ */
+export default function LandingPage({ content }: { content: AboutUsContent }) {
   return (
     <div className="min-h-screen w-full bg-white text-stone-950">
       <PublicHeader />
@@ -203,132 +147,78 @@ export default function LandingPage() {
       <main className="mx-auto grid w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-2 lg:gap-10 lg:px-8">
         <section className="flex min-w-0 flex-col justify-center space-y-6 sm:space-y-8">
           <div>
-            <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
-              Build costs
-              <br />
-              with control.
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{content.tagline}</p>
+            <h1 className="mt-3 text-balance text-4xl font-semibold leading-[1.05] tracking-tight text-stone-950 sm:text-5xl lg:text-6xl">
+              Your house, from design to finished build.
             </h1>
             <p className="mt-4 max-w-md text-base leading-7 text-stone-600">
-              A construction cost estimation and billing workspace for G4
-              Builders Inc, built to keep quantities, approvals, invoices, and
-              project margins aligned.
+              Choose one of our house designs or request your own. Get an
+              itemized cost estimate, then build with G4 Builders and pay by
+              stage.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 sm:max-w-sm sm:gap-8">
-            <Stat label="Published Designs" value={String(stats.publishedDesigns)} />
-            <Stat label="Active Projects" value={String(stats.activeProjects)} />
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-5 opacity-75">
-            <span className="text-xs text-stone-500">BUILT FOR SITE TEAMS</span>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm font-semibold text-stone-400">
-              <span>BOQ</span>
-              <span>Progress Billing</span>
-              <span>Cost Tracking</span>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/register"
+              className="inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+            >
+              Request a Design <ArrowUpRight className="ml-1 h-4 w-4" aria-hidden="true" />
+            </Link>
+            <a
+              href="#designs"
+              className="inline-flex items-center justify-center rounded-full border border-stone-200 px-5 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-300 hover:text-stone-950 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+            >
+              View Our Designs
+            </a>
           </div>
         </section>
 
-        <section className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="relative col-span-1 overflow-hidden rounded-xl bg-gradient-to-b from-red-950 to-red-800 p-6 text-red-50 shadow-lg"
-          >
-            <div className="relative flex min-h-64 flex-col justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-red-600/60 p-2 ring-1 ring-white/10">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <span className="text-xs uppercase tracking-wider text-red-100">
-                  Controlled Billing
-                </span>
-              </div>
-              <div className="mt-6 text-xl leading-snug text-red-50/95">
-                Review every
-                <br /> variation before release
-              </div>
-              <motion.div
-                className="absolute right-6 top-6 h-12 w-12 rounded-full bg-red-500/40"
-                animate={{
-                  boxShadow: [
-                    "0 0 0 0 rgba(248,113,113,0.35)",
-                    "0 0 0 16px rgba(248,113,113,0)",
-                  ],
-                }}
-                transition={{ duration: 2.5, repeat: Infinity }}
-              />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative col-span-1 overflow-hidden rounded-xl bg-gradient-to-b from-rose-600 to-rose-400 p-6 text-white shadow-lg"
-          >
-            <div className="pointer-events-none absolute -right-8 -top-8 opacity-80">
-              <BlueprintMark />
-            </div>
-            <div className="relative mt-28 text-sm text-white/90">
-              Project Dashboard
-            </div>
-            <div className="relative text-xl font-medium leading-snug">
-              Estimate, bill,
-              <br /> and report in one place
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="col-span-1 rounded-xl bg-white p-6 text-stone-800 shadow-lg ring-1 ring-stone-200"
-          >
-            <div className="flex items-center gap-2 text-sm text-stone-500">
-              <Calculator className="h-4 w-4" />
-              Completed Projects
-            </div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight">
-              {stats.completedProjects}{" "}
-              <span className="align-middle text-sm font-medium text-stone-400">
-                 recorded
-              </span>
-            </div>
-            <div className="mt-1 flex items-center gap-1 text-xs text-red-500">
-              <ClipboardCheck className="h-3.5 w-3.5" />
-              Live project updates
-            </div>
-            <MiniBars />
-          </motion.div>
-
-          <div className="hidden sm:block" />
+        <section aria-labelledby="home-services" className="min-w-0">
+          <h2 id="home-services" className="sr-only">What We Do</h2>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            {content.services.map((service, index) => {
+              const Icon = aboutUsServiceIcons[index];
+              const style = serviceCardStyles[index % serviceCardStyles.length];
+              return (
+                <motion.li
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * (index + 1) }}
+                  className={`flex min-h-48 flex-col rounded-xl p-6 shadow-lg ${style.card}`}
+                >
+                  <span className={`grid h-10 w-10 place-items-center rounded-full ${style.icon}`}>
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <h3 className="mt-auto pt-8 text-xl font-semibold leading-snug tracking-tight">{service.title}</h3>
+                  <p className={`mt-2 text-sm leading-6 ${style.text}`}>{service.text}</p>
+                </motion.li>
+              );
+            })}
+          </ul>
         </section>
       </main>
 
-      <section className="border-y border-stone-200 bg-white">
+      <section id="designs" className="scroll-mt-24 border-y border-stone-200 bg-white">
         <div className="mx-auto grid w-full max-w-[1244px] grid-cols-1 items-center gap-8 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-10 lg:px-8">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-red-700">
-              Better every project
+              Our House Designs
             </p>
             <h2 className="mt-4 max-w-xl text-3xl font-semibold leading-[1.1] tracking-tight text-stone-950 sm:text-4xl lg:text-5xl">
-              See costs move before they become problems.
+              Find a design you like, or ask for your own.
             </h2>
             <p className="mt-4 max-w-lg text-base leading-7 text-stone-600 sm:text-lg sm:leading-8">
-              Rotate through site progress, material planning, billing reviews,
-              and office coordination in one visual workspace for G4 Builders
-              Inc.
+              Browse some of our house designs. Create an account to request
+              one as it is or with your changes, or to ask for a custom design.
             </p>
             <div className="mt-8">
-              {/* Projects are viewed after signing in. */}
               <Link
-                href="/login"
+                href="/register"
                 className="inline-flex items-center justify-center rounded-full bg-red-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
               >
-                Review Projects <ArrowUpRight className="ml-1 h-4 w-4" />
+                Request a Design <ArrowUpRight className="ml-1 h-4 w-4" aria-hidden="true" />
               </Link>
             </div>
           </div>

@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 
 export const metadata: Metadata = {
   title: "Log In | G4 Builders Inc",
-  description: "Access the G4 Builders Inc cost estimation and billing system.",
+  description: "Sign in to your G4 Builders Inc account.",
 };
 
 export default async function LoginPage({

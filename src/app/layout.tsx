@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "G4 Builders Inc",
-  description: "Construction cost estimation and billing system",
+  description: "House design, construction cost estimates, blueprints, and construction by G4 Builders Incorporated.",
 };
 
 export default function RootLayout({

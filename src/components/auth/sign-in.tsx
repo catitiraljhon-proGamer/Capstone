@@ -25,16 +25,17 @@ interface SignInPageProps {
   initialRememberMe?: boolean;
 }
 
+/** Two of the services G4 offers, shown beside the sign-in form. */
 const defaultTestimonials: Testimonial[] = [
   {
-    name: "Project Controls",
-    role: "Billing Review",
-    text: "Track approved work, pending variations, and invoice status before releasing progress billing.",
+    name: "House Design",
+    role: "Custom or published designs",
+    text: "Choose one of our house designs or request your own, with an itemized cost estimate to review first.",
   },
   {
-    name: "Site Operations",
-    role: "BOQ Updates",
-    text: "Keep quantities and cost items organized across active G4 Builders Inc projects.",
+    name: "Construction",
+    role: "Billed by stage",
+    text: "We build your house and bill by stage, so you pay as the work progresses.",
   },
 ];
 
@@ -68,7 +69,7 @@ const TestimonialCard = ({
 );
 
 export function SignInPage({
-  description = "Sign in to manage estimates, billing approvals, project costs, and reports for G4 Builders Inc.",
+  description = "Sign in to your G4 Builders Inc account.",
   heroImageSrc = "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=2160&q=80",
   testimonials = defaultTestimonials,
   onSignIn,
@@ -306,10 +307,10 @@ export function SignInPage({
           <div className="relative flex h-full min-h-[680px] flex-col justify-between p-8">
             <div className="max-w-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-red-100">
-                Project Cost Control
+                G4 Builders Incorporated
               </p>
               <h2 className="mt-3 text-4xl font-semibold leading-tight tracking-tight text-white">
-                Keep estimates and billing aligned from field to office.
+                Your house, from design to finished build.
               </h2>
             </div>
 

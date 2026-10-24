@@ -17,11 +17,12 @@ import { ArrowLeft, Check, CheckCircle2, Eye, EyeOff, HardHat, MailCheck } from 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
+/** The services a client account opens, listed beside the sign-up form. */
 const benefits = [
-  "Browse available house designs",
-  "Request and track cost estimates",
-  "Review project billing and payments",
-  "Download your blueprint, invoices, and receipts",
+  "Choose one of our house designs or request your own",
+  "Get an itemized cost estimate before you commit",
+  "Receive your blueprint once your design is approved",
+  "Have us build your house and pay by stage",
 ];
 
 const registrationSteps = [
@@ -648,12 +649,11 @@ export function RegisterAccountPage({
               <HardHat className="h-6 w-6" />
             </span>
             <h2 className="mt-7 text-2xl font-semibold tracking-tight">
-              Your Project Information in One Place
+              Your House, From Design to Finished Build
             </h2>
             <p className="mt-3 text-sm leading-6 text-red-100">
-              Your account connects estimates, design requests, project
-              progress, blueprints, and invoices to one secure client
-              profile.
+              With a client account, you can work with G4 Builders on your
+              house from the first design to the last stage of construction.
             </p>
 
             <ul className="mt-8 space-y-4">
