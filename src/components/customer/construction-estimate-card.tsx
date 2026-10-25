@@ -167,11 +167,11 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
               <p className="mt-1 text-2xl font-semibold text-red-700">{formatPeso(downpayment)}</p>
               <p className="mt-1 text-xs text-stone-600">{percent}% of the contract total</p>
             </div>
-            <p>The Billing Clerk will issue your downpayment invoice. Construction is scheduled once that payment is verified.</p>
+            <p>Your downpayment invoice is issued automatically, so you can pay it in Billing right after you accept. Construction is scheduled once that payment is verified.</p>
             <BillingErrorMessage message={error} />
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Go Back</Button>
-              <Button className="min-h-11" disabled={busy} onClick={() => void run({ action: "accept", downpaymentPercent: percent }, "Estimate accepted. Your project is created and the Billing Clerk will issue your downpayment invoice.")}>{busy ? "Accepting…" : "Confirm and Accept"}</Button>
+              <Button className="min-h-11" disabled={busy} onClick={() => void run({ action: "accept", downpaymentPercent: percent }, "Estimate accepted. Your project is created and your downpayment invoice is ready in Billing.")}>{busy ? "Accepting…" : "Confirm and Accept"}</Button>
             </div>
           </div>
         </BillingDialog>

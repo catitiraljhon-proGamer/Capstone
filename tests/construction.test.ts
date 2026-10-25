@@ -94,7 +94,8 @@ async function billMilestone(project: ConstructionProjectDto, index: number, iss
     projectId: project.id, milestoneId: milestone.id, label: milestone.label, basis: "Completed stage per site inspection report",
     progressPercentage: milestone.percentage, amount: milestone.amount, dueDate: "2099-12-31",
   });
-  if (issue) await changeInvoice(db, clerk, invoiceId, { action: "issue" });
+  // The downpayment invoice is already issued on acceptance; only drafts need the clerk.
+  if (issue && milestone.invoice?.status !== "Sent") await changeInvoice(db, clerk, invoiceId, { action: "issue" });
   return invoiceId;
 }
 async function payInFull(project: ConstructionProjectDto, index: number) {
@@ -125,6 +126,8 @@ test("estimates saved with VAT drop it, unless billing already started on the ac
   const open = await sentEstimate();
   const unbilled = await acceptedProject();
   const billed = await acceptedProject();
+  // A project accepted before downpayment invoices were issued automatically may still hold a Draft one.
+  await db.collection<InvoiceDocument>("invoices").updateMany({ projectId: new ObjectId(unbilled.projectId) }, { $set: { status: "Draft" }, $unset: { issuedAt: "" } });
   // Simulate records saved before G4 Builders became VAT-exempt.
   const withVat = { subtotal: 6_000_000, vatRate: 0.12, vat: 720_000, total: 6_720_000 };
   await db.collection("cost_estimates").updateMany({}, { $set: withVat });
@@ -134,8 +137,7 @@ test("estimates saved with VAT drop it, unless billing already started on the ac
     await db.collection<ProjectDocument>("projects").updateOne({ _id: project!._id }, { $set: { contractPrice: 6_720_000, subtotal: 6_000_000, vat: 720_000, paymentSchedule: schedule } });
     await db.collection<InvoiceDocument>("invoices").updateMany({ projectId: project!._id }, { $set: { amount: 2_016_000 } });
   }
-  const billedProject = await db.collection<ProjectDocument>("projects").findOne({ _id: new ObjectId(billed.projectId) });
-  await changeInvoice(db, clerk, billedProject!.paymentSchedule![0].invoiceId!.toHexString(), { action: "issue" });
+  // The billed project's downpayment invoice was issued automatically when its estimate was accepted.
 
   await removeVatFromEstimates(db);
   const estimates = await listEstimates(db, admin);
@@ -237,7 +239,9 @@ test("the admin calendar lists every customer payment date with its live status"
   const projectDues = async () => (await listPaymentDues(db)).filter((due) => due.projectName.startsWith(project.reference));
   let dues = await projectDues();
   assert.equal(dues.length, project.milestones.length);
-  assert.ok(dues.every((due) => due.status === "Upcoming" && !due.invoiceNumber && due.clientName === customer.name));
+  // The downpayment invoice is issued on acceptance; the later stages wait for their milestones.
+  assert.equal(dues.find((due) => due.kind === "Downpayment")?.invoiceNumber, project.milestones[0].invoice?.number);
+  assert.ok(dues.filter((due) => due.kind !== "Downpayment").every((due) => due.status === "Upcoming" && !due.invoiceNumber && due.clientName === customer.name));
   assert.equal(dues.find((due) => due.kind === "Downpayment")?.amount, project.milestones[0].amount);
   assert.deepEqual(dues.map((due) => due.dueDate), [...dues.map((due) => due.dueDate)].sort());
 
@@ -283,13 +287,14 @@ test("blueprint-flow designs open the optional construction estimate only after 
   await changeEstimate(db, admin, estimate.id, { action: "send" });
   const { projectId } = await changeEstimate(db, customer, estimate.id, { action: "accept", downpaymentPercent: 30 });
   assert.ok(projectId);
-  // The blueprint is already paid, so the clerk can issue the downpayment right away.
+  // The blueprint is already paid, so the downpayment invoice is issued right away, with no step for the clerk.
   assert.equal(await db.collection("notifications").countDocuments({ kind: "blueprint-fee" }), 0);
-  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice issued" }), 1);
   const project = await projectDto(projectId);
   const downpaymentInvoice = project.milestones[0].invoice?.id;
   assert.ok(downpaymentInvoice);
-  await changeInvoice(db, clerk, downpaymentInvoice, { action: "issue" });
+  assert.equal(project.milestones[0].invoice?.status, "Sent");
+  await assert.rejects(changeInvoice(db, clerk, downpaymentInvoice, { action: "issue" }), isError(409));
 });
 
 test("only the owner of an unlocked design can request construction, and each design allows one request", async () => {
@@ -405,7 +410,7 @@ test("customers never see line items before the estimate is sent, and only their
   assert.equal(resent.total, 5_000_000);
 });
 
-test("accepting at 30% creates the project, a Draft downpayment invoice, and payment-due events", async () => {
+test("accepting at 30% creates the project, an issued downpayment invoice, and payment-due events", async () => {
   const { estimate, projectId } = await acceptedProject(30);
   const project = await projectDto(projectId);
   assert.equal(project.status, "Awaiting downpayment");
@@ -419,7 +424,7 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   assert.equal(project.neededBy, neededBy());
   assert.deepEqual(project.milestones.map((milestone) => milestone.amount), [1_800_000, 1_800_000, 1_800_000, 600_000]);
   assert.deepEqual(project.milestones.map((milestone) => milestone.isDownpayment), [true, false, false, false]);
-  assert.equal(project.milestones[0].invoice?.status, "Draft");
+  assert.equal(project.milestones[0].invoice?.status, "Sent");
   assert.equal(project.milestones[0].invoice?.amount, 1_800_000);
   assert.equal(project.milestones[0].status, "Invoiced");
   assert.equal(project.nextMilestone?.id, project.milestones[0].id);
@@ -427,7 +432,8 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
 
   const invoices = await db.collection<InvoiceDocument>("invoices").find({ projectId: new ObjectId(projectId) }).toArray();
   assert.equal(invoices.length, 1);
-  assert.equal(invoices[0].status, "Draft");
+  assert.equal(invoices[0].status, "Sent");
+  assert.ok(invoices[0].issuedAt);
   assert.equal(invoices[0].milestoneId, project.milestones[0].id);
   assert.ok(invoices[0].basis?.includes(estimate.reference));
   assert.equal(invoices[0].dueDate.toISOString().slice(0, 10), daysFromToday(7));
@@ -444,13 +450,13 @@ test("accepting at 30% creates the project, a Draft downpayment invoice, and pay
   assert.equal(accepted.downpaymentPercent, 30);
   await assert.rejects(changeEstimate(db, customer, estimate.id, { action: "accept", downpaymentPercent: 30 }), isError(409));
   assert.equal(await db.collection("projects").countDocuments(), 1);
-  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(clerk.id), title: "Downpayment invoice ready to issue" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(clerk.id), title: "Downpayment invoice issued" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "New invoice" }), 1);
   assert.equal((await db.collection("notifications").findOne({ userId: new ObjectId(clerk.id) }))?.href, "/billing-clerk/progress-billings");
 
-  // Customers do not see the clerk's unreleased invoice; the owner-only list stays private.
+  // The customer sees the issued downpayment invoice at once; the owner-only list stays private.
   const customerView = await projectDto(projectId, customer);
-  assert.equal(customerView.milestones[0].invoice, null);
-  assert.equal(customerView.milestones[0].status, "Upcoming");
+  assert.equal(customerView.milestones[0].invoice?.status, "Sent");
   assert.deepEqual(await listProjects(db, other), []);
 });
 
@@ -487,8 +493,10 @@ test("an awaiting-downpayment project only bills the downpayment, for exactly it
   await assert.rejects(createInvoice(db, clerk, bill(downpayment, { milestoneId: undefined })), (error) => error instanceof BillingError);
   await assert.rejects(createInvoice(db, clerk, bill(downpayment, { milestoneId: randomUUID() })), (error) => error instanceof BillingError);
 
-  // Edits keep the milestone and the exact amount.
+  // Edits keep the milestone and the exact amount. Only drafts can be edited, as on projects accepted before
+  // downpayment invoices were issued automatically.
   const invoiceId = downpayment.invoice!.id;
+  await db.collection<InvoiceDocument>("invoices").updateOne({ _id: new ObjectId(invoiceId) }, { $set: { status: "Draft" }, $unset: { issuedAt: "" } });
   await assert.rejects(changeInvoice(db, clerk, invoiceId, { action: "edit", invoice: bill(downpayment, { amount: 2_000_000 }) }), isError(400));
   await assert.rejects(changeInvoice(db, clerk, invoiceId, { action: "edit", invoice: bill(structural, { label: downpayment.label }) }), isError(400));
   await changeInvoice(db, clerk, invoiceId, { action: "edit", invoice: bill(downpayment, { basis: "Signed estimate, schedule and site plan" }) });

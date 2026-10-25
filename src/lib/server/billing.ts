@@ -115,6 +115,34 @@ async function notifyCustomer(db: Db, session: ClientSession, customerId: Object
   }], session);
 }
 
+/** A week from today, or the construction start date when that is sooner, but never earlier than tomorrow. */
+function downpaymentDueDate(now: Date, startDate?: Date) {
+  const day = 86_400_000;
+  const today = new Date(`${manilaDate(now)}T00:00:00.000Z`).getTime();
+  const start = startDate ? new Date(`${startDate.toISOString().slice(0, 10)}T00:00:00.000Z`).getTime() : today + 7 * day;
+  return new Date(Math.min(today + 7 * day, Math.max(start, today + day)));
+}
+
+/**
+ * Issues a project's downpayment invoice without the Billing Clerk, so the customer can pay right away: when the
+ * estimate is accepted, or once the blueprint fee is fully paid for customers who accepted before paying it.
+ * The due date counts from the day it is issued. Returns the issued invoice, or null when it was not a draft.
+ */
+export async function autoIssueDownpayment(db: Db, session: ClientSession, actor: Pick<SessionUser, "id" | "name" | "role">, project: Pick<ProjectDocument, "paymentSchedule" | "startDate">, now: Date) {
+  const invoiceId = project.paymentSchedule?.find((milestone) => milestone.isDownpayment)?.invoiceId;
+  if (!invoiceId) return null;
+  const dueDate = downpaymentDueDate(now, project.startDate);
+  const invoice = await db.collection<InvoiceDocument>(collections.invoices).findOneAndUpdate(
+    { _id: invoiceId, status: "Draft" },
+    { $set: { status: "Sent", issuedAt: now, dueDate, updatedAt: now } },
+    { session, returnDocument: "after" },
+  );
+  if (!invoice) return null;
+  await notifyCustomer(db, session, invoice.customerId, "New invoice", `${invoice.invoiceNumber}: ${invoice.label} is ready for payment.`, invoice._id);
+  await audit(db, session, actor, "invoice.auto-issued", "invoice", invoice._id, { reference: invoice.invoiceNumber, amount: invoice.amount });
+  return invoice;
+}
+
 async function lockProject(db: Db, session: ClientSession, id: ObjectId) {
   const project = await db.collection<ProjectDocument>(collections.projects).findOneAndUpdate(
     { _id: id }, { $inc: { billingVersion: 1 } }, { session, returnDocument: "after" },
@@ -426,15 +454,20 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
         : "Full payment of your design fee was verified. Open Dream House to view and download your completed images.",
       href: "/customer/dream-house", kind: "design-access", entityId: invoice.designRequestId, createdAt: now,
     }], session);
-    // Customers who accepted an estimate before paying the blueprint already have a project waiting for its downpayment.
-    const waitingProject = blueprint && await db.collection<ProjectDocument>(collections.projects)
-      .countDocuments({ designRequestId: invoice.designRequestId, status: "Awaiting downpayment" }, { session });
-    if (waitingProject) {
+    // Customers who accepted an estimate before paying the blueprint have a project waiting for its downpayment;
+    // its invoice is issued now, with no step for the Billing Clerk.
+    const waitingProjects = blueprint
+      ? await db.collection<ProjectDocument>(collections.projects)
+        .find({ designRequestId: invoice.designRequestId, status: "Awaiting downpayment" }, { session }).toArray()
+      : [];
+    for (const waiting of waitingProjects) {
+      const issued = await autoIssueDownpayment(db, session, verifier, waiting, now);
+      if (!issued) continue;
       const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
       await insertNotifications(db, clerks.map((clerk) => ({
-        _id: new ObjectId(), userId: clerk._id, title: "Downpayment invoice ready to issue",
-        body: `${customer.name} fully paid blueprint fee ${invoice.invoiceNumber}. Issue the downpayment invoice for their construction project.`,
-        href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: invoice.designRequestId!, createdAt: now,
+        _id: new ObjectId(), userId: clerk._id, title: "Downpayment invoice issued",
+        body: `${customer.name} fully paid blueprint fee ${invoice.invoiceNumber}, so downpayment invoice ${issued.invoiceNumber} for ${waiting.reference} was issued automatically.`,
+        href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: waiting._id, createdAt: now,
       })), session);
     }
   }

@@ -250,8 +250,8 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   await assert.rejects(getBlueprintFile(db, other, request.id, file.id), isError(404));
   await assert.rejects(deleteBlueprintFile(db, admin, request.id, file.id), isError(409));
   assert.equal(await db.collection("notifications").countDocuments({ title: "Your blueprint is unlocked" }), 1);
-  // No project is waiting for a downpayment, so the clerk is not asked to issue one.
-  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice ready to issue" }), 0);
+  // No project is waiting for a downpayment, so no downpayment invoice is issued.
+  assert.equal(await db.collection("notifications").countDocuments({ title: "Downpayment invoice issued" }), 0);
   await createInvoice(db, clerk, { ...draft, projectId: project });
 
   // Once paid, the customer can also ask to pick up the printed blueprint; the admin confirms it.
@@ -270,6 +270,44 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   assert.equal(scheduled?.scheduledFor, pickup.preferredTimes[0]);
   assert.equal(await db.collection("notifications").countDocuments({ title: "Blueprint pickup scheduled" }), 1);
   await assert.rejects(requestBlueprintPickup(db, customer, request.id, pickup, scheduleNow), isError(409));
+});
+
+test("a downpayment waiting on the blueprint fee is issued automatically once the fee is fully paid", async () => {
+  const now = new Date();
+  const designRequestId = new ObjectId(await designFixture("Design approved"));
+  const feeId = new ObjectId();
+  const downpaymentId = new ObjectId();
+  const waitingProjectId = new ObjectId();
+  const milestoneId = randomUUID();
+  await db.collection<InvoiceDocument>("invoices").insertMany([
+    { _id: feeId, invoiceNumber: "INV-FEE", customerId: new ObjectId(customer.id), designRequestId, feeType: "blueprint",
+      label: "Blueprint fee", progressPercentage: 0, amount: 5000, dueDate: new Date("2099-12-31T00:00:00.000Z"), status: "Sent", createdAt: now, updatedAt: now },
+    { _id: downpaymentId, invoiceNumber: "INV-DOWN", customerId: new ObjectId(customer.id), projectId: waitingProjectId, milestoneId,
+      label: "Downpayment / Mobilization", progressPercentage: 0, amount: 60000, dueDate: new Date("2020-01-01T00:00:00.000Z"), status: "Draft", createdAt: now, updatedAt: now },
+  ]);
+  // Accepted before the blueprint was paid, so its downpayment invoice is still a draft.
+  await db.collection<ProjectDocument>("projects").insertOne({
+    _id: waitingProjectId, reference: "PRJ-WAIT", name: "Waiting residence", customerId: new ObjectId(customer.id), designRequestId,
+    status: "Awaiting downpayment", contractPrice: 200000, startDate: new Date("2099-06-01T00:00:00.000Z"),
+    paymentSchedule: [{ id: milestoneId, label: "Downpayment / Mobilization", description: "", percentage: 30, amount: 60000,
+      targetDate: new Date("2099-06-01T00:00:00.000Z"), isDownpayment: true, invoiceId: downpaymentId }],
+    createdAt: now, updatedAt: now,
+  });
+
+  // A partial blueprint payment does not release the downpayment invoice.
+  await reviewPayment(db, clerk, await submitPayment(db, customer, payment(feeId.toHexString(), 2000)), { action: "verify" });
+  assert.equal((await db.collection<InvoiceDocument>("invoices").findOne({ _id: downpaymentId }))?.status, "Draft");
+
+  await reviewPayment(db, clerk, await submitPayment(db, customer, payment(feeId.toHexString(), 3000)), { action: "verify" });
+  const downpayment = await db.collection<InvoiceDocument>("invoices").findOne({ _id: downpaymentId });
+  assert.equal(downpayment?.status, "Sent");
+  assert.ok(downpayment?.issuedAt);
+  // The old due date had passed; it counts from the day the invoice is issued.
+  const week = new Date(`${manilaDate()}T00:00:00.000Z`);
+  week.setUTCDate(week.getUTCDate() + 7);
+  assert.equal(downpayment?.dueDate.toISOString(), week.toISOString());
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(clerk.id), title: "Downpayment invoice issued" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "New invoice", entityId: downpaymentId }), 1);
 });
 
 test("the Terms and Conditions need an explicit customer agreement to the current version", async () => {

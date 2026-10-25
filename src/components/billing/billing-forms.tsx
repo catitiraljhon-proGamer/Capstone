@@ -224,6 +224,30 @@ const customerMethodText: Record<CustomerPaymentMethod, {
   },
 };
 
+type AmountMode = "full" | "partial";
+
+/** "Full balance" pays the whole remaining balance; "Partial payment" lets the customer enter part of it. */
+function AmountChoice({ name, mode, balance, disabled, onChange }: {
+  name: string; mode: AmountMode; balance: number; disabled: boolean; onChange: (mode: AmountMode) => void;
+}) {
+  const options: { value: AmountMode; title: string; detail: string }[] = [
+    { value: "full", title: "Full balance", detail: `Pay the whole ${formatPeso(balance)} now.` },
+    { value: "partial", title: "Partial payment", detail: "Pay part of it now and the rest later." },
+  ];
+  return <fieldset disabled={disabled} className="min-w-0">
+    <legend className="text-sm font-medium">How much are you paying?</legend>
+    <div className="mt-2 grid gap-3 sm:grid-cols-2">{options.map((option) => <label key={option.value} className="flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3.5 transition has-[:checked]:border-red-700 has-[:checked]:bg-rose-50 has-[:checked]:ring-1 has-[:checked]:ring-red-700 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-600">
+      <input type="radio" name={name} value={option.value} checked={mode === option.value} onChange={() => onChange(option.value)} className="mt-0.5 h-4 w-4 shrink-0 accent-red-700" />
+      <span className="min-w-0"><span className="block text-sm font-semibold text-stone-950">{option.title}</span><span className="mt-1 block text-xs leading-5 text-stone-600">{option.detail}</span></span>
+    </label>)}</div>
+  </fieldset>;
+}
+
+/** The amount shown, not typed, when the customer pays the full balance. */
+function FullAmount({ label, balance }: { label: string; balance: number }) {
+  return <div><p className="text-sm font-medium">{label}</p><p className="mt-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-semibold tabular-nums text-stone-950">{formatPeso(balance)}</p></div>;
+}
+
 /** A customer's bank deposit or cheque details for one invoice; the Billing Clerk verifies them before the balance changes. */
 export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOnline }: {
   invoice: BillingInvoice; pending: PendingTotals; mutate: BillingMutation; onClose: () => void; onPayOnline: () => void;
@@ -231,13 +255,15 @@ export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOn
   const [submissionKey] = useState(() => crypto.randomUUID());
   const [method, setMethod] = useState<CustomerPaymentMethod>("Bank transfer");
   const [form, setForm] = useState({ amount: "", transactionReference: "", paidAt: manilaDate(), notes: "", proofImage: "" });
+  const [amountMode, setAmountMode] = useState<AmountMode>("full");
+  const amount = amountMode === "full" ? String(invoice.balance) : form.amount;
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fields = useFieldMessages();
   const text = customerMethodText[method];
   const messages = {
-    amount: amountError(form.amount, { label: "Amount", max: invoice.balance, maxLabel: "the remaining invoice balance" }),
+    amount: amountError(amount, { label: "Amount", max: invoice.balance, maxLabel: "the remaining invoice balance" }),
     paidAt: dateError(form.paidAt, { label: text.date, max: manilaDay(), maxLabel: "today" }),
     transactionReference: textError(form.transactionReference, { label: text.reference, min: 3, max: 120 }),
   };
@@ -247,7 +273,7 @@ export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOn
     setBusy(true); setError(null);
     try {
       await mutate("/api/billing/payments", "POST", {
-        ...form, invoiceId: invoice.id, method, amount: Number(form.amount), submissionKey, proofImage: form.proofImage || undefined,
+        ...form, invoiceId: invoice.id, method, amount: Number(amount), submissionKey, proofImage: form.proofImage || undefined,
       });
       onClose();
     } catch (error) { setError(errorText(error)); } finally { setBusy(false); }
@@ -272,8 +298,11 @@ export function CustomerPaymentForm({ invoice, pending, mutate, onClose, onPayOn
         </label>)}</div>
         <p className="mt-2 text-xs text-stone-500">Paying in cash? Pay at the G4 Builders Inc office and the Billing Clerk will record it.</p>
       </fieldset>
+      <AmountChoice name="customer-payment-amount" mode={amountMode} balance={invoice.balance} disabled={busy} onChange={setAmountMode} />
       <div className="grid gap-4 sm:grid-cols-2">
-        <div><label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice.balance} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
+        {amountMode === "full"
+          ? <FullAmount label="Amount paid (PHP)" balance={invoice.balance} />
+          : <div><label className="text-sm font-medium">Amount paid (PHP)<PesoInput required min="0.01" max={invoice.balance} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>}
         <div><label className="text-sm font-medium">{text.date}<input required type="date" max={manilaDate()} value={form.paidAt} className={invalidField} {...fields.props("paidAt", messages.paidAt)} onChange={(event) => setForm({ ...form, paidAt: event.target.value })} /></label>{fields.error("paidAt", messages.paidAt)}</div>
         <div className="sm:col-span-2"><label className="text-sm font-medium">{text.reference}<input required maxLength={120} placeholder={text.placeholder} value={form.transactionReference} className={invalidField} {...fields.props("transactionReference", messages.transactionReference)} onChange={(event) => setForm({ ...form, transactionReference: event.target.value })} /></label>{fields.error("transactionReference", messages.transactionReference)}<p className="mt-1.5 text-xs text-stone-500">{text.help}</p></div>
       </div>
@@ -379,8 +408,10 @@ export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: Billin
   const minimum = Math.min(PAYMONGO_MIN_AMOUNT, invoice.balance);
   const hasPending = pending.count > 0;
   const afterPending = balanceAfterPending(invoice, pending);
-  // Start at what is left after submissions still awaiting verification, so the same balance is not paid twice.
-  const [amount, setAmount] = useState(() => !hasPending ? String(invoice.balance) : afterPending > 0 ? String(afterPending) : "");
+  // With payments still awaiting verification, start at what is left after them, so the same balance is not paid twice.
+  const [amountMode, setAmountMode] = useState<AmountMode>(hasPending && afterPending > 0 && afterPending < invoice.balance ? "partial" : "full");
+  const [partialAmount, setPartialAmount] = useState(() => hasPending && afterPending > 0 ? String(afterPending) : "");
+  const amount = amountMode === "full" ? String(invoice.balance) : partialAmount;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fields = useFieldMessages();
@@ -390,7 +421,6 @@ export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: Billin
     minLabel: invoice.balance < PAYMONGO_MIN_AMOUNT ? "the remaining balance, which is below the usual online minimum" : "the minimum online payment",
   });
   const overPending = hasPending && afterPending > 0 && !amountMessage && value > afterPending;
-  const halfBalance = Math.round(invoice.balance * 50) / 100;
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (fields.blocked({ amount: amountMessage })) return;
@@ -409,16 +439,13 @@ export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: Billin
       {hasPending && (afterPending > 0
         ? <p className="flex items-start gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-stone-700"><Clock3 className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" /><span>You already submitted <strong className="text-stone-950">{formatPeso(pending.total)}</strong> for this invoice ({countLabel(pending.count, "payment")} awaiting verification). To avoid paying twice, the amount starts at what remains after them.</span></p>
         : <p className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-900"><AlertTriangle className="mt-1 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" /><span>Your submitted payments (<strong>{formatPeso(pending.total)}</strong>) already cover this balance. Wait for the Billing Clerk to verify them. Pay online only if one of those submissions was a mistake.</span></p>)}
-      <div>
-        <label className="block text-sm font-medium">Amount to pay (PHP)<PesoInput required min={minimum} max={invoice.balance} step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", amountMessage)} value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+      <AmountChoice name="online-payment-amount" mode={amountMode} balance={invoice.balance} disabled={busy} onChange={setAmountMode} />
+      {amountMode === "full" ? <FullAmount label="Amount to pay (PHP)" balance={invoice.balance} /> : <div>
+        <label className="block text-sm font-medium">Amount to pay (PHP)<PesoInput required min={minimum} max={invoice.balance} step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", amountMessage)} value={partialAmount} onChange={(event) => setPartialAmount(event.target.value)} /></label>
         {fields.error("amount", amountMessage)}
-        {overPending && <p className="mt-1.5 text-xs text-red-700">This is more than what remains after your pending payments ({formatPeso(afterPending)}).</p>}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {hasPending && afterPending > 0 && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(afterPending))}>After Pending · {formatPeso(afterPending)}</Button>}
-          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(invoice.balance))}>Full Balance · {formatPeso(invoice.balance)}</Button>
-          {!hasPending && invoice.balance >= PAYMONGO_MIN_AMOUNT * 2 && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setAmount(String(halfBalance))}>Half</Button>}
-        </div>
-      </div>
+        {hasPending && afterPending > 0 && <div className="mt-2"><Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPartialAmount(String(afterPending))}>After Pending · {formatPeso(afterPending)}</Button></div>}
+      </div>}
+      {overPending && <p className="text-xs text-red-700">This is more than what remains after your pending payments ({formatPeso(afterPending)}).</p>}
       <p className="text-xs leading-5 text-stone-500">Minimum online payment is {formatPeso(minimum)}. Partial payments are allowed, but design images only unlock once the fee is fully paid.</p>
       <p className="rounded-lg bg-rose-50 p-3 text-sm leading-6 text-stone-700">This is a test checkout. You will choose GCash, Maya, GrabPay, card, online banking or QR Ph on the next page; no real money is charged.</p>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}><CreditCard className="mr-2 h-4 w-4" />{busy ? "Starting checkout…" : "Continue to Checkout"}</Button></div>

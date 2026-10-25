@@ -62,7 +62,7 @@ function constructionStep(design: DesignRequestDto, estimate?: CostEstimateDto, 
       };
     }
     if (project.status === "Awaiting downpayment") {
-      return { tone: "waiting", title: "Preparing your downpayment invoice", detail: "The Billing Clerk will issue it shortly. You will be notified when it is ready to pay." };
+      return { tone: "waiting", title: "Preparing your downpayment invoice", detail: "It is issued automatically once your blueprint fee is fully paid. You will be notified when it is ready to pay." };
     }
     if (project.status === "On hold") return { tone: "waiting", title: "Construction is on hold", detail: "G4 Builders will contact you before work resumes." };
     return { tone: "waiting", title: "Construction in progress", detail: "G4 Builders is building your house. The next billing is issued when the next milestone is reached.", action: { label: "View Project", target: `project-${project.id}` } };

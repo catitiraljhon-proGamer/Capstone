@@ -20,7 +20,7 @@ import {
   lineAmount,
   scheduleTemplateError,
 } from "@/lib/construction";
-import { BillingError, audit, billingTransaction, nextReference } from "@/lib/server/billing";
+import { BillingError, audit, autoIssueDownpayment, billingTransaction, nextReference } from "@/lib/server/billing";
 import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
 import { isActiveHouseType } from "@/lib/server/house-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
@@ -327,7 +327,10 @@ async function requestRevision(db: Db, session: ClientSession, actor: SessionUse
   return {};
 }
 
-/** Accepting creates the project, its payment schedule, the downpayment invoice draft, and calendar events together. */
+/**
+ * Accepting creates the project, its payment schedule, the downpayment invoice, and calendar events together. The
+ * downpayment invoice is issued at once, or as soon as the blueprint fee is fully paid if it is not yet.
+ */
 async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, downpaymentPercent: number) {
   if (estimate.status !== "Sent") throw new BillingError("This estimate is not awaiting your response.", 409);
   const template = estimate.scheduleTemplate ?? [];
@@ -384,13 +387,14 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
   const [clerks, admins] = await Promise.all([activeUsers(db, session, "billing-clerk"), activeUsers(db, session, "admin")]);
   // Estimates accepted before the blueprint was paid (older requests) still wait for the blueprint fee.
   const blueprintFirst = Boolean(design && designWorkflow(design) === "blueprint" && (await customerDesignDto(db, design)).access !== "unlocked");
+  if (!blueprintFirst) await autoIssueDownpayment(db, session, actor, project, now);
   await notify(db, session, clerks.map((clerk) => clerk._id), blueprintFirst ? {
     title: "Blueprint fee ready to bill",
-    body: `${actor.name} accepted ${estimate.reference}. Once the admin submits the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) can be issued after the blueprint is paid.`,
+    body: `${actor.name} accepted ${estimate.reference}. Once the admin submits the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) is issued automatically once the blueprint is paid.`,
     href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: estimate.designRequestId,
   } : {
-    title: "Downpayment invoice ready to issue",
-    body: `${actor.name} accepted ${estimate.reference}. Issue the ${downpayment.label} invoice (${invoice.invoiceNumber}) for ${project.reference}.`,
+    title: "Downpayment invoice issued",
+    body: `${actor.name} accepted ${estimate.reference}. The ${downpayment.label} invoice (${invoice.invoiceNumber}) for ${project.reference} was issued automatically and awaits payment.`,
     href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: projectId,
   });
   await notify(db, session, admins.map((admin) => admin._id), {

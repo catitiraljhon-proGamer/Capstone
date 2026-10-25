@@ -433,11 +433,9 @@ test("paying a construction downpayment moves the project from awaiting downpaym
   const before = await projectDto(id);
   assert.equal(before.status, "Awaiting downpayment");
   const milestone = before.milestones[0];
-  const invoiceId = milestone.invoice?.id ?? await createInvoice(db, clerk, {
-    projectId: id, milestoneId: milestone.id, label: milestone.label, basis: "Downpayment per accepted estimate",
-    progressPercentage: milestone.percentage, amount: milestone.amount, dueDate: "2099-12-31",
-  });
-  await changeInvoice(db, clerk, invoiceId, { action: "issue" });
+  // The downpayment invoice was issued automatically on acceptance, so the customer can pay it right away.
+  assert.equal(milestone.invoice?.status, "Sent");
+  const invoiceId = milestone.invoice.id;
   const checkout = await checkoutFor(invoiceId);
   assert.equal(checkout.amount, milestone.amount);
   assert.equal((await simulateCheckout(db, customer, checkout.sessionId, { action: "pay", method: "dob" })).status, "paid");
