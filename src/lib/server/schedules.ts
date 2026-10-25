@@ -199,7 +199,7 @@ async function findCustomerAndProject(db: Db, clientId: ObjectId, projectId: Obj
 }
 
 /** Client meetings must not overlap; the admin picks another time instead. */
-async function assertMeetingSlotFree(db: Db, start: Date, durationMinutes: number, session?: ClientSession) {
+export async function assertMeetingSlotFree(db: Db, start: Date, durationMinutes: number, session?: ClientSession) {
   const end = new Date(start.getTime() + durationMinutes * 60_000);
   const nearby = await db.collection<ScheduleDocument>(collections.schedules).find({
     eventType: "Client meeting", status: "Scheduled",

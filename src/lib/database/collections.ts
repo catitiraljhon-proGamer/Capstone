@@ -26,6 +26,7 @@ import type { ContactDetails, ContactField } from "@/lib/contact-details";
 import type { AccountTermsContent } from "@/lib/account-terms";
 import type { ProfessionalRole } from "@/lib/professionals";
 import type { AboutUsContent } from "@/lib/about-us";
+import type { LotFacing, SiteInspectionStatus } from "@/lib/site-inspection";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -203,6 +204,24 @@ export type ProjectDocument = {
   updatedAt: Date;
 };
 
+export type SiteInspectionDocument = {
+  status: SiteInspectionStatus;
+  scheduledFor: Date;
+  durationMinutes: number;
+  /** The calendar event for the visit. */
+  scheduleId: ObjectId;
+  scheduledByName: string;
+  lotArea?: number;
+  frontage?: number;
+  depth?: number;
+  facing?: LotFacing;
+  photos?: string[];
+  notes?: string;
+  reason?: string;
+  recordedAt?: Date;
+  recordedByName?: string;
+};
+
 export type DesignRequestDocument = {
   _id: ObjectId;
   customerId: ObjectId;
@@ -226,6 +245,11 @@ export type DesignRequestDocument = {
   inspirationImages?: string[];
   /** Legacy single-image field retained for existing records. */
   inspirationImage?: string;
+  /** Where the house will be built; missing on requests made before the lot address was asked. */
+  lotAddress?: string;
+  lotAddressDetails?: AddressDetails;
+  /** The in-person check of the lot; the request can only be approved once the site is approved. */
+  siteInspection?: SiteInspectionDocument;
   completedDesignImages?: string[];
   /** Legacy single-image field retained for existing records. */
   completedDesignImage?: string;

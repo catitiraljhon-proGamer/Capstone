@@ -10,18 +10,21 @@ import {
   embeddedImageAccept,
   readEmbeddedImage,
 } from "@/lib/client-image-upload";
+import { addressFieldErrors, PhAddressFields, readAddressDetails, type AddressFieldErrors } from "@/components/clients/ph-address-fields";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { useHouseDesigns } from "@/lib/house-design-store";
 import { finishLevelDescriptions, finishLevels, type FinishLevel } from "@/lib/house-design-data";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
+import { formatScheduleDateTime } from "@/lib/schedule-display";
 import Link from "next/link";
 import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
   AlertTriangle,
   Hourglass,
   ImagePlus,
+  MapPin,
   Send,
   X,
 } from "lucide-react";
@@ -46,9 +49,32 @@ const statusClass: Record<DesignRequestStatus, string> = {
   Completed: "bg-emerald-50 text-emerald-700",
 };
 
+/** Where the visit to the customer's lot stands, with the architect's notes or reason once it is done. */
+function SiteInspectionNote({ request }: { request: DesignRequestDto }) {
+  const inspection = request.siteInspection;
+  const summary = !inspection
+    ? "G4 Builders will schedule a visit to inspect your lot."
+    : inspection.status === "Scheduled"
+      ? `Site inspection on ${formatScheduleDateTime(inspection.scheduledFor)}.`
+      : inspection.status === "Approved"
+        ? "Your site was inspected and approved."
+        : "Your site was inspected and found not suitable for this design.";
+  return (
+    <div className="mt-3 rounded-lg border border-stone-200 px-3 py-2 text-sm">
+      <p className="flex items-start gap-2 text-stone-600">
+        <MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 break-words">{request.lotAddress ?? "Lot address not given"}</span>
+      </p>
+      <p className="mt-1 font-semibold text-stone-950">{summary}</p>
+      {inspection?.notes ? <p className="mt-1 whitespace-pre-line text-stone-600">Notes: {inspection.notes}</p> : null}
+      {inspection?.reason ? <p className="mt-1 whitespace-pre-line text-stone-600">Reason: {inspection.reason}</p> : null}
+    </div>
+  );
+}
+
 const statusLabel: Record<DesignRequestStatus, string> = {
-  Pending: "Waiting for feasibility review",
-  "In review": "Under feasibility review",
+  Pending: "Waiting for a site inspection and feasibility review",
+  "In review": "Site inspection and feasibility review in progress",
   Approved: "Approved — design and floor plan in progress",
   "In customer review": "Ready for your review — open Dream House",
   "Changes requested": "Your requested changes are being made",
@@ -83,6 +109,11 @@ function DesignRequestForm({ houseDesignId }: {
   houseDesignId?: string;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  /** Lot address messages, keyed by form field name; shown after the first submit attempt. */
+  const [lotErrors, setLotErrors] = useState<AddressFieldErrors>({});
+  /** Changing it clears the lot address dropdowns after a request is sent. */
+  const [lotFormKey, setLotFormKey] = useState(0);
   const { designs, catalog, isLoading: isCatalogLoading, error: catalogError } = useHouseDesigns();
   const hasDesignSelection = houseDesignId !== undefined;
   const selectedDesign = designs.find((design) => design.id === houseDesignId);
@@ -239,8 +270,18 @@ function DesignRequestForm({ houseDesignId }: {
     } as const;
   };
 
+  /** The lot address fields as the server checks them. */
+  const lotErrorsOf = (form: HTMLFormElement) =>
+    addressFieldErrors(Object.fromEntries([...new FormData(form)].map(([name, value]) => [name, String(value)])));
+  /** Re-reads the lot address after React applies the change (choosing a province clears the city and barangay). */
+  const refreshLot = () => {
+    const form = formRef.current;
+    if (form) setTimeout(() => setLotErrors(lotErrorsOf(form)), 0);
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const form = event.currentTarget;
     if (limitReached) {
       setError(designRequestLimitMessage);
       return;
@@ -251,6 +292,8 @@ function DesignRequestForm({ houseDesignId }: {
     }
 
     setSubmitted(true);
+    const lotNow = lotErrorsOf(form);
+    setLotErrors(lotNow);
     const firstInvalid = fieldOrder.find((name) => fieldErrors[name]);
     if (firstInvalid) {
       const element = document.getElementById(fieldIds[firstInvalid]);
@@ -258,6 +301,16 @@ function DesignRequestForm({ houseDesignId }: {
       element?.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
+    const firstLotField = Object.entries(lotNow).find(([, message]) => message)?.[0];
+    if (firstLotField) {
+      const element = form.elements.namedItem(firstLotField);
+      if (element instanceof HTMLElement) {
+        element.focus();
+        element.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+      return;
+    }
+    const lotAddress = readAddressDetails(new FormData(form));
 
     setIsSubmitting(true);
     setError(null);
@@ -278,6 +331,8 @@ function DesignRequestForm({ houseDesignId }: {
           notes,
           preferredDate,
           neededBy,
+          // The server fills in the province and city names from the codes.
+          lotAddress,
           inspirationImages: inspirationImages.map((image) => image.src),
         }),
       });
@@ -306,6 +361,8 @@ function DesignRequestForm({ houseDesignId }: {
       setInspirationImages([]);
       setTouched({});
       setSubmitted(false);
+      setLotErrors({});
+      setLotFormKey((key) => key + 1);
       setImageError(null);
       setSuccessMessage(
         selectedDesign
@@ -361,7 +418,7 @@ function DesignRequestForm({ houseDesignId }: {
           </p>
         ) : null}
 
-        <form onSubmit={submit} noValidate>
+        <form ref={formRef} onSubmit={submit} noValidate>
           {hasDesignSelection ? (
             <div className="mt-5 rounded-lg border border-stone-200 bg-stone-50 p-4">
               {isCatalogLoading ? <p role="status" className="text-sm text-stone-600">Loading your selected design…</p> : null}
@@ -547,6 +604,20 @@ function DesignRequestForm({ houseDesignId }: {
             </label>
             <FieldError id={`${fieldIds.notes}-error`} message={showError("notes")} />
           </div>
+
+          <section aria-labelledby="dr-lot-heading" className="mt-5 rounded-lg border border-stone-200 p-4" onChange={refreshLot} onBlur={refreshLot}>
+            <h3 id="dr-lot-heading" className="text-sm font-semibold">Lot Address</h3>
+            <p className="mt-1 mb-4 text-xs leading-5 text-stone-500">
+              Where the house will be built. An architect or engineer visits the lot to check its size, shape, and which
+              side faces the road before your request is approved.
+            </p>
+            <PhAddressFields
+              key={lotFormKey}
+              inputClassName="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm font-normal outline-none focus:border-red-600 aria-invalid:border-red-600"
+              labelClassName="block text-sm font-semibold"
+              errors={submitted ? lotErrors : undefined}
+            />
+          </section>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div>
@@ -735,6 +806,7 @@ function DesignRequestForm({ houseDesignId }: {
                 <p className="mt-3 text-xs font-semibold text-stone-700">
                   {statusLabel[request.status]}
                 </p>
+                {request.lotAddress || request.siteInspection ? <SiteInspectionNote request={request} /> : null}
                 <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div className="rounded-lg bg-stone-50 px-3 py-2">
                     <dt className="text-xs text-stone-500">Preferred Date</dt>

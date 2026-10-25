@@ -5,6 +5,7 @@ import { invoiceState, sumMoney, toCentavos } from "@/lib/billing";
 import { audit, BillingError, billingTransaction } from "@/lib/server/billing";
 import { embeddedImagesSchema } from "@/lib/server/embedded-images";
 import { insertNotifications } from "@/lib/server/notifications";
+import { toSiteInspectionDto } from "@/lib/site-inspection";
 import type { BlueprintFileDto, BlueprintPickupDto, DesignRequestDto, DesignVersionDto, DesignWorkflow, DesignWorkflowDto } from "@/types/design-requests";
 import type { SessionUser } from "@/types/domain";
 
@@ -99,6 +100,9 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
     finish: design.selectedDesign ? undefined : design.finish,
     rooms: design.rooms, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
+    ...(design.lotAddress ? { lotAddress: design.lotAddress } : {}),
+    ...(design.lotAddressDetails ? { lotAddressDetails: design.lotAddressDetails } : {}),
+    ...(design.siteInspection ? { siteInspection: toSiteInspectionDto(design.siteInspection) } : {}),
     ...(design.preferredDate ? { preferredDate: design.preferredDate.toISOString().slice(0, 10) } : {}),
     ...(design.neededBy ? { neededBy: design.neededBy.toISOString().slice(0, 10) } : {}),
     status: design.status, completedAt: design.completedAt?.toISOString(), designApprovedAt: design.designApprovedAt?.toISOString(),

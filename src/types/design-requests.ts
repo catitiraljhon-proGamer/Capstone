@@ -1,4 +1,27 @@
 
+import type { LotFacing, SiteInspectionStatus } from "@/lib/site-inspection";
+import type { AddressDetails } from "@/types/clients";
+
+/** The in-person check of the lot; the request can only be approved once the site is approved. */
+export type SiteInspectionDto = {
+  status: SiteInspectionStatus;
+  scheduledFor: string;
+  durationMinutes: number;
+  lotArea?: number;
+  /** Width along the road and length back from it, in meters. */
+  frontage?: number;
+  depth?: number;
+  /** Which side of the lot faces the road. */
+  facing?: LotFacing;
+  /** Orientation and other guidance for the design team. */
+  notes?: string;
+  /** Why the site is not suitable. */
+  reason?: string;
+  photoCount: number;
+  recordedAt?: string;
+  recordedByName?: string;
+};
+
 export type RequestedHouseDesign = {
   id: string;
   name: string;
@@ -81,6 +104,10 @@ export type DesignRequestDto = {
   preferredDate?: string;
   neededBy?: string;
   inspirationImages: string[];
+  /** Where the house will be built; missing on requests made before the lot address was asked. */
+  lotAddress?: string;
+  lotAddressDetails?: AddressDetails;
+  siteInspection?: SiteInspectionDto;
   status: DesignRequestStatus;
   completedAt?: string;
   designApprovedAt?: string;

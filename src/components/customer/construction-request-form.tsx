@@ -192,7 +192,8 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
             </label>
           </div>
           <div onChange={refreshAddress} onBlur={refreshAddress}>
-            <PhAddressFields inputClassName={`${constructionFieldClass} aria-invalid:border-red-600`} labelClassName={constructionLabelClass} errors={shownAddressErrors} />
+            {/* Starts from the lot address given with the design request, which the site inspection checked. */}
+            <PhAddressFields defaultValue={design.lotAddressDetails ?? null} inputClassName={`${constructionFieldClass} aria-invalid:border-red-600`} labelClassName={constructionLabelClass} errors={shownAddressErrors} />
           </div>
           <p className="-mt-2 text-xs text-stone-500">Enter the address of the lot where the house will be built.</p>
           <label className={`block min-w-0 ${constructionLabelClass}`}>

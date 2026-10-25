@@ -135,6 +135,18 @@ export async function PATCH(
       );
     }
 
+    // The architect or engineer must inspect and approve the lot before a design request is approved.
+    if (existing.recordType === "Design request") {
+      const design = await db.collection<DesignRequestDocument>(collections.designRequests)
+        .findOne({ _id: existing.recordId }, { projection: { siteInspection: 1 } });
+      if (design?.siteInspection?.status !== "Approved") {
+        return NextResponse.json(
+          { error: "Inspect the site and record it as approved before approving this design request." },
+          { status: 409 },
+        );
+      }
+    }
+
     const now = new Date();
     const updated = await approvals.findOneAndUpdate(
       { _id: approvalId, status: "Pending" },

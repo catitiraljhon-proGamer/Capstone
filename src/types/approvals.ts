@@ -1,4 +1,5 @@
-import type { RequestedHouseDesign } from "@/types/design-requests";
+import type { RequestedHouseDesign, SiteInspectionDto } from "@/types/design-requests";
+import type { AddressDetails } from "@/types/clients";
 
 export const approvalRecordTypes = [
   "Design request",
@@ -31,6 +32,10 @@ export type ApprovalDto = {
   selectedDesignImages?: string[];
   inspirationImages?: string[];
   completedDesignImages?: string[];
+  /** Design requests: the lot to inspect, and the inspection with its photos. */
+  lotAddress?: string;
+  lotAddressDetails?: AddressDetails;
+  siteInspection?: SiteInspectionDto & { photos: string[] };
   completedAt?: string;
   preferredDate?: string;
   neededBy?: string;

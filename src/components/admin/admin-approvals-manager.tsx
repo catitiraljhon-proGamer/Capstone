@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminDesignWorkflow } from "@/components/admin/admin-design-workflow";
+import { AdminSiteInspection } from "@/components/admin/admin-site-inspection";
 import { Button } from "@/components/ui/button";
 import { useModalBehavior } from "@/lib/use-modal-behavior";
 import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
@@ -195,6 +196,8 @@ function ApprovalReviewDialog({
   });
   const inspirationImages = approval.inspirationImages ?? [];
   const deliveredImages = approval.completedDesignImages ?? [];
+  // A design request can only be approved once the lot was inspected in person and approved.
+  const siteBlocked = approval.recordType === "Design request" && approval.siteInspection?.status !== "Approved";
 
   return (
     <div
@@ -360,6 +363,8 @@ function ApprovalReviewDialog({
             </div>
           ) : null}
 
+          {approval.recordType === "Design request" ? <AdminSiteInspection approval={approval} onChanged={onNotice} /> : null}
+
           {approval.status === "Pending" ? (
             <div className="border-t border-stone-200 pt-5">
               <label className="text-sm font-semibold text-stone-700">
@@ -377,13 +382,18 @@ function ApprovalReviewDialog({
                   className="mt-2 w-full resize-none rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100"
                 />
               </label>
+              {siteBlocked ? (
+                <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Inspect the site and record it as approved before approving this request.
+                </p>
+              ) : null}
               <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>
                   Cancel
                 </Button>
                 <Button
                   type="button"
-                  disabled={isSaving || !approval.sourceAvailable}
+                  disabled={isSaving || !approval.sourceAvailable || siteBlocked}
                   onClick={() => onApprove(note)}
                 >
                   {isSaving ? (
@@ -476,6 +486,8 @@ export function AdminApprovalsManager() {
       const payload = await readJson<ApprovalPayload>(response);
       setApprovals(payload.approvals);
       setSummary(payload.summary);
+      // Keep an open review current, e.g. after its site inspection changes.
+      setSelectedApproval((current) => (current ? payload.approvals.find((item) => item.id === current.id) ?? current : current));
       setError(null);
     } catch (loadError) {
       setError(

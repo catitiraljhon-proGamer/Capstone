@@ -9,6 +9,7 @@ import {
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { designRequestSubject } from "@/lib/design-request-subject";
+import { toSiteInspectionDto } from "@/lib/site-inspection";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { syncPendingWorkflowApprovals } from "@/lib/server/approvals";
@@ -30,6 +31,9 @@ type ApprovalSource = Pick<
   | "completedAt"
   | "preferredDate"
   | "neededBy"
+  | "lotAddress"
+  | "lotAddressDetails"
+  | "siteInspection"
   | "roomSpaceNote"
   | "amount"
 >;
@@ -160,6 +164,11 @@ export async function GET() {
         completedAt: source.completedAt?.toISOString(),
         preferredDate: source.preferredDate?.toISOString().slice(0, 10),
         neededBy: source.neededBy?.toISOString().slice(0, 10),
+        ...(source.lotAddress ? { lotAddress: source.lotAddress } : {}),
+        ...(source.lotAddressDetails ? { lotAddressDetails: source.lotAddressDetails } : {}),
+        ...(source.siteInspection
+          ? { siteInspection: { ...toSiteInspectionDto(source.siteInspection), photos: source.siteInspection.photos ?? [] } }
+          : {}),
         ...roomSpaceNote(source),
       });
     }

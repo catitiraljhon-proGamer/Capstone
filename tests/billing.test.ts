@@ -4,7 +4,8 @@ import { after, before, beforeEach, test } from "node:test";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
 import { getDatabase } from "@/lib/database/mongodb";
-import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type UserDocument } from "@/lib/database/collections";
+import { type DesignRequestDocument, type ApprovalDocument, type HouseDesignDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
+import { recordSiteInspection, scheduleSiteInspection } from "@/lib/server/site-inspections";
 import { BillingError, assertBillingRole, changeInvoice, createInvoice, getBillingData, getOwnedPayment, getReceipt, invoiceInputSchema, paymentInputSchema, reviewPayment, submitPayment } from "@/lib/server/billing";
 import { invoiceState, manilaDate } from "@/lib/billing";
 import { receiptHtml } from "@/lib/server/billing-receipt";
@@ -29,7 +30,9 @@ const projectId = new ObjectId();
 const draft = { projectId: projectId.toHexString(), label: "Foundation work", basis: "Signed milestone 1 and approved site report A01", progressPercentage: 25, amount: 100000, dueDate: "2099-12-31" };
 const isError = (status: number) => (error: unknown) => error instanceof BillingError && error.status === status;
 
-const dates = { preferredDate: "2099-01-10", neededBy: "2099-02-10" };
+const lotAddress = { provinceCode: "0401000000", cityCode: "0401003000", barangayCode: "0401003005", barangay: "Poblacion 3", street: "123 Rizal St.", postalCode: "4213" };
+/** What every design request needs besides the design: its timespan and the lot to inspect. */
+const requestBasics = { preferredDate: "2099-01-10", neededBy: "2099-02-10", lotAddress };
 const privateImage = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT1cAAAAASUVORK5CYII=";
 
 /** Records the customer's one-time Terms and Conditions agreement and returns its audit record id. */
@@ -55,7 +58,7 @@ async function publishedHouseDesign() {
 test("requesting a published design keeps its identity and specifications without duplicate uploads", async () => {
   const design = await publishedHouseDesign();
   const acceptance = await agree();
-  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...dates });
+  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...requestBasics });
   assert.equal(result.selectedDesign?.id, design._id.toHexString());
   assert.equal(result.selectedDesign.name, design.name);
   assert.equal(result.floorArea, design.area);
@@ -80,7 +83,7 @@ test("requesting a published design keeps its identity and specifications withou
 test("selected designs reject unavailable records, forged specifications, unauthorized roles, and missing terms", async () => {
   const design = await publishedHouseDesign();
   await agree();
-  const input = { houseDesignId: design._id.toHexString(), ...dates };
+  const input = { houseDesignId: design._id.toHexString(), ...requestBasics };
   for (const actor of [admin, clerk]) await assert.rejects(createDesignRequest(db, actor, input), isError(403));
   await assert.rejects(createDesignRequest(db, other, input), isError(409));
   await assert.rejects(createDesignRequest(db, customer, { houseDesignId: input.houseDesignId }), ZodError);
@@ -100,7 +103,7 @@ test("selected designs reject unavailable records, forged specifications, unauth
 test("customers can have at most three design requests waiting for review", async () => {
   const design = await publishedHouseDesign();
   await agree();
-  const input = { houseDesignId: design._id.toHexString(), ...dates };
+  const input = { houseDesignId: design._id.toHexString(), ...requestBasics };
   const customerId = new ObjectId(customer.id);
   const now = new Date();
   const existing = (status: DesignRequestDocument["status"]): DesignRequestDocument => ({
@@ -128,7 +131,7 @@ test("customers can have at most three design requests waiting for review", asyn
 
 test("custom design requests still require requirements and inspiration images", async () => {
   await agree();
-  const input = { houseType: "Modern", finish: "Semi-luxury", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom courtyard layout", inspirationImages: [privateImage], ...dates };
+  const input = { houseType: "Modern", finish: "Semi-luxury", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom courtyard layout", inspirationImages: [privateImage], ...requestBasics };
   // Custom requests choose one of the three finish levels.
   await assert.rejects(createDesignRequest(db, customer, { ...input, finish: undefined }), ZodError);
   await assert.rejects(createDesignRequest(db, customer, { ...input, finish: "Ultra" }), ZodError);
@@ -151,8 +154,8 @@ test("custom design requests still require requirements and inspiration images",
 test("design requests require a Preferred Date and Needed By in the future, in order, and return them", async () => {
   const design = await publishedHouseDesign();
   await agree();
-  const input = { houseDesignId: design._id.toHexString(), ...dates };
-  const custom = { houseType: "Modern", finish: "Standard", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom layout", inspirationImages: [privateImage], ...dates };
+  const input = { houseDesignId: design._id.toHexString(), ...requestBasics };
+  const custom = { houseType: "Modern", finish: "Standard", floorArea: 80, bedrooms: 2, bathrooms: 1, notes: "Custom layout", inspirationImages: [privateImage], ...requestBasics };
   const withoutPreferred = { ...input, preferredDate: undefined };
   const withoutNeeded = { ...custom, neededBy: undefined };
   await assert.rejects(createDesignRequest(db, customer, withoutPreferred), ZodError);
@@ -165,7 +168,7 @@ test("design requests require a Preferred Date and Needed By in the future, in o
   await assert.rejects(createDesignRequest(db, customer, { ...input, preferredDate: "2099-03-01", neededBy: "2099-02-01" }), isError(400));
   await assert.rejects(createDesignRequest(db, customer, { ...custom, preferredDate: "2099-03-01", neededBy: "2099-02-01" }), isError(400));
   assert.equal(await db.collection("design_requests").countDocuments(), 0);
-  const result = await createDesignRequest(db, customer, { ...input, neededBy: dates.preferredDate });
+  const result = await createDesignRequest(db, customer, { ...input, neededBy: requestBasics.preferredDate });
   assert.equal(result.preferredDate, "2099-01-10");
   assert.equal(result.neededBy, "2099-01-10");
   const saved = await db.collection<DesignRequestDocument>("design_requests").findOne({ _id: new ObjectId(result.id) });
@@ -180,7 +183,7 @@ test("a selected design is reviewed for free, and only the blueprint is paid bef
   const design = await publishedHouseDesign();
   await agree();
   const request = await createDesignRequest(db, customer, {
-    houseDesignId: design._id.toHexString(), ...dates,
+    houseDesignId: design._id.toHexString(), ...requestBasics,
     notes: "Please review a different gate finish.", inspirationImages: [privateImage],
   });
   assert.equal(request.notes, "Please review a different gate finish.");
@@ -310,6 +313,71 @@ test("a downpayment waiting on the blueprint fee is issued automatically once th
   assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "New invoice", entityId: downpaymentId }), 1);
 });
 
+test("an architect inspects the lot in person, and the result is recorded before the request moves on", async () => {
+  const design = await publishedHouseDesign();
+  await agree();
+  const request = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...requestBasics });
+  assert.equal(request.lotAddress, "123 Rizal St., Brgy. Poblacion 3, Balayan, Batangas 4213");
+  assert.equal(request.siteInspection, undefined);
+  const visits = () => db.collection<ScheduleDocument>("schedules").find({ designRequestId: new ObjectId(request.id) }).sort({ createdAt: 1 }).toArray();
+  const found = { result: "Approved", lotArea: 300, frontage: 10, depth: 30, facing: "East", notes: "Keep the living area on the east side for morning sun." };
+
+  await assert.rejects(scheduleSiteInspection(db, customer, request.id, { scheduledFor: "2099-01-05T01:00:00.000Z" }), isError(403));
+  await assert.rejects(recordSiteInspection(db, admin, request.id, found), isError(409)); // nothing scheduled yet
+  await assert.rejects(scheduleSiteInspection(db, admin, request.id, { scheduledFor: "2020-01-05T01:00:00.000Z" }), isError(400));
+  const scheduled = await scheduleSiteInspection(db, admin, request.id, { scheduledFor: "2099-01-05T01:00:00.000Z" });
+  assert.equal(scheduled.status, "Scheduled");
+  let [visit] = await visits();
+  assert.equal(visit.location, request.lotAddress);
+  assert.match(visit.title, /^Site inspection — /);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "Site inspection scheduled" }), 1);
+
+  // Moving the visit cancels the old calendar slot.
+  await scheduleSiteInspection(db, admin, request.id, { scheduledFor: "2099-01-06T01:00:00.000Z", durationMinutes: 90 });
+  assert.deepEqual((await visits()).map((event) => event.status), ["Cancelled", "Scheduled"]);
+
+  // Approving the site needs the measurements and which side faces the road.
+  await assert.rejects(recordSiteInspection(db, admin, request.id, { result: "Approved", lotArea: 300 }), ZodError);
+  await assert.rejects(recordSiteInspection(db, clerk, request.id, found), isError(403));
+  const approved = await recordSiteInspection(db, admin, request.id, found);
+  assert.equal(approved.status, "Approved");
+  const listed = (await listCustomerDesigns(db, customer)).find((item) => item.id === request.id)!;
+  assert.equal(listed.siteInspection?.status, "Approved");
+  assert.equal(listed.siteInspection?.facing, "East");
+  assert.equal(listed.siteInspection?.durationMinutes, 90);
+  assert.equal(listed.status, "In review");
+  visit = (await visits())[1];
+  assert.equal(visit.status, "Completed");
+  // A recorded inspection is final.
+  await assert.rejects(recordSiteInspection(db, admin, request.id, found), isError(409));
+  await assert.rejects(scheduleSiteInspection(db, admin, request.id, { scheduledFor: "2099-01-07T01:00:00.000Z" }), isError(409));
+});
+
+test("a lot found not suitable declines the design request with the reason", async () => {
+  const design = await publishedHouseDesign();
+  await agree();
+  const request = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...requestBasics });
+  await scheduleSiteInspection(db, admin, request.id, { scheduledFor: "2099-01-05T01:00:00.000Z" });
+  await assert.rejects(recordSiteInspection(db, admin, request.id, { result: "Not suitable", reason: "" }), ZodError);
+  await recordSiteInspection(db, admin, request.id, { result: "Not suitable", reason: "The lot is only 8 m wide; this design needs 12 m.", frontage: 8, depth: 25 });
+  const saved = await db.collection<DesignRequestDocument>("design_requests").findOne({ _id: new ObjectId(request.id) });
+  assert.equal(saved?.status, "Rejected");
+  assert.equal(saved?.siteInspection?.reason, "The lot is only 8 m wide; this design needs 12 m.");
+  const approval = await db.collection<ApprovalDocument>("approvals").findOne({ recordId: new ObjectId(request.id) });
+  assert.equal(approval?.status, "Rejected");
+  assert.match(approval?.reviewNote ?? "", /8 m wide/);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "Design request declined after the site inspection" }), 1);
+});
+
+test("requests sent before the lot address was asked get it when the inspection is scheduled", async () => {
+  const id = await designFixture("Pending");
+  await assert.rejects(scheduleSiteInspection(db, admin, id, { scheduledFor: "2099-01-05T01:00:00.000Z" }), isError(400));
+  await scheduleSiteInspection(db, admin, id, { scheduledFor: "2099-01-05T01:00:00.000Z", lotAddress });
+  const saved = await db.collection<DesignRequestDocument>("design_requests").findOne({ _id: new ObjectId(id) });
+  assert.equal(saved?.lotAddress, "123 Rizal St., Brgy. Poblacion 3, Balayan, Batangas 4213");
+  assert.equal(saved?.lotAddressDetails?.province, "Batangas");
+});
+
 test("the Terms and Conditions need an explicit customer agreement to the current version", async () => {
   const input = { accepted: true, version: accountTerms.version };
   await assert.rejects(acceptAccountTerms(db, admin, input), isError(403));
@@ -342,7 +410,7 @@ test("the agreement saves the customer identity, server timestamp, and exact ter
 
 test("design requests need the customer's own Terms and Conditions agreement", async () => {
   const design = await publishedHouseDesign();
-  const input = { houseDesignId: design._id.toHexString(), ...dates };
+  const input = { houseDesignId: design._id.toHexString(), ...requestBasics };
   await assert.rejects(createDesignRequest(db, customer, input), isError(409));
   await agree(other);
   await assert.rejects(createDesignRequest(db, customer, input), isError(409));

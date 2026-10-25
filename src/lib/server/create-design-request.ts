@@ -23,6 +23,7 @@ import { requireAccountTerms } from "@/lib/server/account-terms";
 import { customerDesignDto } from "@/lib/server/design-requests";
 import { embeddedImageSchema, embeddedImagesSchema } from "@/lib/server/embedded-images";
 import { isActiveHouseType } from "@/lib/server/house-designs";
+import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import { finishLevels, formatRoomSetup } from "@/lib/house-design-data";
 import type { SessionUser } from "@/types/domain";
 
@@ -36,6 +37,8 @@ const inputSchema = z.union([
     inspirationImages: z.array(embeddedImageSchema).max(6).default([]),
     preferredDate,
     neededBy,
+    /** Where the house will be built, so G4 can inspect the site before approving the request. */
+    lotAddress: addressDetailsSchema,
   }).strict(),
   z.object({
     houseType: z.string().trim().min(1, "Choose a house type.").max(80),
@@ -47,6 +50,7 @@ const inputSchema = z.union([
     inspirationImages: embeddedImagesSchema,
     preferredDate,
     neededBy,
+    lotAddress: addressDetailsSchema,
   }).strict(),
 ]);
 
@@ -109,6 +113,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
   const document: DesignRequestDocument = {
     _id: new ObjectId(), customerId, ...details, termsAcceptance,
     inspirationImages: input.inspirationImages,
+    lotAddress: formatAddress(input.lotAddress), lotAddressDetails: input.lotAddress,
     preferredDate: new Date(`${input.preferredDate}T00:00:00.000Z`),
     neededBy: new Date(`${input.neededBy}T00:00:00.000Z`),
     status: "Pending", createdAt: now, updatedAt: now,
@@ -135,7 +140,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
       ...(document.houseType ? { houseType: document.houseType } : {}),
       ...(document.finish ? { finish: document.finish } : {}),
       inspirationImageCount: input.inspirationImages.length,
-      preferredDate: input.preferredDate, neededBy: input.neededBy,
+      preferredDate: input.preferredDate, neededBy: input.neededBy, lotAddress: document.lotAddress!,
       ...(document.selectedDesign ? { selectedHouseDesignId: document.selectedDesign.id } : {}),
       termsVersion: termsAcceptance.version,
       termsAcceptedAt: termsAcceptance.acceptedAt.toISOString(),
