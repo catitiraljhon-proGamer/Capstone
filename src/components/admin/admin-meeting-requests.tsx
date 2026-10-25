@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { formatScheduleDateTime, readScheduleJson, toDateTimeInput } from "@/lib/schedule-display";
+import { formatScheduleDateTime, meetingAboutLabel, readScheduleJson, toDateTimeInput } from "@/lib/schedule-display";
 import type { MeetingRequestDto, ScheduleDto } from "@/types/schedules";
-import { Inbox, MapPin, Monitor, Users } from "lucide-react";
+import { FolderOpen, Inbox, MapPin, Monitor, Users } from "lucide-react";
 import { useState } from "react";
 
 const fieldClass =
@@ -69,7 +69,10 @@ function MeetingRequestCard({ request, onAnswered }: { request: MeetingRequestDt
         <div className="min-w-0">
           <h3 className="break-words font-semibold text-stone-950">{request.topic}</h3>
           <p className="mt-1 flex items-center gap-2 text-sm text-stone-600"><Users className="h-4 w-4 shrink-0" />{request.customerName}</p>
-          {request.projectName ? <p className="pl-6 text-xs text-stone-500">{request.projectName}</p> : null}
+          <p className="mt-1 flex items-start gap-2 text-sm text-stone-600">
+            <FolderOpen className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="break-words">Related to: {meetingAboutLabel(request)}</span>
+          </p>
         </div>
         <span className="inline-flex items-center gap-1 rounded bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-700">
           {request.mode === "Online" ? <Monitor className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}{request.mode}

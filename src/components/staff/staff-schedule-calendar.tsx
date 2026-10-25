@@ -423,7 +423,7 @@ function ScheduleCard({ schedule, canUpdate, isUpdating, onStatusChange }: {
       <div className="mt-3 space-y-2 text-sm text-stone-600">
         <p className="flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" />{formatScheduleDateTime(schedule.scheduledFor)}{schedule.eventType === "Client meeting" ? ` · ${schedule.durationMinutes} min` : ""}</p>
         <p className="flex items-start gap-2"><Users className="mt-0.5 h-4 w-4 shrink-0" />{schedule.clientName}</p>
-        {schedule.projectName ? <p className="pl-6 text-xs">{schedule.projectName}</p> : null}
+        {schedule.projectName ?? schedule.designRequestName ? <p className="pl-6 text-xs">{schedule.projectName ?? schedule.designRequestName}</p> : null}
         {schedule.location ? <p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" /><span className="break-all">{schedule.location}</span></p> : null}
         {schedule.notes ? <p className="whitespace-pre-line rounded-lg bg-stone-50 p-3 text-xs leading-5">{schedule.notes}</p> : null}
         <p className="flex items-start gap-2 text-xs text-stone-500"><CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0" />Added by {schedule.createdByName}</p>

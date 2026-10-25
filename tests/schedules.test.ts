@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
 import { MongoMemoryReplSet } from "mongodb-memory-server";
 import { ObjectId, type Db } from "mongodb";
+import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
-import type { InvoiceDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
+import type { DesignRequestDocument, InvoiceDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
 import { BillingError } from "@/lib/server/billing";
 import { createSchedule, getCustomerSchedule, getStaffSchedule, requestMeeting, reviewMeetingRequest, updateScheduleStatus } from "@/lib/server/schedules";
 import type { SessionUser } from "@/types/domain";
@@ -15,13 +16,14 @@ const clerk: SessionUser = { id: new ObjectId().toHexString(), name: "Billing Cl
 const customer: SessionUser = { id: new ObjectId().toHexString(), name: "Test Customer", email: "customer@example.test", role: "customer" };
 const other: SessionUser = { id: new ObjectId().toHexString(), name: "Other Customer", email: "other@example.test", role: "customer" };
 const projectId = new ObjectId();
+const designRequestId = new ObjectId();
 const isError = (status: number) => (error: unknown) => error instanceof BillingError && error.status === status;
 
 // Saturday, October 17, 2026, 8:00 AM in Manila.
 const now = new Date("2026-10-17T00:00:00.000Z");
 const mondayTen = "2026-10-19T02:00:00.000Z"; // Monday 10:00 AM Manila
 const mondayTwo = "2026-10-19T06:00:00.000Z"; // Monday 2:00 PM Manila
-const request = (extra: Record<string, unknown> = {}) => ({ topic: "Discuss floor plan changes", mode: "In person", preferredTimes: [mondayTen, mondayTwo], ...extra });
+const request = (extra: Record<string, unknown> = {}) => ({ topic: "Discuss floor plan changes", mode: "In person", relatedTo: "general", preferredTimes: [mondayTen, mondayTwo], ...extra });
 const notificationsFor = (actor: SessionUser) => db.collection("notifications").find({ userId: new ObjectId(actor.id) }).toArray();
 
 before(async () => {
@@ -32,7 +34,7 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_schedule_tests");
-  await Promise.all(["users", "projects", "invoices", "payments", "schedules", "meeting_requests", "audit_logs", "notifications"].map((name) => db.collection(name).deleteMany({})));
+  await Promise.all(["users", "projects", "design_requests", "invoices", "payments", "schedules", "meeting_requests", "audit_logs", "notifications"].map((name) => db.collection(name).deleteMany({})));
   const created = new Date();
   await db.collection<UserDocument>("users").insertMany([admin, clerk, customer, other].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: created, updatedAt: created,
@@ -41,16 +43,21 @@ beforeEach(async () => {
     _id: projectId, reference: "PRJ-001", name: "Test residence", customerId: new ObjectId(customer.id),
     status: "Active", contractPrice: 200000, createdAt: created, updatedAt: created,
   });
+  await db.collection<DesignRequestDocument>("design_requests").insertOne({
+    _id: designRequestId, customerId: new ObjectId(customer.id), houseType: "Modern", floorArea: 150, rooms: "3 bedrooms, 2 bathrooms",
+    notes: "", status: "Pending", createdAt: new Date("2026-10-20T02:00:00.000Z"), updatedAt: created,
+  } as unknown as DesignRequestDocument);
 });
 after(async () => { await db?.client.close(); await mongo?.stop(); });
 
 test("a customer's meeting request reaches the admins, and only office-hour times at least a day ahead are accepted", async () => {
-  const sent = await requestMeeting(db, customer, request({ projectId: projectId.toHexString() }), now);
+  const sent = await requestMeeting(db, customer, request({ relatedTo: `project:${projectId.toHexString()}` }), now);
   assert.equal(sent.status, "Pending");
   assert.equal(sent.projectName, "PRJ-001 · Test residence");
   assert.deepEqual(sent.preferredTimes, [mondayTen, mondayTwo]);
   const [adminNotice] = await notificationsFor(admin);
   assert.equal(adminNotice.title, "New meeting request");
+  assert.match(adminNotice.body, /about PRJ-001 · Test residence/);
   assert.equal(adminNotice.href, "/admin/scheduling");
 
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-17T06:00:00.000Z"] }), now), isError(400)); // today
@@ -60,7 +67,12 @@ test("a customer's meeting request reaches the admins, and only office-hour time
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-19T08:45:00.000Z"] }), now), isError(400)); // 4:45 PM, ends after 5:00
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: ["2026-10-24T04:00:00.000Z"] }), now), isError(400)); // Saturday 12:00 PM
   await assert.rejects(requestMeeting(db, customer, request({ preferredTimes: [mondayTen, mondayTen] }), now), isError(400));
-  await assert.rejects(requestMeeting(db, customer, request({ projectId: new ObjectId().toHexString() }), now), isError(400));
+  await assert.rejects(requestMeeting(db, customer, request({ relatedTo: `project:${new ObjectId().toHexString()}` }), now), isError(400));
+  await assert.rejects(requestMeeting(db, customer, request({ relatedTo: `design-request:${new ObjectId().toHexString()}` }), now), isError(400));
+  // What the meeting is related to is required.
+  for (const relatedTo of [undefined, "", "project", "something-else"]) {
+    await assert.rejects(requestMeeting(db, customer, request({ relatedTo }), now), ZodError);
+  }
   await assert.rejects(requestMeeting(db, admin, request(), now), isError(403));
 
   // At most three requests can wait at once.
@@ -76,6 +88,24 @@ test("only the customer who asked can cancel a pending request", async () => {
   const { request: cancelled } = await reviewMeetingRequest(db, customer, sent.id, { action: "cancel" }, now);
   assert.equal(cancelled.status, "Cancelled");
   await assert.rejects(reviewMeetingRequest(db, admin, sent.id, { action: "approve", scheduledFor: mondayTen, durationMinutes: 60 }, now), isError(409));
+});
+
+test("a meeting about a design request keeps its name, and the customer can pick from their requests", async () => {
+  const { designRequests } = await getCustomerSchedule(db, customer);
+  assert.deepEqual(designRequests, [{ id: designRequestId.toHexString(), name: "150 sqm Modern design request (Oct 20, 2026)" }]);
+  assert.deepEqual((await getCustomerSchedule(db, other)).designRequests, []);
+
+  const sent = await requestMeeting(db, customer, request({ relatedTo: `design-request:${designRequestId.toHexString()}` }), now);
+  assert.equal(sent.designRequestName, "150 sqm Modern design request (Oct 20, 2026)");
+  assert.equal(sent.projectName, undefined);
+  // Another customer's design request cannot be chosen.
+  await assert.rejects(requestMeeting(db, other, request({ relatedTo: `design-request:${designRequestId.toHexString()}` }), now), isError(400));
+
+  const result = await reviewMeetingRequest(db, admin, sent.id, { action: "approve", scheduledFor: mondayTen, durationMinutes: 60 }, now);
+  assert.ok("schedule" in result && result.schedule);
+  assert.equal(result.schedule.designRequestName, "150 sqm Modern design request (Oct 20, 2026)");
+  const [meeting] = (await getCustomerSchedule(db, customer)).meetings;
+  assert.equal(meeting.designRequestName, "150 sqm Modern design request (Oct 20, 2026)");
 });
 
 test("approving a request schedules the meeting once, notifies the customer, and blocks overlapping meetings", async () => {

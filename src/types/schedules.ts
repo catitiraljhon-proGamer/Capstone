@@ -13,6 +13,8 @@ export type ScheduleDto = {
   clientName: string;
   projectId?: string;
   projectName?: string;
+  /** Set when the meeting came from a request about a design request. */
+  designRequestName?: string;
   scheduledFor: string;
   durationMinutes: number;
   location?: string;
@@ -29,6 +31,8 @@ export type MeetingRequestDto = {
   customerName: string;
   projectId?: string;
   projectName?: string;
+  /** The design request the meeting is about, as the customer chose it. */
+  designRequestName?: string;
   topic: string;
   details?: string;
   mode: MeetingMode;
@@ -55,11 +59,13 @@ export type StaffScheduleData = {
 };
 
 /** What a customer sees about their own meetings; staff notes stay internal. */
-export type CustomerMeetingDto = Pick<ScheduleDto, "id" | "title" | "projectName" | "scheduledFor" | "durationMinutes" | "location" | "status">;
+export type CustomerMeetingDto = Pick<ScheduleDto, "id" | "title" | "projectName" | "designRequestName" | "scheduledFor" | "durationMinutes" | "location" | "status">;
 
 export type CustomerScheduleData = {
   meetings: CustomerMeetingDto[];
   meetingRequests: MeetingRequestDto[];
   projects: { id: string; reference: string; name: string }[];
+  /** The customer's design requests a meeting can be about, newest first. */
+  designRequests: { id: string; name: string }[];
   paymentDues: PaymentDueDto[];
 };

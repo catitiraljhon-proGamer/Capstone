@@ -11,6 +11,7 @@ import {
 import { audit, BillingError, billingTransaction } from "@/lib/server/billing";
 import { insertNotifications } from "@/lib/server/notifications";
 import { designWorkflow, feeInvoiceState } from "@/lib/server/design-requests";
+import { designRequestName } from "@/lib/design-request-subject";
 import { isWithinOfficeHours, officeHoursText } from "@/lib/office-hours";
 import { listPaymentDues } from "@/lib/server/payment-dues";
 import type { SessionUser } from "@/types/domain";
@@ -49,7 +50,9 @@ export const meetingRequestInputSchema = z.object({
   topic: z.string().trim().min(3, "Enter what the meeting is about.").max(120),
   details: z.string().trim().max(1_000).optional(),
   mode: z.enum(["In person", "Online"]),
-  projectId: z.union([objectIdSchema, z.literal("")]).optional(),
+  /** "general", "project:<id>", or "design-request:<id>", so the admin knows what the meeting is for. */
+  relatedTo: z.string({ error: "Choose what the meeting is related to." })
+    .regex(/^(general|project:[a-f\d]{24}|design-request:[a-f\d]{24})$/i, "Choose what the meeting is related to."),
   preferredTimes: z.array(z.iso.datetime()).min(1, "Choose at least one preferred time.").max(3, "Choose up to three preferred times."),
 }).strict();
 
@@ -85,6 +88,7 @@ export function toScheduleDto(document: ScheduleDocument): ScheduleDto {
     clientName: document.clientName,
     projectId: document.projectId?.toHexString(),
     projectName: document.projectName,
+    ...(document.designRequestName ? { designRequestName: document.designRequestName } : {}),
     scheduledFor: document.scheduledFor.toISOString(),
     durationMinutes: document.durationMinutes,
     location: document.location,
@@ -103,6 +107,7 @@ function toMeetingRequestDto(document: MeetingRequestDocument): MeetingRequestDt
     customerName: document.customerName,
     projectId: document.projectId?.toHexString(),
     projectName: document.projectName,
+    ...(document.designRequestName ? { designRequestName: document.designRequestName } : {}),
     topic: document.topic,
     details: document.details,
     mode: document.mode,
@@ -157,23 +162,28 @@ export async function getStaffSchedule(db: Db, actor: SessionUser): Promise<Staf
 export async function getCustomerSchedule(db: Db, actor: SessionUser): Promise<CustomerScheduleData> {
   if (actor.role !== "customer") throw new BillingError("Only customers have a personal schedule.", 403);
   const customerId = recordId(actor.id, "Account");
-  const [meetings, requests, projects, paymentDues] = await Promise.all([
+  const [meetings, requests, projects, designRequests, paymentDues] = await Promise.all([
     db.collection<ScheduleDocument>(collections.schedules)
       .find({ clientId: customerId, eventType: "Client meeting" }).sort({ scheduledFor: 1 }).limit(500).toArray(),
     db.collection<MeetingRequestDocument>(collections.meetingRequests)
       .find({ customerId }).sort({ createdAt: -1 }).limit(30).toArray(),
     db.collection<ProjectDocument>(collections.projects)
       .find({ customerId, status: { $ne: "Completed" } }, { projection: { reference: 1, name: 1 } }).sort({ name: 1 }).toArray(),
+    db.collection<DesignRequestDocument>(collections.designRequests)
+      .find({ customerId, status: { $ne: "Rejected" } }, { projection: { selectedDesign: 1, floorArea: 1, houseType: 1, createdAt: 1 } })
+      .sort({ createdAt: -1 }).limit(20).toArray(),
     listPaymentDues(db, { customerId }),
   ]);
   return {
     meetings: meetings.map((meeting) => ({
       id: meeting._id.toHexString(), title: meeting.title, projectName: meeting.projectName,
+      ...(meeting.designRequestName ? { designRequestName: meeting.designRequestName } : {}),
       scheduledFor: meeting.scheduledFor.toISOString(), durationMinutes: meeting.durationMinutes,
       location: meeting.location, status: meeting.status,
     })),
     meetingRequests: requests.map(toMeetingRequestDto),
     projects: projects.map((project) => ({ id: project._id.toHexString(), reference: project.reference, name: project.name })),
+    designRequests: designRequests.map((request) => ({ id: request._id.toHexString(), name: designRequestName(request) })),
     paymentDues,
   };
 }
@@ -276,21 +286,31 @@ export async function requestMeeting(db: Db, actor: SessionUser, raw: unknown, n
   if (await requests.countDocuments({ customerId, status: "Pending" }) >= maxPendingRequests) {
     throw new BillingError(`You already have ${maxPendingRequests} meeting requests waiting. Wait for a reply or cancel one first.`, 409);
   }
-  const { client, project } = await findCustomerAndProject(db, customerId, input.projectId ? recordId(input.projectId, "Project") : undefined);
+  const [kind, relatedId] = input.relatedTo.split(":");
+  const { client, project } = await findCustomerAndProject(db, customerId, kind === "project" ? recordId(relatedId, "Project") : undefined);
+  const design = kind === "design-request"
+    ? await db.collection<DesignRequestDocument>(collections.designRequests).findOne(
+      { _id: recordId(relatedId, "Design request"), customerId },
+      { projection: { selectedDesign: 1, floorArea: 1, houseType: 1, createdAt: 1 } },
+    )
+    : null;
+  if (kind === "design-request" && !design) throw new BillingError("The selected design request was not found.", 400);
   const document: MeetingRequestDocument = {
     _id: new ObjectId(), customerId, customerName: client.name,
     ...(project ? { projectId: project._id, projectName: projectLabel(project) } : {}),
+    ...(design ? { designRequestId: design._id, designRequestName: designRequestName(design) } : {}),
     topic: input.topic, ...(input.details ? { details: input.details } : {}), mode: input.mode,
     preferredTimes: [...preferredTimes].sort((left, right) => left.getTime() - right.getTime()),
     status: "Pending", createdAt: now, updatedAt: now,
   };
   await billingTransaction(db, async (session) => {
     await requests.insertOne(document, { session });
-    await audit(db, session, actor, "meeting-request.created", "meeting_request", document._id, { topic: document.topic, mode: document.mode });
+    const about = document.projectName ?? document.designRequestName ?? "General inquiry";
+    await audit(db, session, actor, "meeting-request.created", "meeting_request", document._id, { topic: document.topic, mode: document.mode, about });
     const admins = await db.collection<UserDocument>(collections.users).find({ role: "admin", status: "active" }, { session, projection: { _id: 1 } }).toArray();
     await insertNotifications(db, admins.map((admin) => ({
       _id: new ObjectId(), userId: admin._id, kind: "meeting-request", entityId: document._id, href: "/admin/scheduling",
-      title: "New meeting request", body: `${client.name} requested a meeting: ${document.topic}.`, createdAt: now,
+      title: "New meeting request", body: `${client.name} requested a meeting about ${about}: ${document.topic}.`, createdAt: now,
     })), session);
   });
   return toMeetingRequestDto(document);
@@ -339,6 +359,9 @@ export async function reviewMeetingRequest(db: Db, actor: SessionUser, id: strin
     const meeting: ScheduleDocument = {
       _id: new ObjectId(), title: pending.topic, eventType: "Client meeting", clientId: pending.customerId, clientName: client.name,
       ...(project ? { projectId: project._id, projectName: projectLabel(project) } : {}),
+      ...(pending.designRequestId && pending.designRequestName
+        ? { designRequestId: pending.designRequestId, designRequestName: pending.designRequestName }
+        : {}),
       scheduledFor, durationMinutes: input.durationMinutes, ...(location ? { location } : {}),
       notes: [`Requested by the customer (${pending.mode}).`, pending.details].filter(Boolean).join("\n"),
       status: "Scheduled", paymentStatus: "Not applicable",

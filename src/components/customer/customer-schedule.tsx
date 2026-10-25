@@ -11,6 +11,7 @@ import {
   formatScheduleDateTime,
   formatScheduleTime,
   groupByDay,
+  meetingAboutLabel,
   meetingRequestStatusClass,
   paymentDueClass,
   readScheduleJson,
@@ -23,7 +24,8 @@ import { Banknote, CalendarDays, CalendarPlus, Clock3, Inbox, MapPin, Monitor, P
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-type RequestForm = { topic: string; projectId: string; mode: MeetingMode; preferredTimes: string[]; details: string };
+/** `relatedTo` is "general", "project:<id>", or "design-request:<id>". */
+type RequestForm = { topic: string; relatedTo: string; mode: MeetingMode; preferredTimes: string[]; details: string };
 
 const fieldClass =
   "mt-1.5 h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none transition focus:border-red-600 focus:ring-2 focus:ring-red-600/15";
@@ -43,14 +45,14 @@ function firstSuggestedTime() {
 }
 
 function emptyRequest(): RequestForm {
-  return { topic: "", projectId: "", mode: "In person", preferredTimes: [toDateTimeInput(firstSuggestedTime())], details: "" };
+  return { topic: "", relatedTo: "", mode: "In person", preferredTimes: [toDateTimeInput(firstSuggestedTime())], details: "" };
 }
 
 /** The customer's own meetings and payment dates, plus requesting a meeting that the admin approves. */
 export function CustomerSchedule() {
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => dateKey(new Date()));
-  const [data, setData] = useState<CustomerScheduleData>({ meetings: [], meetingRequests: [], projects: [], paymentDues: [] });
+  const [data, setData] = useState<CustomerScheduleData>({ meetings: [], meetingRequests: [], projects: [], designRequests: [], paymentDues: [] });
   const [form, setForm] = useState<RequestForm>(emptyRequest);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -109,6 +111,7 @@ export function CustomerSchedule() {
     setError(null);
     setSuccessMessage(null);
     try {
+      if (!form.relatedTo) throw new Error("Choose what the meeting is related to.");
       const preferredTimes = form.preferredTimes.map((time) => new Date(time));
       if (preferredTimes.some((time) => Number.isNaN(time.getTime()))) throw new Error("Select a valid date and time for each choice.");
       const response = await fetch("/api/meeting-requests", {
@@ -118,7 +121,7 @@ export function CustomerSchedule() {
           topic: form.topic,
           mode: form.mode,
           preferredTimes: preferredTimes.map((time) => time.toISOString()),
-          ...(form.projectId ? { projectId: form.projectId } : {}),
+          relatedTo: form.relatedTo,
           ...(form.details.trim() ? { details: form.details.trim() } : {}),
         }),
       });
@@ -195,10 +198,20 @@ export function CustomerSchedule() {
               <input required minLength={3} maxLength={120} value={form.topic} onChange={(event) => setForm({ ...form, topic: event.target.value })} placeholder="Enter meeting topic" className={fieldClass} />
             </label>
             <label className="text-sm font-medium text-stone-700">
-              Project (optional)
-              <select value={form.projectId} onChange={(event) => setForm({ ...form, projectId: event.target.value })} className={fieldClass}>
-                <option value="">No Specific Project</option>
-                {data.projects.map((project) => <option key={project.id} value={project.id}>{project.reference} · {project.name}</option>)}
+              Related To
+              <select required value={form.relatedTo} onChange={(event) => setForm({ ...form, relatedTo: event.target.value })} className={fieldClass}>
+                <option value="">Select what the meeting is for</option>
+                {data.designRequests.length ? (
+                  <optgroup label="Design Requests">
+                    {data.designRequests.map((request) => <option key={request.id} value={`design-request:${request.id}`}>{request.name}</option>)}
+                  </optgroup>
+                ) : null}
+                {data.projects.length ? (
+                  <optgroup label="Construction Projects">
+                    {data.projects.map((project) => <option key={project.id} value={`project:${project.id}`}>{project.reference} · {project.name}</option>)}
+                  </optgroup>
+                ) : null}
+                <option value="general">General inquiry</option>
               </select>
             </label>
 
@@ -339,7 +352,7 @@ export function CustomerSchedule() {
                     <span className={`rounded px-2 py-0.5 text-xs font-semibold ${meetingRequestStatusClass[request.status]}`}>{request.status}</span>
                     <span className="text-xs text-stone-500">{request.mode}</span>
                   </div>
-                  {request.projectName ? <p className="mt-1 text-xs text-stone-500">{request.projectName}</p> : null}
+                  <p className="mt-1 text-xs text-stone-500">Related to: {meetingAboutLabel(request)}</p>
                   {request.status === "Approved" && request.scheduledFor ? (
                     <p className="mt-2 flex items-center gap-2 text-sm font-medium text-emerald-700"><Clock3 className="h-4 w-4" />Scheduled for {formatScheduleDateTime(request.scheduledFor)}</p>
                   ) : (
@@ -387,7 +400,7 @@ function MeetingCard({ meeting }: { meeting: CustomerMeetingDto }) {
       </div>
       <div className="mt-3 space-y-2 text-sm text-stone-600">
         <p className="flex items-start gap-2"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" />{formatScheduleDateTime(meeting.scheduledFor)} · {meeting.durationMinutes} min</p>
-        {meeting.projectName ? <p className="pl-6 text-xs">{meeting.projectName}</p> : null}
+        {meeting.projectName ?? meeting.designRequestName ? <p className="pl-6 text-xs">{meeting.projectName ?? meeting.designRequestName}</p> : null}
         {meeting.location ? (
           <p className="flex items-start gap-2">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0" />

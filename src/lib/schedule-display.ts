@@ -1,6 +1,11 @@
 import type { PaymentDueDto } from "@/types/billing";
 import type { MeetingRequestStatus, ScheduleEventType, ScheduleStatus } from "@/types/schedules";
 
+/** What a meeting or meeting request is about; one without a project or design request is a general inquiry. */
+export function meetingAboutLabel(item: { projectName?: string; designRequestName?: string }) {
+  return item.projectName ?? item.designRequestName ?? "General inquiry";
+}
+
 export const eventTypeClass: Record<ScheduleEventType, string> = {
   "Client meeting": "border-red-200 bg-red-50 text-red-800",
   "Payment follow-up": "border-violet-200 bg-violet-50 text-violet-800",

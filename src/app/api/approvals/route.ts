@@ -8,6 +8,7 @@ import {
   type UserDocument,
 } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
+import { designRequestSubject } from "@/lib/design-request-subject";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { syncPendingWorkflowApprovals } from "@/lib/server/approvals";
@@ -139,9 +140,7 @@ export async function GET() {
 
     for (const source of designRequests) {
       sourcesByKey.set(sourceKey("Design request", source._id), {
-        subject: source.selectedDesign
-          ? `${source.selectedDesign.name} — design request`
-          : `${source.floorArea.toLocaleString("en-PH")} sqm ${source.houseType ? `${source.houseType} ` : ""}design request`,
+        subject: designRequestSubject(source),
         // A published design already shows its size and rooms, so only the client's note is added.
         description: source.selectedDesign
           ? source.notes

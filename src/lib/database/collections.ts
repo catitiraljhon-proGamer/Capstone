@@ -509,6 +509,9 @@ export type ScheduleDocument = {
   clientName: string;
   projectId?: ObjectId;
   projectName?: string;
+  /** Meetings approved from a request about a design request. */
+  designRequestId?: ObjectId;
+  designRequestName?: string;
   scheduledFor: Date;
   durationMinutes: number;
   location?: string;
@@ -536,7 +539,10 @@ export type MeetingRequestDocument = {
   mode: MeetingMode;
   /** Set when the customer asks to pick up a paid blueprint in person. */
   purpose?: "blueprint-pickup";
+  /** The design request a pickup is for, or that a meeting is about. */
   designRequestId?: ObjectId;
+  /** Snapshot of the design request's name when the customer chose it as what the meeting is about. */
+  designRequestName?: string;
   /** One to three times the customer can attend, in order of preference. */
   preferredTimes: Date[];
   status: MeetingRequestStatus;
