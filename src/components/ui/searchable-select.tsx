@@ -48,6 +48,8 @@ function findMatches(options: SearchableSelectOption[], query: string) {
   return options.filter((_, index) => labels[index].includes(needle));
 }
 
+const isMarginClass = (token: string) => /^(?:[\w-]+:)*-?m[trblxy]?-/.test(token);
+
 /** Search bar that suggests matching options as the user types; only a picked option counts as a value. */
 export function SearchableSelect({
   options,
@@ -75,6 +77,10 @@ export function SearchableSelect({
 
   const selected = options.find((option) => option.value === value);
   const matches = useMemo(() => findMatches(options, query ?? ""), [options, query]);
+  // Margins move to the wrapper, so the wrapper is exactly as tall as the input and the icon centers on it.
+  const classTokens = className?.split(/\s+/).filter(Boolean) ?? [];
+  const wrapperClass = classTokens.filter(isMarginClass).join(" ");
+  const inputClass = classTokens.filter((token) => !isMarginClass(token)).join(" ");
 
   useEffect(() => {
     const message = required && !selected ? "Type to search, then pick from the list." : "";
@@ -118,8 +124,8 @@ export function SearchableSelect({
   };
 
   return (
-    <div className="relative">
-      <Search aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 h-4 w-4 text-stone-400" />
+    <div className={cn("relative", wrapperClass)}>
+      <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
       <input
         ref={inputRef}
         type="search"
@@ -160,7 +166,8 @@ export function SearchableSelect({
           setIsOpen(false);
           onBlur?.();
         }}
-        className={cn(className, "pl-9")}
+        // Chrome keeps room for its clear button even when the field is empty, which cuts off the placeholder.
+        className={cn(inputClass, "pl-9 [&:placeholder-shown::-webkit-search-cancel-button]:hidden")}
       />
 
       {isOpen ? (
