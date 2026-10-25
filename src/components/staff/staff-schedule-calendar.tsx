@@ -286,8 +286,8 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                 disabled={!form.clientId}
                 value={form.projectId}
                 onChange={(projectId) => setForm({ ...form, projectId })}
-                options={[{ value: "", label: "No Linked Project" }, ...clientProjects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))]}
-                placeholder="No Linked Project"
+                options={clientProjects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))}
+                placeholder="Search project"
                 emptyMessage="No project matches that search."
                 className={fieldClass}
               />

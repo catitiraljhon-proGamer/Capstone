@@ -152,8 +152,8 @@ export function PhAddressFields({
       <p className="text-xs text-stone-500">We currently serve projects in Luzon only.</p>
       {legacyAddress && !defaultValue ? (
         <p className="rounded-lg border border-stone-200 bg-stone-50 p-3 text-xs leading-5 text-stone-600">
-          Address on file: <span className="font-medium text-stone-800">{legacyAddress}</span>. Choose it from the
-          lists below to update it.
+          Address on file: <span className="font-medium text-stone-800">{legacyAddress}</span>. Search for it in the
+          fields below to update it.
         </p>
       ) : null}
       <div className="grid min-w-0 gap-4 sm:grid-cols-3">
@@ -174,7 +174,7 @@ export function PhAddressFields({
                 setLoadingCities(Boolean(code));
               }}
               options={provinces.map((item) => ({ value: item.code, label: item.name }))}
-              placeholder={provinces.length ? "Select province" : "Loading provinces…"}
+              placeholder={provinces.length ? "Search province" : "Loading provinces…"}
               emptyMessage="No province matches that name."
               className={selectClassName}
             />
@@ -196,7 +196,7 @@ export function PhAddressFields({
                 setBarangayCode("");
               }}
               options={cities.map((item) => ({ value: item.code, label: item.name }))}
-              placeholder={!provinceCode ? "Select province first" : loadingCities ? "Loading…" : "Select city / municipality"}
+              placeholder={!provinceCode ? "Select province first" : loadingCities ? "Loading…" : "Search city / municipality"}
               emptyMessage="No city or municipality matches that name."
               className={selectClassName}
             />
@@ -215,7 +215,7 @@ export function PhAddressFields({
               value={barangayCode}
               onChange={setBarangayCode}
               options={barangays.map((item) => ({ value: item.code, label: item.name }))}
-              placeholder={city ? "Select barangay" : "Select city first"}
+              placeholder={city ? "Search barangay" : "Select city first"}
               emptyMessage="No barangay matches that name."
               className={selectClassName}
             />

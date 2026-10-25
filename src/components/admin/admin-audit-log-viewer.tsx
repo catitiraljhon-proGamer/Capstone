@@ -238,8 +238,8 @@ export function AdminAuditLogViewer() {
                   setAction(next);
                   setPage(1);
                 }}
-                options={[{ value: "", label: "All Actions" }, ...payload.filters.actions.map((option) => ({ value: option, label: actionLabel(option) }))]}
-                placeholder="All Actions"
+                options={payload.filters.actions.map((option) => ({ value: option, label: actionLabel(option) }))}
+                placeholder="Search action"
                 emptyMessage="No action matches that search."
                 className={`${fieldClass} w-full`}
               />
@@ -253,8 +253,8 @@ export function AdminAuditLogViewer() {
                   setEntityType(next);
                   setPage(1);
                 }}
-                options={[{ value: "", label: "All Targets" }, ...payload.filters.entityTypes.map((option) => ({ value: option, label: humanize(option) }))]}
-                placeholder="All Targets"
+                options={payload.filters.entityTypes.map((option) => ({ value: option, label: humanize(option) }))}
+                placeholder="Search target"
                 emptyMessage="No target matches that search."
                 className={`${fieldClass} w-full`}
               />

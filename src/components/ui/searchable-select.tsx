@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { flushSync } from "react-dom";
 
@@ -24,7 +24,31 @@ type SearchableSelectProps = {
   "aria-describedby"?: string;
 };
 
-/** Text input that filters a list of options by label; only a picked option counts as a value. */
+/** Lowercase without accents, so "paranaque" finds "Parañaque". */
+const normalize = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+const startsAWord = (label: string, needle: string) => {
+  for (let index = label.indexOf(needle); index !== -1; index = label.indexOf(needle, index + 1)) {
+    if (index === 0 || !/[a-z0-9]/.test(label[index - 1])) return true;
+  }
+  return false;
+};
+
+/**
+ * Options with a word that starts with the search, those whose name starts with it first, so typing "a" narrows
+ * the list right away. Only when no word matches does it fall back to any part of the name, e.g. "12" for "PRJ-0012".
+ */
+function findMatches(options: SearchableSelectOption[], query: string) {
+  const needle = normalize(query.trim());
+  if (!needle) return [];
+  const labels = options.map((option) => normalize(option.label));
+  const byName = options.filter((_, index) => labels[index].startsWith(needle));
+  const byWord = options.filter((_, index) => !labels[index].startsWith(needle) && startsAWord(labels[index], needle));
+  if (byName.length || byWord.length) return [...byName, ...byWord];
+  return options.filter((_, index) => labels[index].includes(needle));
+}
+
+/** Search bar that suggests matching options as the user types; only a picked option counts as a value. */
 export function SearchableSelect({
   options,
   value,
@@ -44,18 +68,16 @@ export function SearchableSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const nativeRef = useRef<HTMLSelectElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // What the user typed since the last pick; null shows the picked option's name.
+  const [query, setQuery] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
 
   const selected = options.find((option) => option.value === value);
-  const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return needle ? options.filter((option) => option.label.toLowerCase().includes(needle)) : options;
-  }, [options, query]);
+  const matches = useMemo(() => findMatches(options, query ?? ""), [options, query]);
 
   useEffect(() => {
-    const message = required && !selected ? "Select an option from the list." : "";
+    const message = required && !selected ? "Type to search, then pick from the list." : "";
     inputRef.current?.setCustomValidity(message);
     nativeRef.current?.setCustomValidity(message);
   }, [required, selected]);
@@ -64,26 +86,26 @@ export function SearchableSelect({
     if (isOpen) listRef.current?.children[activeIndex]?.scrollIntoView({ block: "nearest" });
   }, [isOpen, activeIndex]);
 
-  const open = () => {
-    setQuery("");
-    setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
-    setIsOpen(true);
+  const commit = (next: string) => {
+    // Like a native select, picking the current option again is not a change.
+    if (next === value) return;
+    if (!nativeRef.current) return onChange(next);
+    // Apply the value first so form listeners read it from the native select.
+    flushSync(() => onChange(next));
+    nativeRef.current.dispatchEvent(new Event("change", { bubbles: true }));
   };
 
   const pick = (option: SearchableSelectOption) => {
+    setQuery(null);
     setIsOpen(false);
-    // Like a native select, picking the current option again is not a change.
-    if (option.value === value) return;
-    if (!nativeRef.current) return onChange(option.value);
-    // Apply the pick first so form listeners read the new value from the native select.
-    flushSync(() => onChange(option.value));
-    nativeRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+    commit(option.value);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (!isOpen && !query?.trim()) return;
       event.preventDefault();
-      if (!isOpen) return open();
+      if (!isOpen) return setIsOpen(true);
       const step = event.key === "ArrowDown" ? 1 : -1;
       setActiveIndex((index) => (matches.length ? (index + step + matches.length) % matches.length : 0));
     } else if (event.key === "Enter" && isOpen) {
@@ -100,7 +122,7 @@ export function SearchableSelect({
       <Search aria-hidden="true" className="pointer-events-none absolute bottom-3 left-3 h-4 w-4 text-stone-400" />
       <input
         ref={inputRef}
-        type="text"
+        type="search"
         role="combobox"
         id={id}
         // With a name, the visible input carries it for blur listeners but stays out of the form's data and elements.
@@ -114,26 +136,32 @@ export function SearchableSelect({
         autoComplete="off"
         required={required}
         disabled={disabled}
-        value={isOpen ? query : (selected?.label ?? "")}
-        placeholder={selected?.label ?? placeholder}
+        value={query ?? selected?.label ?? ""}
+        placeholder={placeholder}
         title={selected?.label}
-        onFocus={open}
-        onClick={() => !isOpen && open()}
         onChange={(event) => {
-          // Typing only narrows the list; the field's value changes when an option is picked.
+          // Typing only narrows the suggestions; the field's value changes when an option is picked.
           event.stopPropagation();
-          setQuery(event.target.value);
+          const text = event.target.value;
+          setQuery(text);
           setActiveIndex(0);
-          setIsOpen(true);
+          setIsOpen(Boolean(text.trim()));
+          // Emptying the search bar clears the value, so a cleared filter shows everything again.
+          if (!text) commit("");
         }}
         onKeyDown={handleKeyDown}
         onBlur={() => {
+          if (query !== null) {
+            // Typing an option's full name counts as picking it.
+            const exact = options.find((option) => normalize(option.label) === normalize(query.trim()));
+            if (exact) commit(exact.value);
+            setQuery(null);
+          }
           setIsOpen(false);
           onBlur?.();
         }}
-        className={cn(className, "pl-9 pr-9", isOpen && selected && "placeholder:text-stone-950")}
+        className={cn(className, "pl-9")}
       />
-      <ChevronDown aria-hidden="true" className="pointer-events-none absolute bottom-3 right-3 h-4 w-4 text-stone-500" />
 
       {isOpen ? (
         <ul ref={listRef} id={listId} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-stone-200">
@@ -147,7 +175,7 @@ export function SearchableSelect({
                 aria-selected={option.value === value}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={(event) => {
-                  // Keeps a wrapping <label> from re-opening the list by clicking the input.
+                  // Keeps a wrapping <label> from refocusing the input.
                   event.preventDefault();
                   pick(option);
                 }}

@@ -199,8 +199,8 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
               className={field}
               value={projectId}
               onChange={setProjectId}
-              options={[{ value: "", label: "All Projects" }, ...projects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))]}
-              placeholder="All Projects"
+              options={projects.map((project) => ({ value: project.id, label: `${project.reference} · ${project.name}` }))}
+              placeholder="Search project"
               emptyMessage="No project matches that search."
             />
           </label>
