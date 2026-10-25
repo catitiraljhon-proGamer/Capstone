@@ -30,19 +30,6 @@ function parseManilaDate(value: string | null, endOfDay: boolean) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function startOfTodayInManila() {
-  const now = new Date();
-  const manila = new Date(now.getTime() + 8 * 60 * 60 * 1000);
-  return new Date(
-    Date.UTC(
-      manila.getUTCFullYear(),
-      manila.getUTCMonth(),
-      manila.getUTCDate(),
-    ) -
-      8 * 60 * 60 * 1000,
-  );
-}
-
 export async function GET(request: Request) {
   try {
     const session = await readSession();
@@ -86,13 +73,9 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
     const auditLogs = db.collection<AuditLogDocument>(collections.auditLogs);
-    const today = startOfTodayInManila();
     const [
       documents,
       filteredTotal,
-      total,
-      todayTotal,
-      actorGroups,
       actionGroups,
       entityTypeGroups,
     ] = await Promise.all([
@@ -103,11 +86,6 @@ export async function GET(request: Request) {
           .limit(PAGE_SIZE)
           .toArray(),
         auditLogs.countDocuments(filter),
-        auditLogs.countDocuments(),
-        auditLogs.countDocuments({ createdAt: { $gte: today } }),
-        auditLogs
-          .aggregate<{ _id: ObjectId }>([{ $group: { _id: "$actorId" } }])
-          .toArray(),
         auditLogs
           .aggregate<{ _id: string }>([
             { $group: { _id: "$action" } },
@@ -158,12 +136,6 @@ export async function GET(request: Request) {
         pageSize: PAGE_SIZE,
         total: filteredTotal,
         pageCount: Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE)),
-      },
-      summary: {
-        total,
-        today: todayTotal,
-        actors: actorGroups.length,
-        eventTypes: actionGroups.length,
       },
       filters: {
         actions: actionGroups.map((group) => group._id).filter(Boolean),

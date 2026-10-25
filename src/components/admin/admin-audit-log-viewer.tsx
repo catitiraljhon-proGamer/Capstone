@@ -4,15 +4,12 @@ import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { roleLabels, type UserRole } from "@/types/domain";
 import {
-  Activity,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   FilterX,
   ListFilter,
   Search,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -36,12 +33,6 @@ type AuditLogPayload = {
     total: number;
     pageCount: number;
   };
-  summary: {
-    total: number;
-    today: number;
-    actors: number;
-    eventTypes: number;
-  };
   filters: {
     actions: string[];
     entityTypes: string[];
@@ -51,7 +42,6 @@ type AuditLogPayload = {
 const emptyPayload: AuditLogPayload = {
   logs: [],
   pagination: { page: 1, pageSize: 15, total: 0, pageCount: 1 },
-  summary: { total: 0, today: 0, actors: 0, eventTypes: 0 },
   filters: { actions: [], entityTypes: [] },
 };
 
@@ -200,32 +190,6 @@ export function AdminAuditLogViewer() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Total Events", value: payload.summary.total, icon: Activity },
-          { label: "Events Today", value: payload.summary.today, icon: CalendarDays },
-          { label: "Recorded Actors", value: payload.summary.actors, icon: Users },
-          { label: "Event types", value: payload.summary.eventTypes, icon: ShieldCheck },
-        ].map((item) => (
-          <section
-            key={item.label}
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm text-stone-500">{item.label}</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight">
-                  {item.value.toLocaleString("en-PH")}
-                </p>
-              </div>
-              <span className="grid h-11 w-11 place-items-center rounded-lg bg-red-50 text-red-700">
-                <item.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-          </section>
-        ))}
-      </div>
-
       {error ? (
         <p
           role="alert"
