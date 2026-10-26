@@ -946,3 +946,30 @@ test("unallocated legacy payments stay visible without fabricated receipts", asy
   await assert.rejects(reviewPayment(db, clerk, id.toHexString(), { action: "reverse", reason: "Cannot reallocate silently" }), isError(409));
   await assert.rejects(getReceipt(db, clerk, id.toHexString()), isError(404));
 });
+
+test("the Billing Clerk names a G4 team member as the billing basis instead of typing it", async () => {
+  const { approvers = [] } = await getBillingData(db, clerk);
+  for (const name of ["Arch. Sherwin Macalalad", "Arch. Marlo Baral Diaz", "Engr. Gina R. Abellar"]) {
+    assert.ok(approvers.some((person) => person.name === name), name);
+  }
+  assert.equal((await getBillingData(db, customer)).approvers, undefined);
+  const engineer = approvers.find((person) => person.name === "Engr. Gina R. Abellar")!;
+  const withoutBasis = { projectId: draft.projectId, label: draft.label, progressPercentage: draft.progressPercentage, amount: draft.amount, dueDate: draft.dueDate };
+
+  await assert.rejects(createInvoice(db, clerk, withoutBasis), ZodError);
+  await assert.rejects(createInvoice(db, clerk, { ...withoutBasis, approverId: new ObjectId().toHexString() }), isError(409));
+  const id = await createInvoice(db, clerk, { ...withoutBasis, approverId: engineer.id });
+  const saved = await db.collection<InvoiceDocument>("invoices").findOne({ _id: new ObjectId(id) });
+  assert.equal(saved?.basis, "Approved by Engr. Gina R. Abellar (Engineer)");
+  assert.equal(saved?.approvedById?.toHexString(), engineer.id);
+  assert.equal((await getBillingData(db, clerk)).invoices.find((invoice) => invoice.id === id)?.approvedById, engineer.id);
+
+  // The basis stays as written once issued, and a typed basis (older drafts) clears the approver.
+  await changeInvoice(db, clerk, id, { action: "edit", invoice: draft });
+  const edited = await db.collection<InvoiceDocument>("invoices").findOne({ _id: new ObjectId(id) });
+  assert.equal(edited?.basis, draft.basis);
+  assert.equal(edited?.approvedById, undefined);
+  await changeInvoice(db, clerk, id, { action: "edit", invoice: { ...withoutBasis, approverId: engineer.id } });
+  await changeInvoice(db, clerk, id, { action: "issue" });
+  assert.equal((await getBillingData(db, customer)).invoices.find((invoice) => invoice.id === id)?.basis, "Approved by Engr. Gina R. Abellar (Engineer)");
+});

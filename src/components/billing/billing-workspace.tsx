@@ -286,7 +286,7 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         </>}
       </>}
     </>}
-    {dialog?.type === "invoice-form" && <InvoiceForm projects={data.projects} designRequests={data.designRequests} designRequestId={dialog.designRequestId} invoice={dialog.invoice} mutate={mutate} onClose={close} />}
+    {dialog?.type === "invoice-form" && <InvoiceForm projects={data.projects} designRequests={data.designRequests} approvers={data.approvers ?? []} designRequestId={dialog.designRequestId} invoice={dialog.invoice} mutate={mutate} onClose={close} />}
     {dialog?.type === "payment-form" && (customer
       ? dialog.invoice && <CustomerPaymentForm invoice={dialog.invoice} pending={pendingFor(dialog.invoice)} mutate={mutate} onClose={close} onPayOnline={() => dialog.invoice && setDialog({ type: "pay-online", invoice: dialog.invoice })} />
       : <RecordPaymentForm invoices={data.invoices} selectedInvoice={dialog.invoice} mutate={mutate} onClose={close} />)}

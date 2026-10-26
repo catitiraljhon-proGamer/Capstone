@@ -9,6 +9,7 @@ import { FieldError } from "@/components/ui/field-error";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { amountError, dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
 import { formatPeso, pesoInputValue } from "@/lib/house-design-data";
+import { professionalRoles } from "@/lib/professionals";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
 import { GatewayPills } from "@/components/billing/billing-tables";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
@@ -17,7 +18,7 @@ import type { PaymentMilestoneDto } from "@/types/construction";
 import { PAYMONGO_MIN_AMOUNT, type CreateCheckoutInput, type PaymongoCheckoutDto } from "@/types/paymongo";
 import {
   customerPaymentMethods,
-  type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type BillingReceipt, type CustomerPaymentMethod,
+  type BillingApprover, type BillingData, type BillingInvoice, type BillingPayment, type BillingProject, type BillingReceipt, type CustomerPaymentMethod,
 } from "@/types/billing";
 
 /** Sends a billing write, refreshes the billing records, and resolves with the response body. */
@@ -76,13 +77,16 @@ function milestoneFields(project: BillingProject, milestone: PaymentMilestoneDto
   };
 }
 
-export function InvoiceForm({ projects, designRequests, designRequestId, invoice, mutate, onClose }: {
-  projects: BillingProject[]; designRequests: BillingData["designRequests"]; designRequestId?: string; invoice?: BillingInvoice; mutate: BillingMutation; onClose: () => void;
+export function InvoiceForm({ projects, designRequests, approvers, designRequestId, invoice, mutate, onClose }: {
+  projects: BillingProject[]; designRequests: BillingData["designRequests"];
+  /** G4's team (Maintenance > About Us); the clerk picks who approved the billing instead of typing it. */
+  approvers: BillingApprover[];
+  designRequestId?: string; invoice?: BillingInvoice; mutate: BillingMutation; onClose: () => void;
 }) {
   const feeTypeOf = (id: string) => designRequests.find((item) => item.id === id)?.feeType ?? invoice?.feeType ?? "design";
   const feeLabelFor = (id: string) => (feeTypeOf(id) === "blueprint" ? "Blueprint fee" : "House design fee");
   const [form, setForm] = useState({
-    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? feeLabelFor(designRequestId) : ""), basis: invoice?.basis ?? "",
+    projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? feeLabelFor(designRequestId) : ""), approverId: invoice?.approvedById ?? "",
     progressPercentage: String(invoice?.progressPercentage ?? 0), amount: invoice ? pesoInputValue(invoice.amount) : "", dueDate: invoice?.dueDate ?? manilaDate(),
   });
   const [busy, setBusy] = useState(false);
@@ -91,6 +95,11 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
   const hasMilestones = !form.designRequestId && Boolean(project?.milestones.length);
   const availableMilestones = hasMilestones ? billableMilestones(project, invoice?.milestoneId) : [];
   const milestone = hasMilestones ? project?.milestones.find((item) => item.id === form.milestoneId) : undefined;
+  // The downpayment follows the accepted estimate, so no one is named as its approver.
+  const isDownpayment = Boolean(milestone?.isDownpayment);
+  const approver = approvers.find((item) => item.id === form.approverId);
+  /** A draft saved before approvers were picked shows its typed basis until someone is chosen. */
+  const typedBasis = invoice && !invoice.approvedById && invoice.basis !== downpaymentBasis ? invoice.basis : "";
   const fields = useFieldMessages();
   const remaining = project ? Math.round((project.contractPrice - project.allocated + (invoice?.amount ?? 0)) * 100) / 100 : undefined;
   // Milestone amount and progress are fixed by the accepted payment schedule, so only free-entry values are checked.
@@ -98,7 +107,8 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
     project: !form.designRequestId && !project ? "Choose the customer / project to bill." : null,
     milestone: hasMilestones && !milestone ? "Choose the milestone to bill." : null,
     label: textError(form.label, { label: "Billing stage", min: 3, max: 160 }),
-    basis: textError(form.basis, { label: "Billing basis", min: 5, max: 2000 }),
+    basis: isDownpayment || approver ? null
+      : approvers.length ? "Choose who approved this billing." : "Ask the Admin to add G4's team in Maintenance › About Us first.",
     amount: milestone ? null : amountError(form.amount, { label: "Amount", max: form.designRequestId ? undefined : remaining, maxLabel: "the remaining contract amount" }),
     progress: form.designRequestId || milestone ? null : numberError(form.progressPercentage, { label: "Project progress", min: 0, max: 100, unit: "%", maxDecimals: 2 }),
     dueDate: dateError(form.dueDate, { label: "Due date", min: manilaDay(), minLabel: "today" }),
@@ -106,19 +116,19 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
   function chooseProject(projectId: string) {
     const next = projects.find((item) => item.id === projectId);
     const first = next?.milestones.length ? billableMilestones(next)[0] : undefined;
-    setForm({ ...form, projectId, milestoneId: first?.id ?? "", ...(next && first ? { ...milestoneFields(next, first), basis: first.isDownpayment && !form.basis ? downpaymentBasis : form.basis } : {}) });
+    setForm({ ...form, projectId, milestoneId: first?.id ?? "", ...(next && first ? milestoneFields(next, first) : {}) });
   }
   function chooseMilestone(milestoneId: string) {
     const picked = project?.milestones.find((item) => item.id === milestoneId);
     if (!project || !picked) { setForm({ ...form, milestoneId }); return; }
-    setForm({ ...form, milestoneId, ...milestoneFields(project, picked), basis: picked.isDownpayment ? (form.basis || downpaymentBasis) : (form.basis === downpaymentBasis ? "" : form.basis) });
+    setForm({ ...form, milestoneId, ...milestoneFields(project, picked) });
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (fields.blocked(messages)) return;
     setBusy(true); setError(null);
-    const { projectId, designRequestId, milestoneId, ...values } = form;
-    const input = { ...values, ...(designRequestId ? { designRequestId } : { projectId }), ...(hasMilestones ? { milestoneId } : {}), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
+    const { projectId, designRequestId, milestoneId, approverId, ...values } = form;
+    const input = { ...values, ...(isDownpayment ? { basis: downpaymentBasis } : { approverId }), ...(designRequestId ? { designRequestId } : { projectId }), ...(hasMilestones ? { milestoneId } : {}), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
     try {
       await mutate(invoice ? `/api/billing/invoices/${invoice.id}` : "/api/billing/invoices", invoice ? "PATCH" : "POST", invoice ? { action: "edit", invoice: input } : input);
       onClose();
@@ -158,14 +168,34 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
         <input required maxLength={160} className={invalidField} {...fields.props("label", messages.label)} placeholder="Enter billing stage" value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} />
       </label>{fields.error("label", messages.label)}</div>
       <div><label className="block text-sm font-medium">Billing Basis / Approved Reference
-        <textarea required maxLength={2000} rows={3} className={invalidField} {...fields.props("basis", messages.basis)} placeholder="Enter billing basis or approved reference" value={form.basis} onChange={(event) => setForm({ ...form, basis: event.target.value })} />
+        {isDownpayment ? (
+          <p className="mt-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-normal text-stone-700">{downpaymentBasis}</p>
+        ) : (
+          <select required disabled={busy} className={invalidField} {...fields.props("basis", messages.basis)} value={approver ? form.approverId : ""} onChange={(event) => setForm({ ...form, approverId: event.target.value })}>
+            <option value="">Select who approved this billing</option>
+            {professionalRoles.map((role) => {
+              const people = approvers.filter((item) => item.role === role);
+              return people.length ? (
+                <optgroup key={role} label={`${role}s`}>
+                  {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                </optgroup>
+              ) : null;
+            })}
+          </select>
+        )}
+        <p className="mt-2 text-xs font-normal leading-5 text-stone-500">
+          {isDownpayment ? "The downpayment follows the accepted estimate, so no approver is needed."
+            : approver ? `Shows on the invoice as: Approved by ${approver.name} (${approver.role})`
+              : typedBasis ? `Previously typed: ${typedBasis}`
+                : "Pick from G4's team in Maintenance › About Us. No typing needed."}
+        </p>
       </label>{fields.error("basis", messages.basis)}</div>
       <div className="grid gap-4 sm:grid-cols-3">
         <div><label className="text-sm font-medium">Amount (PHP)<PesoInput required readOnly={Boolean(milestone)} min="0.01" max="1000000000" step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} /></label>{fields.error("amount", messages.amount)}</div>
         {!form.designRequestId && <div><label className="text-sm font-medium">Project progress (%)<input required readOnly={Boolean(milestone)} type="number" min="0" max="100" step="0.01" className={invalidField} {...fields.props("progress", messages.progress)} value={form.progressPercentage} onChange={(event) => setForm({ ...form, progressPercentage: event.target.value })} /></label>{fields.error("progress", messages.progress)}</div>}
         <div><label className="text-sm font-medium">Due Date<input required type="date" className={invalidField} {...fields.props("dueDate", messages.dueDate)} value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label>{fields.error("dueDate", messages.dueDate)}</div>
       </div>
-      <p className="text-xs leading-5 text-stone-500">Use the agreed fee or approved contract as your basis. Review the saved draft before issuing it to the customer.</p>
+      <p className="text-xs leading-5 text-stone-500">Review the saved draft before issuing it to the customer.</p>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button disabled={busy}>{busy ? "Saving…" : "Save Draft"}</Button></div>
     </form>
   </BillingDialog>;

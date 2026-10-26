@@ -3,6 +3,7 @@ import { z } from "zod";
 import { collections, type AuditLogDocument, type BlueprintFileDocument, type DesignRequestDocument, type InvoiceDocument, type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument } from "@/lib/database/collections";
 import { fromCentavos, invoiceState, manilaDate, sumMoney, toCentavos } from "@/lib/billing";
 import { insertNotifications } from "@/lib/server/notifications";
+import { findTeamMember, getTeamMembers } from "@/lib/server/professionals";
 import { milestoneDtos, projectBillingFrom, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { isCustomerPaymentMethod, normalizePaymentMethod, paymentMethods, type BillingData, type BillingReceipt } from "@/types/billing";
 import type { SessionUser, UserRole } from "@/types/domain";
@@ -25,11 +26,16 @@ export const invoiceInputSchema = z.object({
   designRequestId: idSchema.optional(),
   milestoneId: z.uuid().optional(),
   label: z.string().trim().min(3).max(160),
-  basis: z.string().trim().min(5, "Enter the approved accomplishment or contract milestone reference.").max(2000),
+  /** The team member who approved the billing; the server writes the basis from their name. */
+  approverId: idSchema.optional(),
+  /** Typed basis, kept for the downpayment and for invoices saved before approvers were picked. */
+  basis: z.string().trim().max(2000).optional(),
   progressPercentage: z.number().min(0).max(100),
   amount: moneySchema,
   dueDate: z.iso.date(),
-}).strict().refine((input) => Boolean(input.projectId) !== Boolean(input.designRequestId), "Select either a construction project or a completed design request.");
+}).strict()
+  .refine((input) => Boolean(input.projectId) !== Boolean(input.designRequestId), "Select either a construction project or a completed design request.")
+  .refine((input) => Boolean(input.approverId) || (input.basis?.length ?? 0) >= 5, { message: "Choose who approved this billing.", path: ["approverId"] });
 export const invoiceActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("edit"), invoice: invoiceInputSchema }).strict(),
   z.object({ action: z.literal("issue") }).strict(),
@@ -234,10 +240,19 @@ async function validateDesignInvoice(db: Db, session: ClientSession, id: ObjectI
   return design;
 }
 
+/** "Approved by Engr. Gina R. Abellar (Engineer)" from the picked team member, or the typed basis when none was picked. */
+async function billingBasis(db: Db, session: ClientSession, input: z.infer<typeof invoiceInputSchema>) {
+  if (!input.approverId) return { basis: input.basis ?? "", approvedById: null };
+  const approver = await findTeamMember(db, recordId(input.approverId), session);
+  if (!approver) throw new BillingError("The chosen team member was removed from the team. Choose another one.", 409);
+  return { basis: `Approved by ${approver.name} (${approver.role})`, approvedById: approver._id };
+}
+
 export async function createInvoice(db: Db, actor: SessionUser, raw: unknown) {
   assertBillingRole(actor);
   const input = invoiceInputSchema.parse(raw);
   return billingTransaction(db, async (session) => {
+    const { basis, approvedById } = await billingBasis(db, session, input);
     let customerId: ObjectId;
     let blueprintFee = false;
     if (input.designRequestId) {
@@ -253,7 +268,7 @@ export async function createInvoice(db: Db, actor: SessionUser, raw: unknown) {
     const invoice: InvoiceDocument = {
       _id: new ObjectId(), invoiceNumber: await nextReference(db, session, "INV", now), customerId,
       ...(input.designRequestId ? { designRequestId: recordId(input.designRequestId), ...(blueprintFee ? { feeType: "blueprint" as const } : {}) } : { projectId: recordId(input.projectId!), ...(input.milestoneId ? { milestoneId: input.milestoneId } : {}) }),
-      label: input.label, basis: input.basis,
+      label: input.label, basis, ...(approvedById ? { approvedById } : {}),
       progressPercentage: input.designRequestId ? 0 : input.progressPercentage, amount: input.amount,
       dueDate: new Date(input.dueDate + "T00:00:00.000Z"), status: "Draft", createdAt: now, updatedAt: now,
     };
@@ -283,10 +298,15 @@ export async function changeInvoice(db: Db, actor: SessionUser, id: string, raw:
       if (invoice.designRequestId) await validateDesignInvoice(db, session, invoice.designRequestId, invoice._id);
       else if (project) await validateInvoice(db, session, input.invoice, project, invoice._id);
       else throw new BillingError("The invoice source is missing.", 409);
-      await invoices.updateOne({ _id: invoice._id }, { $set: {
-        label: input.invoice.label, basis: input.invoice.basis, progressPercentage: invoice.designRequestId ? 0 : input.invoice.progressPercentage,
-        amount: input.invoice.amount, dueDate: new Date(`${input.invoice.dueDate}T00:00:00.000Z`), updatedAt: now,
-      } }, { session });
+      const { basis, approvedById } = await billingBasis(db, session, input.invoice);
+      await invoices.updateOne({ _id: invoice._id }, {
+        $set: {
+          label: input.invoice.label, basis, ...(approvedById ? { approvedById } : {}),
+          progressPercentage: invoice.designRequestId ? 0 : input.invoice.progressPercentage,
+          amount: input.invoice.amount, dueDate: new Date(`${input.invoice.dueDate}T00:00:00.000Z`), updatedAt: now,
+        },
+        ...(approvedById ? {} : { $unset: { approvedById: "" } }),
+      }, { session });
     } else if (input.action === "issue") {
       if (invoice.status !== "Draft") throw new BillingError("This invoice has already been released or voided.", 409);
       if (invoice.designRequestId) {
@@ -546,12 +566,13 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
     ...owner, status: { $ne: "Draft" },
     $or: [{ status: { $ne: "Void" } }, { issuedAt: { $exists: true } }],
   };
-  const [projects, invoices, payments, users, designs] = await Promise.all([
+  const [projects, invoices, payments, users, designs, approvers] = await Promise.all([
     db.collection<ProjectDocument>(collections.projects).find(owner).sort({ createdAt: -1 }).toArray(),
     db.collection<InvoiceDocument>(collections.invoices).find(invoiceFilter).sort({ createdAt: -1 }).toArray(),
     db.collection<PaymentDocument>(collections.payments).find(owner, { projection: { proofImage: 0 } }).sort({ createdAt: -1 }).toArray(),
     db.collection<UserDocument>(collections.users).find(clerk ? { role: "customer" } : { _id: recordId(actor.id) }, { projection: { name: 1 } }).toArray(),
     clerk ? billableDesignRequests(db) : [],
+    clerk ? getTeamMembers(db) : [],
   ]);
   const billing = projectBillingFrom(invoices, payments);
   const customerNames = new Map(users.map((user) => [user._id.toHexString(), user.name]));
@@ -566,12 +587,14 @@ export async function getBillingData(db: Db, actor: SessionUser): Promise<Billin
       customerId: invoice.customerId.toHexString(), customerName: customerNames.get(invoice.customerId.toHexString()) ?? "Unknown customer",
       ...(invoice.designRequestId ? { feeType: invoice.feeType ?? "design" as const } : {}),
       projectName: invoice.designRequestId ? designInvoiceName(invoice) : projectNames.get(invoice.projectId?.toHexString() ?? "") ?? "Unknown project",
-      label: invoice.label, basis: invoice.basis ?? "", progressPercentage: invoice.progressPercentage,
+      label: invoice.label, basis: invoice.basis ?? "", ...(clerk && invoice.approvedById ? { approvedById: invoice.approvedById.toHexString() } : {}),
+      progressPercentage: invoice.progressPercentage,
       amount: invoice.amount, paid, ...invoiceState(invoice, paid),
       dueDate: invoice.dueDate.toISOString().slice(0, 10), issuedAt: invoice.issuedAt?.toISOString(), voidReason: invoice.voidReason,
     };
   });
   return {
+    ...(clerk ? { approvers } : {}),
     designRequests: designs.map((design) => ({
       id: design._id.toHexString(), customerName: customerNames.get(design.customerId.toHexString()) ?? "Unknown customer",
       label: design.floorArea + " sqm · " + design.rooms + " · " + design._id.toHexString().slice(-8).toUpperCase(),

@@ -460,6 +460,8 @@ export type InvoiceDocument = {
   dueDate: Date;
   status: InvoiceStatus;
   basis?: string;
+  /** The team member (Maintenance > About Us) named in `basis` as the billing's approver. */
+  approvedById?: ObjectId;
   issuedAt?: Date;
   issuedBy?: ObjectId;
   voidReason?: string;

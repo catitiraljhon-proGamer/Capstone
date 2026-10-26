@@ -1,4 +1,4 @@
-import { type Db, ObjectId } from "mongodb";
+import { type ClientSession, type Db, ObjectId } from "mongodb";
 import { z } from "zod";
 import {
   collections,
@@ -137,6 +137,17 @@ async function readProfessionals(db: Db): Promise<ManagedProfessional[]> {
 /** What the About Us page lists: the people the Admin shows, in the Admin's order. */
 export async function getAboutUsProfessionals(db: Db): Promise<Professional[]> {
   return (await readDocuments(db, { includeHidden: false })).map(({ document, designCount }) => toProfessional(document, designCount));
+}
+
+/** Everyone in the Admin's order, hidden people included, for the Billing Clerk to name a billing's approver. */
+export async function getTeamMembers(db: Db) {
+  return (await readDocuments(db, { includeHidden: true }))
+    .map(({ document }) => ({ id: document._id.toHexString(), name: document.name, role: document.role }));
+}
+
+/** The person named as a billing's approver; null when they were removed from the team. */
+export async function findTeamMember(db: Db, id: ObjectId, session?: ClientSession) {
+  return professionalsCollection(db).findOne({ _id: id }, { session });
 }
 
 /** Everyone, hidden people included, for Maintenance and the Designed By list in House Design. */

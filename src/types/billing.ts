@@ -1,3 +1,4 @@
+import type { ProfessionalRole } from "@/lib/professionals";
 import type { PaymentMilestoneDto } from "@/types/construction";
 import type { PaymongoMethod } from "@/types/paymongo";
 
@@ -49,6 +50,8 @@ export type BillingInvoice = {
   projectName: string;
   label: string;
   basis: string;
+  /** The G4 team member picked as the billing basis; older invoices have only the typed basis. */
+  approvedById?: string;
   progressPercentage: number;
   amount: number;
   paid: number;
@@ -139,11 +142,16 @@ export type CashReport = {
   payments: CashReportPayment[];
 };
 
+/** A G4 team member (Maintenance > About Us) the Billing Clerk can name as a billing's approver. */
+export type BillingApprover = { id: string; name: string; role: ProfessionalRole };
+
 export type BillingData = {
   designRequests: { id: string; customerName: string; label: string; feeType: DesignFeeType; invoiceId?: string }[];
   projects: BillingProject[];
   invoices: BillingInvoice[];
   payments: BillingPayment[];
+  /** Billing Clerk only: the team to pick a billing's approver from, hidden About Us members included. */
+  approvers?: BillingApprover[];
   /** Billing Clerk only: cash not counted yet and the clerk's recent daily cash reports. */
   cashDrawer?: CashDrawer;
   cashReports?: CashReport[];
