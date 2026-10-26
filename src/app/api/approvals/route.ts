@@ -13,7 +13,9 @@ import { toSiteInspectionDto } from "@/lib/site-inspection";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { apiError, forbidden, unauthorized } from "@/lib/server/api";
 import { syncPendingWorkflowApprovals } from "@/lib/server/approvals";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { readSession } from "@/lib/server/session";
+import type { RoomSizes } from "@/lib/system-settings";
 import type { ApprovalDto, ApprovalRecordType } from "@/types/approvals";
 import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
@@ -46,9 +48,9 @@ const missingSource: ApprovalSource = {
 };
 
 /** A note for custom requests whose floor area looks too small for the rooms; published designs and older requests get none. */
-function roomSpaceNote(request: DesignRequestDocument): Pick<ApprovalDto, "roomSpaceNote"> {
+function roomSpaceNote(request: DesignRequestDocument, roomSizes: RoomSizes): Pick<ApprovalDto, "roomSpaceNote"> {
   if (request.selectedDesign || request.bedrooms === undefined || request.bathrooms === undefined) return {};
-  const needed = roomSpaceShortfall(request.floorArea, request.bedrooms, request.bathrooms);
+  const needed = roomSpaceShortfall(request.floorArea, request.bedrooms, request.bathrooms, roomSizes);
   return needed
     ? {
         roomSpaceNote:
@@ -97,7 +99,7 @@ export async function GET() {
       ),
     ].map((id) => new ObjectId(id));
 
-    const [users, designRequests, estimates, documents] =
+    const [users, designRequests, estimates, documents, settings] =
       await Promise.all([
         userIds.length
           ? db
@@ -122,6 +124,7 @@ export async function GET() {
           .collection<DocumentRecord>(collections.documents)
           .find({ _id: { $in: uniqueIds(approvals, "Document") } })
           .toArray(),
+        getSystemSettings(db),
       ]);
 
     const selectedDesignIds = designRequests.flatMap((request) =>
@@ -169,7 +172,7 @@ export async function GET() {
         ...(source.siteInspection
           ? { siteInspection: { ...toSiteInspectionDto(source.siteInspection), photos: source.siteInspection.photos ?? [] } }
           : {}),
-        ...roomSpaceNote(source),
+        ...roomSpaceNote(source, settings),
       });
     }
     for (const source of estimates) {

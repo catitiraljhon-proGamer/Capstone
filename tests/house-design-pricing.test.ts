@@ -9,6 +9,7 @@ import {
 import { houseDesignInputSchema, houseDesignPatchSchema, toHouseDesignDto } from "@/lib/server/house-designs";
 import type { HouseDesignDocument } from "@/lib/database/collections";
 import { minimumFloorArea, roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
+import { defaultRoomSizes } from "@/lib/system-settings";
 
 const fence = { id: "fence", item: "Fence", material: "Steel", unit: "lm", quantity: 2.5, unitPrice: 10.25 };
 const designInput = {
@@ -58,26 +59,36 @@ test("room counts are whole numbers saved together", () => {
 });
 
 test("the room-space guide only warns when the floor area is too small for the rooms", () => {
-  // (bedrooms × 6 + bathrooms × 1.2 + kitchen 3 + living 6) × 1.2, rounded up to whole sqm.
-  assert.equal(minimumFloorArea(2, 2), 29);
-  assert.equal(minimumFloorArea(3, 2), 36);
-  assert.equal(minimumFloorArea(6, 4), 60);
-  assert.equal(minimumFloorArea(0, 0), 11);
+  const sizes = defaultRoomSizes;
+  // (bedrooms × 9 + bathrooms × 3 + kitchen 6 + living and dining 12) × 1.2, rounded up to whole sqm.
+  assert.equal(minimumFloorArea(2, 2, sizes), 51);
+  assert.equal(minimumFloorArea(3, 2, sizes), 62);
+  assert.equal(minimumFloorArea(6, 4, sizes), 101);
+  assert.equal(minimumFloorArea(0, 0, sizes), 22);
+  assert.equal(minimumFloorArea(11, 6, sizes), 162);
 
+  // The case the panel tried: 10 bedrooms and 11 bathrooms do not fit in 100 sqm.
+  assert.equal(roomSpaceShortfall(100, 10, 11, sizes), 170);
   // A big house with few rooms is fine; there is never a minimum number of rooms.
-  assert.equal(roomSpaceShortfall(300, 2, 2), null);
-  assert.equal(roomSpaceShortfall(60, 3, 2), null);
-  assert.equal(roomSpaceShortfall(36, 3, 2), null);
-  assert.equal(roomSpaceShortfall(35, 3, 2), 36);
-  assert.equal(roomSpaceShortfall(30, 6, 4), 60);
+  assert.equal(roomSpaceShortfall(300, 2, 2, sizes), null);
+  assert.equal(roomSpaceShortfall(250, 11, 6, sizes), null);
+  assert.equal(roomSpaceShortfall(62, 3, 2, sizes), null);
+  assert.equal(roomSpaceShortfall(61, 3, 2, sizes), 62);
 
   // Unusable numbers give no warning; the form's own checks handle them.
-  assert.equal(roomSpaceShortfall(0, 3, 2), null);
-  assert.equal(roomSpaceShortfall(Number.NaN, 3, 2), null);
-  assert.equal(roomSpaceShortfall(30, -1, 2), null);
+  assert.equal(roomSpaceShortfall(0, 3, 2, sizes), null);
+  assert.equal(roomSpaceShortfall(Number.NaN, 3, 2, sizes), null);
+  assert.equal(roomSpaceShortfall(30, -1, 2, sizes), null);
 
   assert.equal(roomsPhrase(1, 1), "1 bedroom and 1 bathroom");
   assert.equal(roomsPhrase(3, 2), "3 bedrooms and 2 bathrooms");
+});
+
+test("the room-space guide uses the sizes the Admin saved in Maintenance", () => {
+  const smaller = { roomBedroomSqm: 6, roomBathroomSqm: 2, roomKitchenSqm: 3, roomLivingSqm: 6, roomWallsPercent: 0 };
+  assert.equal(minimumFloorArea(3, 2, smaller), 31);
+  assert.equal(roomSpaceShortfall(100, 10, 11, smaller), null);
+  assert.equal(minimumFloorArea(3, 2, { ...smaller, roomWallsPercent: 50 }), 47);
 });
 
 test("peso amounts display centavos without rounding them to whole pesos", () => {

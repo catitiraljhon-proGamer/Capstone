@@ -18,6 +18,11 @@ export type SystemSettings = {
   inactiveArchiveDays: number;
   autoBackup: boolean;
   keepAutomaticBackups: number;
+  roomBedroomSqm: number;
+  roomBathroomSqm: number;
+  roomKitchenSqm: number;
+  roomLivingSqm: number;
+  roomWallsPercent: number;
 };
 
 export type SettingKey = keyof SystemSettings;
@@ -41,6 +46,12 @@ export const defaultSystemSettings: SystemSettings = {
   inactiveArchiveDays: 30,
   autoBackup: true,
   keepAutomaticBackups: 7,
+  // Typical room sizes, larger than the Building Code minimums, so a crowded floor plan gets a warning.
+  roomBedroomSqm: 9,
+  roomBathroomSqm: 3,
+  roomKitchenSqm: 6,
+  roomLivingSqm: 12,
+  roomWallsPercent: 20,
 };
 
 export type NumberSettingField = { kind: "number"; label: string; hint?: string; unit: string; min: number; max: number };
@@ -66,6 +77,11 @@ export const settingFields: Record<SettingKey, SettingField> = {
   inactiveArchiveDays: { kind: "number", label: "Archive inactive clients after", hint: "Days with no open work after the last project is completed.", unit: "day/s", min: 7, max: 365 },
   autoBackup: { kind: "toggle", label: "Automatic daily backup" },
   keepAutomaticBackups: { kind: "number", label: "Keep the last", hint: "Older automatic backups are deleted. Manual ones are kept.", unit: "automatic backups", min: 1, max: 30 },
+  roomBedroomSqm: { kind: "number", label: "Bedroom", hint: "For each bedroom.", unit: "sqm", min: 1, max: 100 },
+  roomBathroomSqm: { kind: "number", label: "Toilet and bath", hint: "For each bathroom.", unit: "sqm", min: 1, max: 100 },
+  roomKitchenSqm: { kind: "number", label: "Kitchen", hint: "One per house.", unit: "sqm", min: 1, max: 100 },
+  roomLivingSqm: { kind: "number", label: "Living and dining", hint: "One per house.", unit: "sqm", min: 1, max: 200 },
+  roomWallsPercent: { kind: "number", label: "Walls and hallways", hint: "Added on top of the rooms.", unit: "percent", min: 0, max: 100 },
 };
 
 export const settingKeys = Object.keys(defaultSystemSettings) as SettingKey[];
@@ -80,13 +96,27 @@ export type SystemSettingsView = {
 
 export type PasswordPolicy = Pick<SystemSettings, "passwordMinLength" | "passwordLettersAndNumbers" | "passwordUpperAndSymbol">;
 
-/** Settings any visitor may read: sign-up forms show the password rules, every page needs the sign-out time. */
-export type PublicSettings = PasswordPolicy & Pick<SystemSettings, "idleSignOutMinutes">;
+/** Room sizes for the floor area warning on design requests and house designs. */
+export type RoomSizes = Pick<SystemSettings, "roomBedroomSqm" | "roomBathroomSqm" | "roomKitchenSqm" | "roomLivingSqm" | "roomWallsPercent">;
+
+/**
+ * Settings any visitor may read: sign-up forms show the password rules, every page needs the sign-out time,
+ * and the design forms need the room sizes.
+ */
+export type PublicSettings = PasswordPolicy & Pick<SystemSettings, "idleSignOutMinutes"> & RoomSizes;
 
 export const defaultPasswordPolicy: PasswordPolicy = {
   passwordMinLength: defaultSystemSettings.passwordMinLength,
   passwordLettersAndNumbers: defaultSystemSettings.passwordLettersAndNumbers,
   passwordUpperAndSymbol: defaultSystemSettings.passwordUpperAndSymbol,
+};
+
+export const defaultRoomSizes: RoomSizes = {
+  roomBedroomSqm: defaultSystemSettings.roomBedroomSqm,
+  roomBathroomSqm: defaultSystemSettings.roomBathroomSqm,
+  roomKitchenSqm: defaultSystemSettings.roomKitchenSqm,
+  roomLivingSqm: defaultSystemSettings.roomLivingSqm,
+  roomWallsPercent: defaultSystemSettings.roomWallsPercent,
 };
 
 /** bcrypt only reads the first 72 bytes of a password. */

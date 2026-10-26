@@ -10,6 +10,7 @@ import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
 import type { HouseDesignDocument, UserDocument } from "@/lib/database/collections";
 import {
+  getPublicSettings,
   getSystemSettings,
   getSystemSettingsView,
   MaintenanceError,
@@ -51,7 +52,7 @@ import {
   requireAccountTerms,
   requireCurrentTerms,
 } from "@/lib/server/account-terms";
-import { defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
+import { defaultPasswordPolicy, defaultRoomSizes, defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
 import type { SessionUser } from "@/types/domain";
 
 let mongo: MongoMemoryReplSet;
@@ -112,6 +113,19 @@ test("saving records who changed each setting and audits old and new values", as
   const log = await db.collection("audit_logs").findOne({ action: "Updated settings" });
   assert.deepEqual(log?.details, { "Minimum length": "8 characters → 12 characters", Customer: "On → Off" });
   assert.equal((await getSystemSettingsView(db)).settings.passwordMinLength, 12);
+});
+
+test("the Admin sets the room sizes for the floor area warning, and every form can read them", async () => {
+  assert.deepEqual(await getPublicSettings(db), { ...defaultPasswordPolicy, idleSignOutMinutes: 0, ...defaultRoomSizes });
+  await assert.rejects(updateSystemSettings(db, admin, { roomBedroomSqm: 0 }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { roomBathroomSqm: 1.2 }), ZodError);
+  await assert.rejects(updateSystemSettings(db, admin, { roomWallsPercent: 101 }), ZodError);
+  await updateSystemSettings(db, admin, { roomBedroomSqm: 10, roomWallsPercent: 0 });
+  const log = await db.collection("audit_logs").findOne({ action: "Updated settings" });
+  assert.deepEqual(log?.details, { Bedroom: "9 sqm → 10 sqm", "Walls and hallways": "20 percent → 0 percent" });
+  assert.deepEqual(await getPublicSettings(db), {
+    ...defaultPasswordPolicy, idleSignOutMinutes: 0, ...defaultRoomSizes, roomBedroomSqm: 10, roomWallsPercent: 0,
+  });
 });
 
 test("the Admin edits the Contact Us details, which are checked, stamped, and audited", async () => {

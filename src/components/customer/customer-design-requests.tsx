@@ -18,6 +18,7 @@ import { useHouseDesigns } from "@/lib/house-design-store";
 import { finishLevelDescriptions, finishLevels, type FinishLevel } from "@/lib/house-design-data";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { formatScheduleDateTime } from "@/lib/schedule-display";
+import { usePublicSettings } from "@/lib/use-public-settings";
 import Link from "next/link";
 import type { DesignRequestDto, DesignRequestStatus } from "@/types/design-requests";
 import {
@@ -124,10 +125,11 @@ function DesignRequestForm({ houseDesignId }: {
   const [floorArea, setFloorArea] = useState("");
   const [bedrooms, setBedrooms] = useState("");
   const [bathrooms, setBathrooms] = useState("");
+  const roomSizes = usePublicSettings();
   // A warning only: the request can still be sent, and the Admin checks the size during the feasibility review.
   const roomShortfall = hasDesignSelection || !floorArea.trim() || !bedrooms.trim() || !bathrooms.trim()
     ? null
-    : roomSpaceShortfall(Number(floorArea), Number(bedrooms), Number(bathrooms));
+    : roomSpaceShortfall(Number(floorArea), Number(bedrooms), Number(bathrooms), roomSizes);
   const [notes, setNotes] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [neededBy, setNeededBy] = useState("");

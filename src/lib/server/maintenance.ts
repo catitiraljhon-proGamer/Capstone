@@ -60,8 +60,14 @@ export async function getSystemSettingsView(db: Db): Promise<SystemSettingsView>
 }
 
 export async function getPublicSettings(db: Db): Promise<PublicSettings> {
-  const { passwordMinLength, passwordLettersAndNumbers, passwordUpperAndSymbol, idleSignOutMinutes } = await getSystemSettings(db);
-  return { passwordMinLength, passwordLettersAndNumbers, passwordUpperAndSymbol, idleSignOutMinutes };
+  const {
+    passwordMinLength, passwordLettersAndNumbers, passwordUpperAndSymbol, idleSignOutMinutes,
+    roomBedroomSqm, roomBathroomSqm, roomKitchenSqm, roomLivingSqm, roomWallsPercent,
+  } = await getSystemSettings(db);
+  return {
+    passwordMinLength, passwordLettersAndNumbers, passwordUpperAndSymbol, idleSignOutMinutes,
+    roomBedroomSqm, roomBathroomSqm, roomKitchenSqm, roomLivingSqm, roomWallsPercent,
+  };
 }
 
 function display(key: SettingKey, value: number | boolean) {

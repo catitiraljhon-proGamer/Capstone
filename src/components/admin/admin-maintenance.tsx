@@ -7,19 +7,31 @@ import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode"
 import { AdminMaintenanceSlideshow } from "@/components/admin/admin-maintenance-slideshow";
 import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
 import { Button } from "@/components/ui/button";
+import { minimumFloorArea } from "@/lib/room-space";
 import {
   settingFields,
   settingKeys,
+  type RoomSizes,
   type SettingKey,
   type SystemSettings,
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, ScrollText, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, Ruler, ScrollText, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Section = "mode" | "security" | "email" | "notifications" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
-type SettingGroup = { title: string; description?: string; keys: SettingKey[] };
+type Section = "mode" | "security" | "email" | "notifications" | "rooms" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
+type Draft = Record<SettingKey, string | boolean>;
+/** `note` adds a line under the group worked out from the typed values. */
+type SettingGroup = { title: string; description?: string; keys: SettingKey[]; note?: (draft: Draft) => string | null };
+
+const roomSizeKeys: (keyof RoomSizes)[] = ["roomBedroomSqm", "roomBathroomSqm", "roomKitchenSqm", "roomLivingSqm", "roomWallsPercent"];
+
+function roomSizesExample(draft: Draft) {
+  if (roomSizeKeys.some((key) => String(draft[key]).trim() === "" || !Number.isFinite(Number(draft[key])))) return null;
+  const sizes = Object.fromEntries(roomSizeKeys.map((key) => [key, Number(draft[key])])) as RoomSizes;
+  return `Example: 3 bedrooms and 2 bathrooms need at least ${minimumFloorArea(3, 2, sizes)} sqm, and 10 bedrooms and 11 bathrooms need at least ${minimumFloorArea(10, 11, sizes)} sqm.`;
+}
 
 const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
   { id: "mode", label: "Maintenance mode", icon: Wrench, groups: [] },
@@ -38,6 +50,16 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
     id: "notifications", label: "Notifications and reminders", icon: Bell, groups: [
       { title: "Email copies of notifications", description: "Every notification also shows inside the system.", keys: ["emailCopiesAdmin", "emailCopiesBillingClerk", "emailCopiesCustomer"] },
       { title: "Reminders", keys: ["dueReminderDays", "inactiveNoticeDays", "inactiveArchiveDays"] },
+    ],
+  },
+  {
+    id: "rooms", label: "Room sizes", icon: Ruler, groups: [
+      {
+        title: "Floor area warning",
+        description: "Design requests and house designs show a warning when the floor area looks too small for the bedrooms and bathrooms. It is a warning only: requests are never blocked.",
+        keys: roomSizeKeys,
+        note: roomSizesExample,
+      },
     ],
   },
   { id: "contact", label: "Contact Us", icon: Phone, groups: [] },
@@ -64,13 +86,13 @@ export function AdminMaintenance() {
   const [section, setSection] = useState<Section>("mode");
   const [view, setView] = useState<SystemSettingsView | null>(null);
   /** Typed values; numbers stay as text until saved so a field can be cleared while editing. */
-  const [draft, setDraft] = useState<Record<SettingKey, string | boolean> | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const toDraft = (settings: SystemSettings) =>
-    Object.fromEntries(settingKeys.map((key) => [key, typeof settings[key] === "boolean" ? settings[key] : String(settings[key])])) as Record<SettingKey, string | boolean>;
+    Object.fromEntries(settingKeys.map((key) => [key, typeof settings[key] === "boolean" ? settings[key] : String(settings[key])])) as Draft;
 
   useEffect(() => {
     let active = true;
@@ -186,6 +208,7 @@ export function AdminMaintenance() {
                     />
                   ))}
                 </div>
+                {group.note?.(draft) ? <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-stone-700">{group.note(draft)}</p> : null}
               </section>
             ))
           )

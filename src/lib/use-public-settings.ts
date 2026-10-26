@@ -1,9 +1,9 @@
 "use client";
 
-import { defaultPasswordPolicy, type PublicSettings } from "@/lib/system-settings";
+import { defaultPasswordPolicy, defaultRoomSizes, type PublicSettings } from "@/lib/system-settings";
 import { useEffect, useState } from "react";
 
-const fallback: PublicSettings = { ...defaultPasswordPolicy, idleSignOutMinutes: 0 };
+const fallback: PublicSettings = { ...defaultPasswordPolicy, idleSignOutMinutes: 0, ...defaultRoomSizes };
 /** A tab left open re-reads the settings when shown again, at most this often. */
 const staleAfterMs = 60_000;
 let request: Promise<PublicSettings> | null = null;
@@ -31,7 +31,7 @@ export function refreshPublicSettings() {
   });
 }
 
-/** The Admin's password rules and inactivity sign-out time; the defaults apply until they load. */
+/** The Admin's password rules, inactivity sign-out time, and room sizes; the defaults apply until they load. */
 export function usePublicSettings() {
   const [settings, setSettings] = useState<PublicSettings>(fallback);
   useEffect(() => {
