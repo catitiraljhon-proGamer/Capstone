@@ -14,7 +14,7 @@ import {
   scheduleTemplateError,
 } from "@/lib/construction";
 import { amountError, dateError, numberError, textError } from "@/lib/form-validation";
-import { formatPeso } from "@/lib/house-design-data";
+import { formatPeso, pesoInputValue } from "@/lib/house-design-data";
 import { type Material, materialNameKey } from "@/lib/materials";
 import type {
   CostEstimateDto,
@@ -67,7 +67,7 @@ const toLineRows = (items: EstimateLineItem[]): LineRow[] =>
     key: nextKey(),
     // Older itemized lines fold their description into the scope text.
     scope: (line.description ? `${line.item} – ${line.description}` : line.item).slice(0, 160),
-    amount: line.materials?.length ? "" : String(lineAmount(line.quantity, line.unitPrice)),
+    amount: line.materials?.length ? "" : pesoInputValue(lineAmount(line.quantity, line.unitPrice)),
     materials: (line.materials ?? []).flatMap((material) => (material.materialId ? [{
       key: nextKey(), materialId: material.materialId, name: material.name,
       savedPrice: material.unitPrice ?? 0, quantity: String(material.quantity ?? ""),

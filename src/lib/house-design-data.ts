@@ -98,14 +98,17 @@ export const formatRoomSetup = (bedrooms: number, bathrooms: number) =>
 
 export const isDataImage = (src: string) => src.startsWith("data:");
 
-/** Whole pesos drop the decimals; anything with centavos always shows two digits (₱783,565.20). */
+/** Every peso amount shows its centavos, whole pesos included (₱1,450.00, ₱783,565.20), as the panel required. */
 export const formatPeso = (value: number) =>
   new Intl.NumberFormat("en-PH", {
     style: "currency",
     currency: "PHP",
-    minimumFractionDigits: Number.isInteger(Math.round(value * 100) / 100) ? 0 : 2,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+
+/** A saved amount as an input's starting text, with centavos ("1450.00"). */
+export const pesoInputValue = (value: number) => (Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2);
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 

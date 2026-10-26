@@ -8,6 +8,7 @@ import { maxRoomCount } from "@/lib/design-request-limit";
 import { amountError, numberError, textError } from "@/lib/form-validation";
 import {
   formatPeso,
+  pesoInputValue,
   getDesignEstimate,
   isDataImage,
   finishLevelDescriptions,
@@ -277,7 +278,7 @@ export function HouseDesignForm({
     name: design?.name ?? "",
     houseType: design?.houseType ?? defaultHouseType ?? "",
     area: design ? String(design.area) : "",
-    cost: design ? String(getDesignEstimate({ area: design.area, rate: design.rate }).baseEstimate) : "",
+    cost: design ? pesoInputValue(getDesignEstimate({ area: design.area, rate: design.rate }).baseEstimate) : "",
     bedrooms: design ? String(design.bedrooms) : "",
     bathrooms: design ? String(design.bathrooms) : "",
     finish: design?.finish ?? "",
@@ -293,7 +294,7 @@ export function HouseDesignForm({
     (design?.customItems ?? []).map((item) => ({
       ...item,
       quantity: String(item.quantity),
-      unitPrice: String(item.unitPrice),
+      unitPrice: pesoInputValue(item.unitPrice),
     })),
   );
   const [submitted, setSubmitted] = useState(false);

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { PesoInput } from "@/components/ui/peso-input";
-import { formatPeso } from "@/lib/house-design-data";
+import { formatPeso, pesoInputValue } from "@/lib/house-design-data";
 import { type Material, materialNameKey, materialNameMax, materialPriceError } from "@/lib/materials";
 import { Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -238,7 +238,7 @@ export function AdminMaintenanceMaterials({ onError, onSuccess }: {
                 </tr>
               ) : null}
               {rows.map((material) => {
-                const typed = drafts[material.id] ?? String(material.price);
+                const typed = drafts[material.id] ?? pesoInputValue(material.price);
                 const error = materialPriceError(typed);
                 const changed = changedIds.includes(material.id);
                 const inputId = `material-price-${material.id}`;

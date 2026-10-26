@@ -107,6 +107,7 @@ test("the room-space guide uses the sizes the Admin saved in Maintenance", () =>
 
 test("peso amounts display centavos without rounding them to whole pesos", () => {
   assert.equal(formatPeso(1675.25), "₱1,675.25");
-  assert.equal(formatPeso(1450), "₱1,450");
+  assert.equal(formatPeso(1450), "₱1,450.00");
+  assert.equal(formatPeso(0), "₱0.00");
   assert.equal(formatPeso(783_565.2), "₱783,565.20");
 });

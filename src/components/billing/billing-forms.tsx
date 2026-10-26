@@ -8,7 +8,7 @@ import { PesoInput } from "@/components/ui/peso-input";
 import { FieldError } from "@/components/ui/field-error";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { amountError, dateError, manilaDay, numberError, textError } from "@/lib/form-validation";
-import { formatPeso } from "@/lib/house-design-data";
+import { formatPeso, pesoInputValue } from "@/lib/house-design-data";
 import { BillingBadge, BillingDialog, BillingErrorMessage, billingDate, billingFieldClass as field, billingJson } from "@/components/billing/billing-primitives";
 import { GatewayPills } from "@/components/billing/billing-tables";
 import { embeddedImageAccept, readEmbeddedImage } from "@/lib/client-image-upload";
@@ -71,7 +71,7 @@ function milestoneFields(project: BillingProject, milestone: PaymentMilestoneDto
   const progress = project.milestones.slice(0, index + 1).reduce((sum, item) => sum + item.percentage, 0);
   const today = manilaDate();
   return {
-    label: milestone.label, amount: String(milestone.amount), progressPercentage: String(Math.min(100, roundPercent(progress))),
+    label: milestone.label, amount: pesoInputValue(milestone.amount), progressPercentage: String(Math.min(100, roundPercent(progress))),
     dueDate: milestone.targetDate && milestone.targetDate >= today ? milestone.targetDate : manilaDate(new Date(Date.now() + 7 * 86_400_000)),
   };
 }
@@ -83,7 +83,7 @@ export function InvoiceForm({ projects, designRequests, designRequestId, invoice
   const feeLabelFor = (id: string) => (feeTypeOf(id) === "blueprint" ? "Blueprint fee" : "House design fee");
   const [form, setForm] = useState({
     projectId: invoice?.projectId ?? "", designRequestId: invoice?.designRequestId ?? designRequestId ?? "", milestoneId: invoice?.milestoneId ?? "", label: invoice?.label ?? (designRequestId ? feeLabelFor(designRequestId) : ""), basis: invoice?.basis ?? "",
-    progressPercentage: String(invoice?.progressPercentage ?? 0), amount: invoice ? String(invoice.amount) : "", dueDate: invoice?.dueDate ?? manilaDate(),
+    progressPercentage: String(invoice?.progressPercentage ?? 0), amount: invoice ? pesoInputValue(invoice.amount) : "", dueDate: invoice?.dueDate ?? manilaDate(),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -410,7 +410,7 @@ export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: Billin
   const afterPending = balanceAfterPending(invoice, pending);
   // With payments still awaiting verification, start at what is left after them, so the same balance is not paid twice.
   const [amountMode, setAmountMode] = useState<AmountMode>(hasPending && afterPending > 0 && afterPending < invoice.balance ? "partial" : "full");
-  const [partialAmount, setPartialAmount] = useState(() => hasPending && afterPending > 0 ? String(afterPending) : "");
+  const [partialAmount, setPartialAmount] = useState(() => hasPending && afterPending > 0 ? pesoInputValue(afterPending) : "");
   const amount = amountMode === "full" ? String(invoice.balance) : partialAmount;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -443,7 +443,7 @@ export function PayOnlineDialog({ invoice, pending, onClose }: { invoice: Billin
       {amountMode === "full" ? <FullAmount label="Amount to pay (PHP)" balance={invoice.balance} /> : <div>
         <label className="block text-sm font-medium">Amount to pay (PHP)<PesoInput required min={minimum} max={invoice.balance} step="0.01" wrapperClassName="mt-1.5" {...fields.props("amount", amountMessage)} value={partialAmount} onChange={(event) => setPartialAmount(event.target.value)} /></label>
         {fields.error("amount", amountMessage)}
-        {hasPending && afterPending > 0 && <div className="mt-2"><Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPartialAmount(String(afterPending))}>After Pending · {formatPeso(afterPending)}</Button></div>}
+        {hasPending && afterPending > 0 && <div className="mt-2"><Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPartialAmount(pesoInputValue(afterPending))}>After Pending · {formatPeso(afterPending)}</Button></div>}
       </div>}
       {overPending && <p className="text-xs text-red-700">This is more than what remains after your pending payments ({formatPeso(afterPending)}).</p>}
       <p className="text-xs leading-5 text-stone-500">Minimum online payment is {formatPeso(minimum)}. Partial payments are allowed, but design images only unlock once the fee is fully paid.</p>
