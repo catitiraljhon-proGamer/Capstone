@@ -1,6 +1,7 @@
 import { type ClientSession, type Db, MongoServerError, ObjectId } from "mongodb";
 import { z } from "zod";
 import { collections, type MaterialDocument, type MaterialsSeedDocument } from "@/lib/database/collections";
+import { formatPeso } from "@/lib/house-design-data";
 import { type Material, materialNameKey, materialNameMax, maxMaterialPrice } from "@/lib/materials";
 import { recordAuditLog } from "@/lib/server/audit";
 import { MaintenanceError } from "@/lib/server/maintenance";
@@ -10,7 +11,6 @@ import startingList from "../../../database/seeds/materials.json";
 const startingMaterials = startingList as { name: string; price: number }[];
 const seededId = "materials-seeded";
 const materialsCollection = (db: Db) => db.collection<MaterialDocument>(collections.materials);
-const peso = (value: number) => value.toLocaleString("en-PH", { style: "currency", currency: "PHP" });
 
 const priceSchema = z.number({ error: "Enter the price as a number." })
   .finite()
@@ -36,8 +36,10 @@ function requireAdmin(actor: SessionUser) {
 
 /** The first read adds G4's starting list once. After that the Admin's list is kept as it is. */
 async function addStartingMaterials(db: Db) {
-  const marker = await db.collection<MaterialsSeedDocument>(collections.systemSettings)
-    .updateOne({ _id: seededId }, { $setOnInsert: { seededAt: new Date() } }, { upsert: true });
+  const settings = db.collection<MaterialsSeedDocument>(collections.systemSettings);
+  // Reads only check the marker; the write happens once, on the first read.
+  if (await settings.findOne({ _id: seededId }, { projection: { _id: 1 } })) return;
+  const marker = await settings.updateOne({ _id: seededId }, { $setOnInsert: { seededAt: new Date() } }, { upsert: true });
   if (!marker.upsertedCount || (await materialsCollection(db).estimatedDocumentCount()) > 0) return;
   const now = new Date();
   await materialsCollection(db).insertMany(startingMaterials.map(({ name, price }) => ({
@@ -93,7 +95,7 @@ export async function createMaterial(db: Db, actor: SessionUser, raw: unknown, n
   }
   await recordAuditLog({
     db, actor, action: "Added a material", entityType: "Material", entityId: document._id, createdAt: now,
-    details: { Material: name, Price: peso(input.price) },
+    details: { Material: name, Price: formatPeso(input.price) },
   });
   return readMaterials(db);
 }
@@ -122,7 +124,7 @@ export async function updateMaterialPrices(db: Db, actor: SessionUser, raw: unkn
       db, actor, action: changed.length === 1 ? "Changed a material price" : "Changed material prices", entityType: "Material",
       ...(changed.length === 1 ? { entityId: changed[0].document._id } : {}), createdAt: now,
       details: {
-        Changes: changed.slice(0, 10).map(({ document, price }) => `${document.name}: ${peso(document.price)} → ${peso(price)}`).join("; ")
+        Changes: changed.slice(0, 10).map(({ document, price }) => `${document.name}: ${formatPeso(document.price)} → ${formatPeso(price)}`).join("; ")
           + (changed.length > 10 ? `; and ${changed.length - 10} more` : ""),
       },
     });

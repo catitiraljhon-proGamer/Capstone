@@ -51,13 +51,19 @@ export type EstimateLineItem = {
   materials?: EstimateMaterial[];
 };
 
-/** A material the admin picked for a scope; the server fills in its name and current price. */
-export type EstimateMaterialInput = { materialId: string; quantity: number };
+/**
+ * A material the admin picked for a scope; the server fills in its name and current price. `id` keeps a saved row's
+ * id across saves, so a customer's change request still points at it.
+ */
+export type EstimateMaterialInput = { id?: string; materialId: string; quantity: number };
 
-export type EstimateLineItemInput = Omit<EstimateLineItem, "id" | "amount" | "materials"> & { materials?: EstimateMaterialInput[] };
+export type EstimateLineItemInput = Omit<EstimateLineItem, "id" | "amount" | "materials"> & { id?: string; materials?: EstimateMaterialInput[] };
 
-/** A material the customer asked to swap, e.g. Glass for Fiber glass, named as the estimate showed it. */
-export type EstimateRevisionChange = { scope: string; material: string; wants: string };
+/**
+ * A material the customer asked to swap, e.g. Glass for Fiber glass, named as the estimate showed it. `lineId` and
+ * `materialLineId` point at the scope and material row; requests saved before they were kept have names only.
+ */
+export type EstimateRevisionChange = { scope: string; material: string; wants: string; lineId?: string; materialLineId?: string };
 
 /** One row of the payment schedule before amounts are applied. The first row is always the downpayment. */
 export type MilestoneTemplate = {

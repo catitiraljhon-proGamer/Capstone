@@ -73,8 +73,10 @@ function requireAdmin(actor: SessionUser) {
  * even when every person was removed.
  */
 async function addStartingProfessionals(db: Db) {
-  const marker = await db.collection<ProfessionalsSeedDocument>(collections.systemSettings)
-    .updateOne({ _id: seededId }, { $setOnInsert: { seededAt: new Date() } }, { upsert: true });
+  const settings = db.collection<ProfessionalsSeedDocument>(collections.systemSettings);
+  // Reads only check the marker; the write happens once, on the first read.
+  if (await settings.findOne({ _id: seededId }, { projection: { _id: 1 } })) return;
+  const marker = await settings.updateOne({ _id: seededId }, { $setOnInsert: { seededAt: new Date() } }, { upsert: true });
   if (!marker.upsertedCount || (await professionalsCollection(db).estimatedDocumentCount()) > 0) return;
   const now = new Date();
   await professionalsCollection(db).insertMany(startingProfessionals.map(({ name, role }, order) => ({
@@ -141,8 +143,12 @@ export async function getAboutUsProfessionals(db: Db): Promise<Professional[]> {
 
 /** Everyone in the Admin's order, hidden people included, for the Billing Clerk to name a billing's approver. */
 export async function getTeamMembers(db: Db) {
-  return (await readDocuments(db, { includeHidden: true }))
-    .map(({ document }) => ({ id: document._id.toHexString(), name: document.name, role: document.role }));
+  await addStartingProfessionals(db);
+  const documents = await professionalsCollection(db)
+    .find({}, { projection: { name: 1, role: 1 } })
+    .sort({ order: 1, createdAt: 1 })
+    .toArray();
+  return documents.map((document) => ({ id: document._id.toHexString(), name: document.name, role: document.role }));
 }
 
 /** The person named as a billing's approver; null when they were removed from the team. */

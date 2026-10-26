@@ -78,12 +78,15 @@ const requestSchema = z.object({
 }).strict();
 
 const lineMaterialSchema = z.object({
+  id: z.uuid().optional(),
   materialId: z.string().regex(idPattern, "Choose each material from the list."),
   quantity: z.number().finite().positive("Material quantities must be greater than 0.").max(10_000_000)
     .refine(twoDecimals, "Use at most two decimal places for material quantities."),
 }).strict();
 
 const lineItemSchema = z.object({
+  /** A saved scope keeps its id, so the customer's change requests still point at it. */
+  id: z.uuid().optional(),
   item: z.string().trim().min(1, "Every line item needs a name.").max(160),
   description: z.string().trim().max(500),
   unit: z.string().trim().min(1, "Every line item needs a unit.").max(30),
@@ -323,8 +326,15 @@ async function guardedEstimateUpdate(db: Db, session: ClientSession, estimate: E
 async function pricedLineItems(db: Db, session: ClientSession, lines: Extract<EstimateAction, { action: "save" }>["lineItems"]) {
   const picked = lines.flatMap((line) => line.materials ?? []);
   const catalog = await findMaterials(db, [...new Set(picked.map((entry) => entry.materialId.toLowerCase()))].map((id) => new ObjectId(id)), session);
-  return lines.map(({ materials = [], ...line }): EstimateLineItemDocument => {
-    if (!materials.length) return { id: randomUUID(), ...line, amount: lineAmount(line.quantity, line.unitPrice) };
+  // Saved rows keep their ids; a new or repeated id gets a fresh one.
+  const usedIds = new Set<string>();
+  const rowId = (id?: string) => {
+    const next = id && !usedIds.has(id) ? id : randomUUID();
+    usedIds.add(next);
+    return next;
+  };
+  return lines.map(({ id, materials = [], ...line }): EstimateLineItemDocument => {
+    if (!materials.length) return { id: rowId(id), ...line, amount: lineAmount(line.quantity, line.unitPrice) };
     if (new Set(materials.map((entry) => entry.materialId.toLowerCase())).size !== materials.length) {
       throw new BillingError(`List each material once in ${line.item}.`);
     }
@@ -332,13 +342,13 @@ async function pricedLineItems(db: Db, session: ClientSession, lines: Extract<Es
       const material = catalog.get(entry.materialId.toLowerCase());
       if (!material) throw new BillingError(`A material in ${line.item} is no longer in Maintenance. Reload the estimate and pick it again.`, 409);
       return {
-        id: randomUUID(), materialId: material._id, name: material.name, unitPrice: material.price,
+        id: rowId(entry.id), materialId: material._id, name: material.name, unitPrice: material.price,
         quantity: entry.quantity, amount: lineAmount(entry.quantity, material.price),
       };
     });
     const total = fromCentavos(priced.reduce((sum, material) => sum + toCentavos(material.amount), 0));
     if (total > MAX_CONTRACT_TOTAL) throw new BillingError("The contract total cannot exceed PHP 1,000,000,000.");
-    return { id: randomUUID(), ...line, unit: "lot", quantity: 1, unitPrice: total, amount: total, materials: priced };
+    return { id: rowId(id), ...line, unit: "lot", quantity: 1, unitPrice: total, amount: total, materials: priced };
   });
 }
 
@@ -392,7 +402,7 @@ function revisionChangesOf(estimate: EstimateDocument, changes: Extract<Estimate
     if (seen.has(material.id)) throw new BillingError(`Ask for one change to ${material.name} only.`);
     seen.add(material.id);
     if (materialNameKey(change.wants) === materialNameKey(material.name)) throw new BillingError(`Enter a different material than ${material.name}.`);
-    return { scope: line.item, material: material.name, wants: change.wants };
+    return { scope: line.item, material: material.name, wants: change.wants, lineId: line.id, materialLineId: material.id };
   });
 }
 

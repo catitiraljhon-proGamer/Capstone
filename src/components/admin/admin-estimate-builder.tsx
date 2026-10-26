@@ -54,22 +54,23 @@ let rowCounter = 0;
 const nextKey = () => ++rowCounter;
 
 /** A material in a scope of work. Its price comes from Maintenance > Materials; the admin types only the quantity. */
-type MaterialRow = { key: number; materialId: string; name: string; savedPrice: number; quantity: string };
+type MaterialRow = { key: number; id?: string; materialId: string; name: string; savedPrice: number; quantity: string };
 /**
  * One scope of work, saved as 1 lot. With materials its amount is their total; without any it keeps the lump sum
- * typed in Amount, as older estimates did.
+ * typed in Amount, as older estimates did. Saved rows keep their `id`, which the customer's change requests point at.
  */
-type LineRow = { key: number; scope: string; amount: string; materials: MaterialRow[]; open: boolean };
+type LineRow = { key: number; id?: string; scope: string; amount: string; materials: MaterialRow[]; open: boolean };
 type ScheduleRow = { key: number; label: string; description: string; percentage: string; targetDate: string };
 
 const toLineRows = (items: EstimateLineItem[]): LineRow[] =>
   items.map((line) => ({
     key: nextKey(),
+    id: line.id,
     // Older itemized lines fold their description into the scope text.
     scope: (line.description ? `${line.item} – ${line.description}` : line.item).slice(0, 160),
     amount: line.materials?.length ? "" : pesoInputValue(lineAmount(line.quantity, line.unitPrice)),
     materials: (line.materials ?? []).flatMap((material) => (material.materialId ? [{
-      key: nextKey(), materialId: material.materialId, name: material.name,
+      key: nextKey(), id: material.id, materialId: material.materialId, name: material.name,
       savedPrice: material.unitPrice ?? 0, quantity: String(material.quantity ?? ""),
     }] : [])),
     open: false,
@@ -101,20 +102,30 @@ const rowAmount = (row: LineRow, priceOf: PriceOf) => (row.materials.length
 
 /** The server prices each material again from Maintenance when the estimate is saved. */
 const fromLineRows = (rows: LineRow[]): EstimateLineItemInput[] =>
-  rows.map((row) => (row.materials.length
-    ? {
-      item: row.scope.trim(), description: "", unit: "lot", quantity: 1, unitPrice: 0,
-      materials: row.materials.map((material) => ({ materialId: material.materialId, quantity: num(material.quantity) })),
-    }
-    : { item: row.scope.trim(), description: "", unit: "lot", quantity: 1, unitPrice: num(row.amount) }));
+  rows.map((row) => ({
+    ...(row.id ? { id: row.id } : {}), item: row.scope.trim(), description: "", unit: "lot", quantity: 1,
+    ...(row.materials.length
+      ? {
+        unitPrice: 0,
+        materials: row.materials.map((material) => ({ ...(material.id ? { id: material.id } : {}), materialId: material.materialId, quantity: num(material.quantity) })),
+      }
+      : { unitPrice: num(row.amount) }),
+  }));
 
 const sameName = (a: string, b: string) => materialNameKey(a) === materialNameKey(b);
+/**
+ * Whether this row is the material the customer asked to change. Requests point at the row's id, so renaming the
+ * scope keeps them; older requests without ids match by scope and material name.
+ */
+const isRequested = (change: EstimateRevisionChange, row: LineRow, material: MaterialRow) =>
+  sameName(change.material, material.name)
+  && (change.materialLineId ? material.id === change.materialLineId : sameName(change.scope, row.scope));
 /** The customer's request for this material, if they asked to change it. */
 const changeFor = (changes: EstimateRevisionChange[], row: LineRow, material: MaterialRow) =>
-  changes.find((change) => sameName(change.scope, row.scope) && sameName(change.material, material.name));
-/** A change is done once the material is no longer in that scope, replaced or removed. */
+  changes.find((change) => isRequested(change, row, material));
+/** A change is done once that material is no longer in its scope: replaced or removed. */
 const changeDone = (change: EstimateRevisionChange, rows: LineRow[]) =>
-  !rows.some((row) => sameName(row.scope, change.scope) && row.materials.some((material) => sameName(material.name, change.material)));
+  !rows.some((row) => row.materials.some((material) => isRequested(change, row, material)));
 
 const fromScheduleRows = (rows: ScheduleRow[]): MilestoneTemplate[] =>
   rows.map((row) => ({
@@ -490,7 +501,11 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
 
   useEffect(() => {
     let active = true;
+    let loadedAt = 0;
     const refresh = () => {
+      // Coming back to the tab reloads the list at most once a minute.
+      if (Date.now() - loadedAt < 60_000) return;
+      loadedAt = Date.now();
       loadMaterials()
         .then((materials) => {
           if (!active) return;
@@ -601,13 +616,27 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
       : [...materials, { key: nextKey(), materialId, name: material.name, savedPrice: material.price, quantity: "1" }]));
   }
 
-  /** Swaps the material the customer asked to change, keeping its quantity; the new price comes from Maintenance. */
+  /**
+   * Swaps the material the customer asked to change, keeping its quantity; the new price comes from Maintenance. When
+   * the scope already lists the new material, the quantities are added together.
+   */
   function replaceMaterial(key: number, materialKey: number, replacement: Material) {
-    updateMaterials(key, (materials) => (materials.some((item) => item.materialId === replacement.id)
-      ? materials.filter((item) => item.key !== materialKey)
-      : materials.map((item) => (item.key === materialKey
-        ? { ...item, materialId: replacement.id, name: replacement.name, savedPrice: replacement.price }
-        : item))));
+    updateMaterials(key, (materials) => {
+      const replaced = materials.find((item) => item.key === materialKey);
+      const existing = materials.find((item) => item.materialId === replacement.id);
+      if (!replaced) return materials;
+      if (!existing) {
+        return materials.map((item) => (item.key === materialKey
+          ? { ...item, materialId: replacement.id, name: replacement.name, savedPrice: replacement.price }
+          : item));
+      }
+      const quantity = quantityError(existing.quantity) || quantityError(replaced.quantity)
+        ? existing.quantity
+        : String(fromCentavos(toCentavos(Number(existing.quantity)) + toCentavos(Number(replaced.quantity))));
+      return materials
+        .filter((item) => item.key !== materialKey)
+        .map((item) => (item.key === existing.key ? { ...item, quantity } : item));
+    });
   }
 
   function updateSchedule(key: number, patch: Partial<ScheduleRow>) {

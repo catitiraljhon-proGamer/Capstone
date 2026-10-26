@@ -97,9 +97,11 @@ export function InvoiceForm({ projects, designRequests, approvers, designRequest
   const milestone = hasMilestones ? project?.milestones.find((item) => item.id === form.milestoneId) : undefined;
   // The downpayment follows the accepted estimate, so no one is named as its approver.
   const isDownpayment = Boolean(milestone?.isDownpayment);
+  /** A saved downpayment keeps its basis, which may name the estimate ("… per accepted estimate EST-…"). */
+  const downpaymentText = invoice?.milestoneId === milestone?.id && invoice?.basis ? invoice.basis : downpaymentBasis;
   const approver = approvers.find((item) => item.id === form.approverId);
   /** A draft saved before approvers were picked shows its typed basis until someone is chosen. */
-  const typedBasis = invoice && !invoice.approvedById && invoice.basis !== downpaymentBasis ? invoice.basis : "";
+  const typedBasis = invoice && !invoice.approvedById ? invoice.basis : "";
   const fields = useFieldMessages();
   const remaining = project ? Math.round((project.contractPrice - project.allocated + (invoice?.amount ?? 0)) * 100) / 100 : undefined;
   // Milestone amount and progress are fixed by the accepted payment schedule, so only free-entry values are checked.
@@ -128,7 +130,7 @@ export function InvoiceForm({ projects, designRequests, approvers, designRequest
     if (fields.blocked(messages)) return;
     setBusy(true); setError(null);
     const { projectId, designRequestId, milestoneId, approverId, ...values } = form;
-    const input = { ...values, ...(isDownpayment ? { basis: downpaymentBasis } : { approverId }), ...(designRequestId ? { designRequestId } : { projectId }), ...(hasMilestones ? { milestoneId } : {}), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
+    const input = { ...values, ...(isDownpayment ? { basis: downpaymentText } : { approverId }), ...(designRequestId ? { designRequestId } : { projectId }), ...(hasMilestones ? { milestoneId } : {}), amount: Number(form.amount), progressPercentage: designRequestId ? 0 : Number(form.progressPercentage) };
     try {
       await mutate(invoice ? `/api/billing/invoices/${invoice.id}` : "/api/billing/invoices", invoice ? "PATCH" : "POST", invoice ? { action: "edit", invoice: input } : input);
       onClose();
@@ -169,7 +171,7 @@ export function InvoiceForm({ projects, designRequests, approvers, designRequest
       </label>{fields.error("label", messages.label)}</div>
       <div><label className="block text-sm font-medium">Billing Basis / Approved Reference
         {isDownpayment ? (
-          <p className="mt-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-normal text-stone-700">{downpaymentBasis}</p>
+          <p className="mt-1.5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm font-normal text-stone-700">{downpaymentText}</p>
         ) : (
           <select required disabled={busy} className={invalidField} {...fields.props("basis", messages.basis)} value={approver ? form.approverId : ""} onChange={(event) => setForm({ ...form, approverId: event.target.value })}>
             <option value="">Select who approved this billing</option>

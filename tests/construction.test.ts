@@ -449,7 +449,8 @@ test("scopes with materials are priced from Maintenance, customers see only the 
   const catalog = await getMaterials(db, admin);
   const cement = catalog.find((material) => material.name === "Cement")!;
   const chb = catalog.find((material) => material.name === "CHB #4")!;
-  const masonry = (materials: { materialId: string; quantity: number }[]) => ({ item: "Masonry", description: "", unit: "lot", quantity: 1, unitPrice: 0, materials });
+  const masonry = (materials: { id?: string; materialId: string; quantity: number }[], id?: string) =>
+    ({ ...(id ? { id } : {}), item: "Masonry", description: "", unit: "lot", quantity: 1, unitPrice: 0, materials });
   const permits = { item: "Permits", description: "", unit: "lot", quantity: 1, unitPrice: 50_000 };
   const estimate = await requestedEstimate();
 
@@ -491,7 +492,18 @@ test("scopes with materials are priced from Maintenance, customers see only the 
   const revision = (await revise([{ lineId, materialLineId: shown[0].id, wants: "Fiber glass" }])).estimate;
   assert.equal(revision.status, "Revision requested");
   assert.equal(revision.revisionNote, null);
-  assert.deepEqual(revision.revisionChanges, [{ scope: "Masonry", material: "Cement", wants: "Fiber glass" }]);
+  assert.deepEqual(revision.revisionChanges, [{ scope: "Masonry", material: "Cement", wants: "Fiber glass", lineId, materialLineId: shown[0].id }]);
+
+  // Saving with the rows' ids keeps them, so the request still points at the same scope and material.
+  const kept = (await changeEstimate(db, admin, estimate.id, savePayload({
+    lineItems: [masonry([{ id: shown[0].id, materialId: cement.id, quantity: 10 }, { id: shown[1].id, materialId: chb.id, quantity: 100 }], lineId), permits],
+  }))).estimate;
+  assert.equal(kept.lineItems[0].id, lineId);
+  assert.deepEqual(kept.lineItems[0].materials?.map((material) => material.id), [shown[0].id, shown[1].id]);
+  const repeated = (await changeEstimate(db, admin, estimate.id, savePayload({
+    lineItems: [masonry([{ materialId: cement.id, quantity: 10 }], lineId), { ...permits, id: lineId }],
+  }))).estimate;
+  assert.notEqual(repeated.lineItems[1].id, lineId);
   assert.deepEqual((await getEstimate(db, admin, estimate.id)).revisionChanges, revision.revisionChanges);
   assert.match((await db.collection("notifications").findOne({ kind: "construction-revision" }))?.body ?? "", /Cement → Fiber glass/);
 
