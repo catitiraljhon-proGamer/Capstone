@@ -26,6 +26,19 @@ export type ProjectStatus =
   /** Legacy seeded projects created before the construction workflow. */
   | "Pending";
 
+/**
+ * One material in a scope of work, priced from Maintenance > Materials when the estimate was saved. Customers get only
+ * `id` and `name`: the price and quantity stay with G4 Builders.
+ */
+export type EstimateMaterial = {
+  id: string;
+  name: string;
+  materialId?: string;
+  unitPrice?: number;
+  quantity?: number;
+  amount?: number;
+};
+
 export type EstimateLineItem = {
   id: string;
   item: string;
@@ -34,9 +47,17 @@ export type EstimateLineItem = {
   quantity: number;
   unitPrice: number;
   amount: number;
+  /** When listed, the scope's amount is the total of these; otherwise it is a lump sum. */
+  materials?: EstimateMaterial[];
 };
 
-export type EstimateLineItemInput = Omit<EstimateLineItem, "id" | "amount">;
+/** A material the admin picked for a scope; the server fills in its name and current price. */
+export type EstimateMaterialInput = { materialId: string; quantity: number };
+
+export type EstimateLineItemInput = Omit<EstimateLineItem, "id" | "amount" | "materials"> & { materials?: EstimateMaterialInput[] };
+
+/** A material the customer asked to swap, e.g. Glass for Fiber glass, named as the estimate showed it. */
+export type EstimateRevisionChange = { scope: string; material: string; wants: string };
 
 /** One row of the payment schedule before amounts are applied. The first row is always the downpayment. */
 export type MilestoneTemplate = {
@@ -93,6 +114,8 @@ export type CostEstimateDto = {
   scheduleTemplate: MilestoneTemplate[];
   adminNotes: string;
   revisionNote: string | null;
+  /** Materials the customer asked to change in their last revision request. */
+  revisionChanges: EstimateRevisionChange[];
   sentAt: string | null;
   acceptedAt: string | null;
   downpaymentPercent: number | null;
@@ -137,7 +160,8 @@ export type ConstructionRequestInput = {
 export type EstimateAction =
   | { action: "save"; lineItems: EstimateLineItemInput[]; scheduleTemplate: MilestoneTemplate[]; adminNotes: string }
   | { action: "send" }
-  | { action: "request-revision"; reason: string }
+  /** `changes` point at a scope (`lineId`) and one of its materials (`EstimateMaterial.id`). */
+  | { action: "request-revision"; reason: string; changes?: { lineId: string; materialLineId: string; wants: string }[] }
   | { action: "accept"; downpaymentPercent: number };
 
 export type ProjectStatusAction = {

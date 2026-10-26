@@ -121,6 +121,7 @@ async function ensureIndexes(db: Db) {
       db.collection("warranty_claims").createIndex({ customerId: 1, createdAt: -1 }),
       db.collection("warranty_claims").createIndex({ projectId: 1, status: 1 }),
       db.collection("warranty_claims").createIndex({ status: 1, "repair.repairedAt": 1 }),
+      db.collection("materials").createIndex({ nameKey: 1 }, { unique: true }),
       db.collection("audit_logs").createIndex({ createdAt: -1 }),
       db.collection("audit_logs").createIndex({ action: 1, createdAt: -1 }),
       db.collection("audit_logs").createIndex({ entityType: 1, createdAt: -1 }),

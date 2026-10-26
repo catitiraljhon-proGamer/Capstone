@@ -3,6 +3,7 @@
 import { AdminMaintenanceAboutUs } from "@/components/admin/admin-maintenance-about-us";
 import { AdminMaintenanceBackups } from "@/components/admin/admin-maintenance-backups";
 import { AdminMaintenanceContact } from "@/components/admin/admin-maintenance-contact";
+import { AdminMaintenanceMaterials } from "@/components/admin/admin-maintenance-materials";
 import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
 import { AdminMaintenanceSlideshow } from "@/components/admin/admin-maintenance-slideshow";
 import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
@@ -20,10 +21,10 @@ import {
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, Ruler, ScrollText, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Package, Phone, Ruler, ScrollText, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export type MaintenanceSection = "mode" | "security" | "email" | "notifications" | "rooms" | "warranty" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
+export type MaintenanceSection = "mode" | "security" | "email" | "notifications" | "rooms" | "warranty" | "materials" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
 type Section = MaintenanceSection;
 type Draft = Record<SettingKey, string | boolean>;
 /** `note` adds a line under the group worked out from the typed values. */
@@ -82,6 +83,7 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
       },
     ],
   },
+  { id: "materials", label: "Materials", icon: Package, groups: [] },
   { id: "contact", label: "Contact Us", icon: Phone, groups: [] },
   { id: "terms", label: "Terms and Conditions", icon: ScrollText, groups: [] },
   { id: "slideshow", label: "Home Page Slideshow", icon: Images, groups: [] },
@@ -235,6 +237,7 @@ export function AdminMaintenance({ initialSection = "mode" }: { initialSection?:
         ) : null}
 
         {section === "warranty" ? <AdminMaintenanceWarranty onError={setError} onSuccess={setSuccess} /> : null}
+        {section === "materials" ? <AdminMaintenanceMaterials onError={setError} onSuccess={setSuccess} /> : null}
         {section === "contact" ? <AdminMaintenanceContact onError={setError} onSuccess={setSuccess} /> : null}
         {section === "terms" ? <AdminMaintenanceTerms onError={setError} onSuccess={setSuccess} /> : null}
         {section === "slideshow" ? <AdminMaintenanceSlideshow onError={setError} onSuccess={setSuccess} /> : null}

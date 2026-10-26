@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Hourglass, MessageSquareText } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ArrowLeftRight, CheckCircle2, ChevronRight, ClipboardCheck, Hourglass, MessageSquareText, X } from "lucide-react";
 import { BillingDialog, BillingErrorMessage, BillingPanel, billingJson } from "@/components/billing/billing-primitives";
 import { constructionFieldClass, constructionLabelClass, dateOrDash, Eyebrow, Fact, ScheduleTable } from "@/components/customer/construction-shared";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { RequiredIndicator } from "@/components/ui/required-indicator";
 import { buildPaymentSchedule, MIN_DOWNPAYMENT_PERCENT } from "@/lib/construction";
 import { numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
-import type { CostEstimateDto, EstimateAction } from "@/types/construction";
+import { materialNameKey, materialNameMax } from "@/lib/materials";
+import type { CostEstimateDto, EstimateAction, EstimateRevisionChange } from "@/types/construction";
 
 async function sendAction(id: string, action: EstimateAction) {
   const response = await fetch(`/api/construction/estimates/${encodeURIComponent(id)}`, {
@@ -32,29 +33,198 @@ function RequestSummary({ estimate }: { estimate: CostEstimateDto }) {
   );
 }
 
-function ScopeOfWorksTable({ estimate }: { estimate: CostEstimateDto }) {
+/** A material the customer wants swapped; `lineId` and `materialLineId` point at it in the sent estimate. */
+type MaterialRequest = EstimateRevisionChange & { lineId: string; materialLineId: string };
+
+function changeRequestError(text: string, current: string) {
+  const value = text.trim();
+  if (!value) return "Enter the material you want.";
+  if (value.length < 2) return "Material name must be at least 2 characters.";
+  if (materialNameKey(value) === materialNameKey(current)) return "Enter a different material.";
+  return null;
+}
+
+/** Material names to suggest; prices are never sent to customers. */
+function useMaterialNames(enabled: boolean) {
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+    fetch("/api/catalog/materials", { cache: "no-store" })
+      .then(async (response) => ((await response.json().catch(() => ({}))) as { names?: string[] }).names ?? [])
+      .then((list) => { if (active) setNames(list); })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [enabled]);
+  return names;
+}
+
+/**
+ * Each scope with its quantity, unit, and amount. Scopes with materials open to list the material names only; the
+ * prices and quantities stay with G4 Builders. With `onRequestsChange`, each material can be asked to change.
+ */
+function ScopeOfWorksTable({ estimate, requests = [], onRequestsChange }: {
+  estimate: CostEstimateDto;
+  requests?: MaterialRequest[];
+  onRequestsChange?: (requests: MaterialRequest[]) => void;
+}) {
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(estimate.lineItems[0]?.materials?.length ? [estimate.lineItems[0].id] : []));
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [tried, setTried] = useState(false);
+  const names = useMaterialNames(Boolean(onRequestsChange));
+  const listId = useId();
+
+  const toggle = (id: string) => setOpen((current) => {
+    const next = new Set(current);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  });
+  const startChange = (materialLineId: string) => {
+    setEditing(materialLineId);
+    setDraft("");
+    setTried(false);
+  };
+
   return (
     <div className="overflow-x-auto rounded-lg border border-stone-200">
-      <table className="w-full min-w-[20rem] border-collapse text-left text-sm">
+      <table className="w-full min-w-[28rem] border-collapse text-left text-sm">
         <thead className="bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
           <tr>
             <th scope="col" className="px-3 py-2.5">Scope of Works</th>
-            <th scope="col" className="px-3 py-2.5 text-right">Amount</th>
+            <th scope="col" className="w-16 px-3 py-2.5 text-right">Qty</th>
+            <th scope="col" className="w-20 px-3 py-2.5">Unit</th>
+            <th scope="col" className="w-36 px-3 py-2.5 text-right">Amount</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stone-200">
-          {estimate.lineItems.map((line) => (
-            <tr key={line.id}>
-              <td className="px-3 py-2.5 align-top font-semibold text-stone-950">{line.description ? `${line.item} – ${line.description}` : line.item}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums">{formatPeso(line.amount)}</td>
-            </tr>
-          ))}
-        </tbody>
+        {estimate.lineItems.map((line) => {
+          const materials = line.materials ?? [];
+          const isOpen = open.has(line.id);
+          const name = line.description ? `${line.item} – ${line.description}` : line.item;
+          return (
+            <tbody key={line.id} className="border-t border-stone-200">
+              <tr>
+                <td className="px-3 py-2.5 align-top font-semibold text-stone-950">
+                  {materials.length ? (
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={`scope-${line.id}`}
+                      onClick={() => toggle(line.id)}
+                      className="inline-flex min-h-6 items-center gap-2 text-left font-semibold hover:text-red-800"
+                    >
+                      <ChevronRight aria-hidden="true" className={`h-4 w-4 shrink-0 text-red-700 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                      {name}
+                    </button>
+                  ) : <span className="pl-6">{name}</span>}
+                </td>
+                <td className="px-3 py-2.5 text-right align-top tabular-nums">{line.quantity}</td>
+                <td className="px-3 py-2.5 align-top">{line.unit}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-right align-top font-semibold tabular-nums">{formatPeso(line.amount)}</td>
+              </tr>
+              {isOpen ? (
+                <tr id={`scope-${line.id}`}>
+                  <td colSpan={4} className="px-3 pb-3 sm:pl-9">
+                    <div className="rounded-lg border border-stone-200 bg-stone-50 px-3">
+                      <p className="border-b border-stone-200 pb-2 pt-2.5 text-xs font-semibold uppercase tracking-wide text-stone-500">Material</p>
+                      <ul aria-label={`Materials in ${line.item}`} className="divide-y divide-stone-200/70">
+                        {materials.map((material) => {
+                          const request = requests.find((item) => item.materialLineId === material.id);
+                          const isEditing = editing === material.id;
+                          const error = isEditing ? changeRequestError(draft, material.name) : null;
+                          const inputId = `change-${material.id}`;
+                          return (
+                            <li key={material.id} className="py-2.5">
+                              <div className="flex min-h-8 flex-wrap items-center justify-between gap-2">
+                                <span className="text-stone-950">
+                                  {material.name}
+                                  {request ? <> <span className="text-stone-500">→</span> <strong className="text-red-800">{request.wants}</strong></> : null}
+                                </span>
+                                {onRequestsChange ? (
+                                  <span className="flex items-center gap-2">
+                                    {request ? (
+                                      <>
+                                        <span className="rounded-md bg-rose-100 px-2 py-0.5 text-xs font-semibold text-red-800">Change requested</span>
+                                        <Button type="button" variant="outline" size="sm" aria-label={`Undo the change to ${material.name}`} onClick={() => onRequestsChange(requests.filter((item) => item !== request))}>Undo</Button>
+                                      </>
+                                    ) : !isEditing ? (
+                                      <Button type="button" variant="outline" size="sm" className="text-red-700" aria-label={`Request a change to ${material.name}`} onClick={() => startChange(material.id)}>
+                                        <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Request change
+                                      </Button>
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                              </div>
+                              {isEditing && onRequestsChange ? (
+                                <form
+                                  noValidate
+                                  className="mt-2.5 rounded-lg border border-stone-200 bg-white p-3"
+                                  onSubmit={(event) => {
+                                    event.preventDefault();
+                                    if (error) {
+                                      setTried(true);
+                                      return;
+                                    }
+                                    onRequestsChange([...requests, {
+                                      lineId: line.id, materialLineId: material.id, scope: line.item, material: material.name, wants: draft.trim(),
+                                    }]);
+                                    setEditing(null);
+                                  }}
+                                >
+                                  <label htmlFor={inputId} className={constructionLabelClass}>Change {material.name} to <RequiredIndicator /></label>
+                                  <input
+                                    id={inputId}
+                                    list={listId}
+                                    maxLength={materialNameMax}
+                                    autoFocus
+                                    placeholder="Enter material name"
+                                    className={`${constructionFieldClass} max-w-md aria-invalid:border-red-600`}
+                                    value={draft}
+                                    onChange={(event) => setDraft(event.target.value)}
+                                    aria-invalid={tried && error ? true : undefined}
+                                    aria-describedby={tried && error ? `${inputId}-error` : `${inputId}-hint`}
+                                  />
+                                  {tried && error
+                                    ? <FieldError id={`${inputId}-error`} message={error} />
+                                    : <p id={`${inputId}-hint`} className="mt-1 text-xs text-stone-500">Type any material. It doesn&apos;t have to be on the list.</p>}
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <Button type="submit" size="sm" className="min-h-10">Add to Request</Button>
+                                    <Button type="button" variant="outline" size="sm" className="min-h-10" onClick={() => setEditing(null)}>Cancel</Button>
+                                  </div>
+                                </form>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          );
+        })}
         <tfoot className="border-t border-stone-200 text-sm">
-          <tr className="bg-rose-50"><td className="px-3 py-3 text-right font-semibold text-stone-950">Contract Total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
+          <tr className="bg-rose-50"><td colSpan={3} className="px-3 py-3 text-right font-semibold text-stone-950">Contract Total</td><td className="whitespace-nowrap px-3 py-3 text-right text-base font-semibold tabular-nums text-red-700">{formatPeso(estimate.total)}</td></tr>
         </tfoot>
       </table>
+      {onRequestsChange ? <datalist id={listId}>{names.map((option) => <option key={option} value={option} />)}</datalist> : null}
     </div>
+  );
+}
+
+/** The materials the customer asked to change, as listed in their revision request. */
+function RequestedChanges({ changes }: { changes: EstimateRevisionChange[] }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {changes.map((change, index) => (
+        <li key={index} className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-stone-700">
+          <span className="text-stone-500">{change.scope}:</span> {change.material} → <strong className="text-red-800">{change.wants}</strong>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -63,6 +233,8 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
   const [percentText, setPercentText] = useState(String(minPercent));
   const [dialog, setDialog] = useState<"accept" | "revise" | null>(null);
   const [reason, setReason] = useState("");
+  const [requests, setRequests] = useState<MaterialRequest[]>([]);
+  const [otherChanges, setOtherChanges] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,8 +286,61 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
     <div className="space-y-6">
       <div>
         <h3 className="text-base font-semibold tracking-tight">Scope of Works</h3>
-        <p className="mt-1 text-sm text-stone-600">Each scope of work for building your house and its amount.</p>
-        <div className="mt-3"><ScopeOfWorksTable estimate={estimate} /></div>
+        <p className="mt-1 text-sm text-stone-600">
+          Each scope of work for building your house and its amount. Open one to see the materials it includes, and ask for a different material if you want one.
+        </p>
+        <div className="mt-3">
+          <ScopeOfWorksTable estimate={estimate} requests={requests} onRequestsChange={(next) => { setRequests(next); setError(null); }} />
+        </div>
+        {requests.length ? (
+          <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4">
+            <p className="text-sm font-semibold text-red-900">Your revision request</p>
+            <p className="mt-1 text-sm text-stone-600">G4 Builders will update these materials and send you a new estimate. The amounts may change.</p>
+            <ul className="mt-3 space-y-1.5">
+              {requests.map((request) => (
+                <li key={request.materialLineId} className="flex items-center gap-2 rounded-lg border border-rose-200 bg-white py-1.5 pl-3 pr-1.5 text-sm">
+                  <span className="min-w-0 flex-1 text-stone-700">
+                    <span className="text-stone-500">{request.scope}:</span> {request.material} → <strong className="text-red-800">{request.wants}</strong>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove the change to ${request.material}`}
+                    onClick={() => setRequests(requests.filter((item) => item !== request))}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <label className={`${constructionLabelClass} mt-4`} htmlFor="estimate-other-changes">Other changes (optional)</label>
+            <textarea
+              id="estimate-other-changes"
+              rows={3}
+              maxLength={1000}
+              placeholder="Enter other changes"
+              className={constructionFieldClass}
+              value={otherChanges}
+              onChange={(event) => setOtherChanges(event.target.value)}
+            />
+            {dialog === null ? <BillingErrorMessage message={error} /> : null}
+            <div className="mt-3 flex justify-end">
+              <Button
+                type="button"
+                className="min-h-11"
+                disabled={busy}
+                onClick={() => void run({
+                  action: "request-revision",
+                  reason: otherChanges.trim(),
+                  changes: requests.map(({ lineId, materialLineId, wants }) => ({ lineId, materialLineId, wants })),
+                }, "Revision requested. G4 Builders will update the materials and send you a new estimate.")}
+              >
+                {busy ? "Sending…" : "Send Revision Request"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {estimate.adminNotes && (
@@ -153,10 +378,14 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
         <div className="mt-3"><ScheduleTable rows={schedule} /></div>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:justify-end">
-        <Button variant="outline" className="min-h-11" onClick={() => { setError(null); setReason(""); setReasonTouched(false); setDialog("revise"); }}>Request revision</Button>
-        <Button className="min-h-11" onClick={openAccept}><ClipboardCheck className="mr-2 h-4 w-4" />Accept Estimate</Button>
-      </div>
+      {requests.length ? (
+        <p className="border-t border-stone-200 pt-5 text-right text-sm text-stone-600">Send or remove your requested changes before accepting this estimate.</p>
+      ) : (
+        <div className="flex flex-col gap-3 border-t border-stone-200 pt-5 sm:flex-row sm:justify-end">
+          <Button variant="outline" className="min-h-11" onClick={() => { setError(null); setReason(""); setReasonTouched(false); setDialog("revise"); }}>Request revision</Button>
+          <Button className="min-h-11" onClick={openAccept}><ClipboardCheck className="mr-2 h-4 w-4" />Accept Estimate</Button>
+        </div>
+      )}
 
       {dialog === "accept" && (
         <BillingDialog title="Accept this estimate?" busy={busy} onClose={() => setDialog(null)}>
@@ -251,7 +480,18 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
                 <Hourglass className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
                 <div className="min-w-0"><p className="text-sm font-semibold">Waiting for the revised estimate</p><p className="mt-1 text-sm leading-6 text-stone-600">G4 Builders received your revision request and will send an updated estimate.</p></div>
               </div>
-              {estimate.revisionNote && <p className="whitespace-pre-wrap break-words rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600"><span className="block text-xs font-semibold uppercase tracking-wide text-stone-500">Your Revision Request</span>{estimate.revisionNote}</p>}
+              {estimate.revisionNote || estimate.revisionChanges.length ? (
+                <div className="rounded-lg border border-stone-200 p-4 text-sm leading-6 text-stone-600">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Your Revision Request</p>
+                  {estimate.revisionChanges.length ? <RequestedChanges changes={estimate.revisionChanges} /> : null}
+                  {estimate.revisionNote ? (
+                    <p className="mt-2 whitespace-pre-wrap break-words">
+                      {estimate.revisionChanges.length ? <span className="font-semibold text-stone-700">Other changes: </span> : null}
+                      {estimate.revisionNote}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <RequestSummary estimate={estimate} />
             </>
           )}

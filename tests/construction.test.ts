@@ -14,6 +14,8 @@ import { listPaymentDues } from "@/lib/server/payment-dues";
 import { removeVatFromEstimates } from "@/lib/server/vat-cleanup";
 import { archiveInactiveClients } from "@/lib/server/client-inactivity";
 import { setClientArchived } from "@/lib/server/clients";
+import { MaintenanceError } from "@/lib/server/maintenance";
+import { createMaterial, getMaterialNames, getMaterials, updateMaterialPrices } from "@/lib/server/materials";
 import { manilaDate } from "@/lib/billing";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { SessionUser } from "@/types/domain";
@@ -113,8 +115,9 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_construction_tests");
-  await Promise.all(["house_designs", "exterior_items", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "cost_estimates", "schedules"]
+  await Promise.all(["house_designs", "exterior_items", "design_requests", "users", "projects", "invoices", "payments", "approvals", "audit_logs", "notifications", "billing_counters", "cost_estimates", "schedules", "materials"]
     .map((name) => db.collection(name).deleteMany({})));
+  await db.collection<{ _id: string }>("system_settings").deleteOne({ _id: "materials-seeded" });
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([clerk, customer, other, admin].map((actor) => ({
     _id: new ObjectId(actor.id), name: actor.name, email: actor.email, role: actor.role, status: "active", createdAt: now, updatedAt: now,
@@ -411,6 +414,97 @@ test("customers never see line items before the estimate is sent, and only their
   assert.equal(resent.status, "Sent");
   assert.equal(resent.revisionNote, null);
   assert.equal(resent.total, 5_000_000);
+});
+
+test("Maintenance materials start from G4's list once; only the Admin adds materials and changes prices", async () => {
+  const starting = await getMaterials(db, admin);
+  assert.equal(starting.length, 55);
+  assert.equal(starting[0].name, "Lumber 1½\" × 1½\" × 12 ft");
+  assert.equal((await getMaterials(db, admin)).length, 55);
+  await assert.rejects(getMaterials(db, customer), (error) => error instanceof MaintenanceError && error.status === 403);
+  await assert.rejects(createMaterial(db, customer, { name: "Fiber glass", price: 1200 }), (error) => error instanceof MaintenanceError && error.status === 403);
+
+  await assert.rejects(createMaterial(db, admin, { name: "  cement ", price: 300 }), (error) => error instanceof MaintenanceError && error.status === 409);
+  for (const payload of [{ name: "Fiber glass", price: 0 }, { name: "Fiber glass", price: 10.005 }, { name: "F", price: 10 }, { name: "Fiber glass", price: 1200, unit: "pc" }]) {
+    await assert.rejects(createMaterial(db, admin, payload), ZodError);
+  }
+  const added = await createMaterial(db, admin, { name: "Fiber glass", price: 1200 });
+  assert.equal(added.length, 56);
+  assert.equal(added.at(-1)?.name, "Fiber glass");
+
+  const cement = starting.find((material) => material.name === "Cement")!;
+  const changed = await updateMaterialPrices(db, admin, { prices: [{ id: cement.id, price: 280 }, { id: starting[0].id, price: starting[0].price }] });
+  const updated = changed.find((material) => material.id === cement.id)!;
+  assert.equal(updated.price, 280);
+  assert.deepEqual({ by: updated.priceChange?.by, previousPrice: updated.priceChange?.previousPrice }, { by: "Admin", previousPrice: 265 });
+  assert.equal(changed[0].priceChange, null);
+  await assert.rejects(updateMaterialPrices(db, admin, { prices: [{ id: new ObjectId().toHexString(), price: 5 }] }), (error) => error instanceof MaintenanceError && error.status === 409);
+
+  const names = await getMaterialNames(db);
+  assert.ok(names.includes("Fiber glass"));
+  assert.ok(names.every((name) => typeof name === "string"));
+});
+
+test("scopes with materials are priced from Maintenance, customers see only the names, and can ask to change one", async () => {
+  const catalog = await getMaterials(db, admin);
+  const cement = catalog.find((material) => material.name === "Cement")!;
+  const chb = catalog.find((material) => material.name === "CHB #4")!;
+  const masonry = (materials: { materialId: string; quantity: number }[]) => ({ item: "Masonry", description: "", unit: "lot", quantity: 1, unitPrice: 0, materials });
+  const permits = { item: "Permits", description: "", unit: "lot", quantity: 1, unitPrice: 50_000 };
+  const estimate = await requestedEstimate();
+
+  await assert.rejects(changeEstimate(db, admin, estimate.id, savePayload({ lineItems: [masonry([{ materialId: cement.id, quantity: 1 }, { materialId: cement.id, quantity: 2 }])] })), isError(400));
+  await assert.rejects(changeEstimate(db, admin, estimate.id, savePayload({ lineItems: [masonry([{ materialId: new ObjectId().toHexString(), quantity: 1 }])] })), isError(409));
+  await assert.rejects(changeEstimate(db, admin, estimate.id, savePayload({ lineItems: [masonry([{ materialId: cement.id, quantity: 0 }])] })), ZodError);
+
+  const saved = (await changeEstimate(db, admin, estimate.id, savePayload({
+    lineItems: [masonry([{ materialId: cement.id, quantity: 10 }, { materialId: chb.id, quantity: 100 }]), permits],
+  }))).estimate;
+  const [scope, lumpSum] = saved.lineItems;
+  assert.deepEqual([scope.quantity, scope.unit, scope.unitPrice, scope.amount], [1, "lot", 4_150, 4_150]);
+  assert.deepEqual(scope.materials?.map(({ name, unitPrice, quantity, amount }) => ({ name, unitPrice, quantity, amount })), [
+    { name: "Cement", unitPrice: 265, quantity: 10, amount: 2_650 },
+    { name: "CHB #4", unitPrice: 15, quantity: 100, amount: 1_500 },
+  ]);
+  assert.equal(lumpSum.materials, undefined);
+  assert.equal(saved.total, 54_150);
+  await changeEstimate(db, admin, estimate.id, { action: "send" });
+
+  // A later price change does not touch the sent estimate.
+  await updateMaterialPrices(db, admin, { prices: [{ id: cement.id, price: 300 }] });
+  assert.equal((await getEstimate(db, admin, estimate.id)).lineItems[0].materials?.[0].unitPrice, 265);
+
+  const customerView = await getEstimate(db, customer, estimate.id);
+  const shown = customerView.lineItems[0].materials ?? [];
+  assert.deepEqual(shown.map((material) => Object.keys(material).sort()), [["id", "name"], ["id", "name"]]);
+  assert.deepEqual(shown.map((material) => material.name), ["Cement", "CHB #4"]);
+  assert.equal(customerView.lineItems[0].amount, 4_150);
+
+  const lineId = customerView.lineItems[0].id;
+  const revise = (changes: { lineId: string; materialLineId: string; wants: string }[], reason = "") =>
+    changeEstimate(db, customer, estimate.id, { action: "request-revision", reason, changes });
+  await assert.rejects(revise([]), ZodError);
+  await assert.rejects(revise([{ lineId, materialLineId: shown[0].id, wants: " CEMENT " }]), isError(400));
+  await assert.rejects(revise([{ lineId, materialLineId: "missing", wants: "Fiber glass" }]), isError(409));
+  await assert.rejects(revise([{ lineId, materialLineId: shown[0].id, wants: "Fiber glass" }, { lineId, materialLineId: shown[0].id, wants: "Glass" }]), isError(400));
+
+  const revision = (await revise([{ lineId, materialLineId: shown[0].id, wants: "Fiber glass" }])).estimate;
+  assert.equal(revision.status, "Revision requested");
+  assert.equal(revision.revisionNote, null);
+  assert.deepEqual(revision.revisionChanges, [{ scope: "Masonry", material: "Cement", wants: "Fiber glass" }]);
+  assert.deepEqual((await getEstimate(db, admin, estimate.id)).revisionChanges, revision.revisionChanges);
+  assert.match((await db.collection("notifications").findOne({ kind: "construction-revision" }))?.body ?? "", /Cement → Fiber glass/);
+
+  // Saving again prices every material at today's Maintenance price; sending clears the request.
+  const fiber = (await createMaterial(db, admin, { name: "Fiber glass", price: 1_200 })).at(-1)!;
+  const resaved = (await changeEstimate(db, admin, estimate.id, savePayload({
+    lineItems: [masonry([{ materialId: fiber.id, quantity: 10 }, { materialId: chb.id, quantity: 100 }]), permits],
+  }))).estimate;
+  assert.equal(resaved.lineItems[0].amount, 13_500);
+  assert.deepEqual(resaved.revisionChanges, revision.revisionChanges);
+  const resent = (await changeEstimate(db, admin, estimate.id, { action: "send" })).estimate;
+  assert.deepEqual(resent.revisionChanges, []);
+  assert.equal(resent.total, 63_500);
 });
 
 test("accepting at 30% creates the project, an issued downpayment invoice, and payment-due events", async () => {

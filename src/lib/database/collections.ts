@@ -18,7 +18,7 @@ import type { ObjectId } from "mongodb";
 import type { AddressDetails, ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot, StoredPaymentMethod } from "@/types/billing";
 import type { DesignRequestStatus, RequestedHouseDesign } from "@/types/design-requests";
-import type { EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
+import type { EstimateRevisionChange, EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 import type { SettingKey, SystemSettings } from "@/lib/system-settings";
@@ -58,6 +58,7 @@ export const collections = {
   backupUploads: "backup_uploads",
   professionals: "professionals",
   warrantyClaims: "warranty_claims",
+  materials: "materials",
 } as const;
 
 export type UserDocument = {
@@ -364,6 +365,16 @@ export type BlueprintFileDocument = {
   createdAt: Date;
 };
 
+/** A material in a scope of work, with the name and price it had when the estimate was saved. */
+export type EstimateMaterialDocument = {
+  id: string;
+  materialId: ObjectId;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  amount: number;
+};
+
 export type EstimateLineItemDocument = {
   id: string;
   item: string;
@@ -372,6 +383,8 @@ export type EstimateLineItemDocument = {
   quantity: number;
   unitPrice: number;
   amount: number;
+  /** When listed, `unitPrice` and `amount` are their total; older lines are lump sums. */
+  materials?: EstimateMaterialDocument[];
 };
 
 /**
@@ -400,6 +413,8 @@ export type EstimateDocument = {
   scheduleTemplate?: MilestoneTemplate[];
   adminNotes?: string;
   revisionNote?: string;
+  /** Materials the customer asked to change; cleared when the estimate is sent again. */
+  revisionChanges?: EstimateRevisionChange[];
   sentAt?: Date;
   sentBy?: ObjectId;
   acceptedAt?: Date;
@@ -705,6 +720,22 @@ export type WarrantyListsDocument = {
 /** Written once the starting team was added, so a list the Admin emptied stays empty. */
 export type ProfessionalsSeedDocument = {
   _id: "professionals-seeded";
+  seededAt: Date;
+};
+
+/** Maintenance > Materials. `nameKey` is the lowercase name, unique so a material is listed once. */
+export type MaterialDocument = {
+  _id: ObjectId;
+  name: string;
+  nameKey: string;
+  price: number;
+  createdAt: Date;
+  updatedAt: Date;
+  priceChange?: { byName: string; at: Date; previousPrice: number };
+};
+
+export type MaterialsSeedDocument = {
+  _id: "materials-seeded";
   seededAt: Date;
 };
 

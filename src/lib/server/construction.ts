@@ -5,6 +5,7 @@ import {
   collections,
   type DesignRequestDocument,
   type EstimateDocument,
+  type EstimateLineItemDocument,
   type InvoiceDocument,
   type NotificationDocument,
   type ProjectDocument,
@@ -12,7 +13,7 @@ import {
   type ScheduleDocument,
   type UserDocument,
 } from "@/lib/database/collections";
-import { manilaDate } from "@/lib/billing";
+import { fromCentavos, manilaDate, toCentavos } from "@/lib/billing";
 import {
   MIN_DOWNPAYMENT_PERCENT,
   buildPaymentSchedule,
@@ -25,6 +26,8 @@ import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/c
 import { isActiveHouseType } from "@/lib/server/house-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
 import { getSystemSettings } from "@/lib/server/maintenance";
+import { findMaterials } from "@/lib/server/materials";
+import { materialNameKey, materialNameMax } from "@/lib/materials";
 import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
@@ -33,6 +36,8 @@ import { ensureWarrantyDates, projectWarranty, warrantyOnCompletion, warrantySum
 import type {
   ConstructionProjectDto,
   CostEstimateDto,
+  EstimateLineItem,
+  EstimateRevisionChange,
 } from "@/types/construction";
 import type { SessionUser, UserRole } from "@/types/domain";
 
@@ -72,12 +77,26 @@ const requestSchema = z.object({
   notes: z.string().trim().max(4_000).default(""),
 }).strict();
 
+const lineMaterialSchema = z.object({
+  materialId: z.string().regex(idPattern, "Choose each material from the list."),
+  quantity: z.number().finite().positive("Material quantities must be greater than 0.").max(10_000_000)
+    .refine(twoDecimals, "Use at most two decimal places for material quantities."),
+}).strict();
+
 const lineItemSchema = z.object({
   item: z.string().trim().min(1, "Every line item needs a name.").max(160),
   description: z.string().trim().max(500),
   unit: z.string().trim().min(1, "Every line item needs a unit.").max(30),
   quantity: z.number().finite().positive("Quantities must be greater than 0.").max(10_000_000),
   unitPrice: z.number().finite().min(0).max(1_000_000_000).refine(twoDecimals, "Use at most two decimal places for unit prices."),
+  /** When listed, the scope is priced from Maintenance > Materials and `unitPrice` is ignored. */
+  materials: z.array(lineMaterialSchema).max(100, "List at most 100 materials in one scope of work.").optional(),
+}).strict();
+
+const revisionChangeSchema = z.object({
+  lineId: z.string().min(1).max(100),
+  materialLineId: z.string().min(1).max(100),
+  wants: z.string().trim().min(2, "Enter the material you want (at least 2 characters).").max(materialNameMax, "Keep the material name within 120 characters."),
 }).strict();
 
 const templateRowSchema = z.object({
@@ -95,7 +114,13 @@ const estimateActionSchema = z.discriminatedUnion("action", [
     adminNotes: z.string().trim().max(4_000),
   }).strict(),
   z.object({ action: z.literal("send") }).strict(),
-  z.object({ action: z.literal("request-revision"), reason: z.string().trim().min(5, "Tell us what should change (at least 5 characters).").max(1_000) }).strict(),
+  z.object({
+    action: z.literal("request-revision"),
+    reason: z.string().trim().max(1_000),
+    changes: z.array(revisionChangeSchema).max(100).default([]),
+  }).strict().refine((value) => value.changes.length > 0 || value.reason.length >= 5, {
+    message: "Tell us what should change (at least 5 characters).", path: ["reason"],
+  }),
   z.object({
     action: z.literal("accept"),
     downpaymentPercent: z.number().finite().max(100).refine(twoDecimals, "Use at most two decimal places."),
@@ -128,6 +153,21 @@ async function notify(db: Db, session: ClientSession, userIds: ObjectId[], note:
 const designLabelOf = (design?: DesignRequestDocument | null) =>
   design ? design.selectedDesign?.name ?? `${design.floorArea} sqm · ${design.rooms}` : "Construction estimate";
 
+/** Customers see which materials a scope uses, never their prices or quantities. */
+function lineItemDto(line: EstimateLineItemDocument, viewer: UserRole): EstimateLineItem {
+  const { materials, ...scope } = line;
+  if (!materials?.length) return scope;
+  return {
+    ...scope,
+    materials: materials.map((material) => (viewer === "customer"
+      ? { id: material.id, name: material.name }
+      : {
+        id: material.id, name: material.name, materialId: material.materialId.toHexString(),
+        unitPrice: material.unitPrice, quantity: material.quantity, amount: material.amount,
+      })),
+  };
+}
+
 async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: UserRole): Promise<CostEstimateDto[]> {
   const customerIds = [...new Set(estimates.map((estimate) => estimate.customerId.toHexString()))].map((id) => new ObjectId(id));
   const designIds = estimates.flatMap((estimate) => (estimate.designRequestId ? [estimate.designRequestId] : []));
@@ -152,12 +192,13 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
       preferredStartDate: isoDate(estimate.preferredStartDate), neededBy: isoDate(estimate.neededBy),
       siteAddress: estimate.siteAddress ?? "", siteAddressDetails: estimate.siteAddressDetails ?? null,
       customerNotes: estimate.customerNotes ?? "",
-      lineItems: hidden ? [] : estimate.lineItems ?? [],
+      lineItems: hidden ? [] : (estimate.lineItems ?? []).map((line) => lineItemDto(line, viewer)),
       subtotal: hidden ? 0 : estimate.subtotal ?? 0,
       total: hidden ? 0 : estimate.total ?? 0,
       scheduleTemplate: hidden ? [] : estimate.scheduleTemplate ?? [],
       adminNotes: hidden ? "" : estimate.adminNotes ?? "",
       revisionNote: estimate.revisionNote ?? null,
+      revisionChanges: estimate.revisionChanges ?? [],
       sentAt: estimate.sentAt?.toISOString() ?? null, acceptedAt: estimate.acceptedAt?.toISOString() ?? null,
       downpaymentPercent: estimate.downpaymentPercent ?? null, projectId: estimate.projectId?.toHexString() ?? null,
       createdAt: estimate.createdAt.toISOString(), updatedAt: estimate.updatedAt.toISOString(),
@@ -261,7 +302,7 @@ export async function changeEstimate(db: Db, actor: SessionUser, id: string, raw
     const estimate = await findEstimate(db, actor, id, session);
     if (input.action === "save") return { estimateId: estimate._id, ...(await saveEstimate(db, session, actor, estimate, input)) };
     if (input.action === "send") return { estimateId: estimate._id, ...(await sendEstimate(db, session, actor, estimate)) };
-    if (input.action === "request-revision") return { estimateId: estimate._id, ...(await requestRevision(db, session, actor, estimate, input.reason)) };
+    if (input.action === "request-revision") return { estimateId: estimate._id, ...(await requestRevision(db, session, actor, estimate, input)) };
     return { estimateId: estimate._id, ...(await acceptEstimate(db, session, actor, estimate, input.downpaymentPercent)) };
   });
   return {
@@ -275,11 +316,37 @@ async function guardedEstimateUpdate(db: Db, session: ClientSession, estimate: E
   if (!result.matchedCount) throw new BillingError(message, 409);
 }
 
+/**
+ * A scope with materials is one lot priced at the total of its materials, each at its current price in
+ * Maintenance > Materials. A scope without materials keeps the lump sum the admin typed.
+ */
+async function pricedLineItems(db: Db, session: ClientSession, lines: Extract<EstimateAction, { action: "save" }>["lineItems"]) {
+  const picked = lines.flatMap((line) => line.materials ?? []);
+  const catalog = await findMaterials(db, [...new Set(picked.map((entry) => entry.materialId.toLowerCase()))].map((id) => new ObjectId(id)), session);
+  return lines.map(({ materials = [], ...line }): EstimateLineItemDocument => {
+    if (!materials.length) return { id: randomUUID(), ...line, amount: lineAmount(line.quantity, line.unitPrice) };
+    if (new Set(materials.map((entry) => entry.materialId.toLowerCase())).size !== materials.length) {
+      throw new BillingError(`List each material once in ${line.item}.`);
+    }
+    const priced = materials.map((entry) => {
+      const material = catalog.get(entry.materialId.toLowerCase());
+      if (!material) throw new BillingError(`A material in ${line.item} is no longer in Maintenance. Reload the estimate and pick it again.`, 409);
+      return {
+        id: randomUUID(), materialId: material._id, name: material.name, unitPrice: material.price,
+        quantity: entry.quantity, amount: lineAmount(entry.quantity, material.price),
+      };
+    });
+    const total = fromCentavos(priced.reduce((sum, material) => sum + toCentavos(material.amount), 0));
+    if (total > MAX_CONTRACT_TOTAL) throw new BillingError("The contract total cannot exceed PHP 1,000,000,000.");
+    return { id: randomUUID(), ...line, unit: "lot", quantity: 1, unitPrice: total, amount: total, materials: priced };
+  });
+}
+
 async function saveEstimate(db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, input: Extract<EstimateAction, { action: "save" }>) {
   if (!(editableStatuses as readonly string[]).includes(estimate.status)) {
     throw new BillingError("This estimate was already sent to the customer and can no longer be edited.", 409);
   }
-  const lineItems = input.lineItems.map((line) => ({ id: randomUUID(), ...line, amount: lineAmount(line.quantity, line.unitPrice) }));
+  const lineItems = await pricedLineItems(db, session, input.lineItems);
   const totals = estimateTotals(lineItems);
   if (totals.total > MAX_CONTRACT_TOTAL) throw new BillingError("The contract total cannot exceed PHP 1,000,000,000.");
   await guardedEstimateUpdate(db, session, estimate, { $set: {
@@ -304,7 +371,7 @@ async function sendEstimate(db: Db, session: ClientSession, actor: SessionUser, 
   if (template[0].targetDate < manilaDate()) throw new BillingError("The downpayment target date cannot be in the past.");
   const now = new Date();
   await guardedEstimateUpdate(db, session, estimate, {
-    $set: { status: "Sent", sentAt: now, sentBy: new ObjectId(actor.id), updatedAt: now }, $unset: { revisionNote: "" },
+    $set: { status: "Sent", sentAt: now, sentBy: new ObjectId(actor.id), updatedAt: now }, $unset: { revisionNote: "", revisionChanges: "" },
   }, "This estimate changed while you were sending it. Reload it and try again.");
   await notify(db, session, [estimate.customerId], {
     title: "Your construction cost estimate is ready",
@@ -315,17 +382,42 @@ async function sendEstimate(db: Db, session: ClientSession, actor: SessionUser, 
   return {};
 }
 
-async function requestRevision(db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, reason: string) {
+/** The materials the customer picked, named as the sent estimate showed them. */
+function revisionChangesOf(estimate: EstimateDocument, changes: Extract<EstimateAction, { action: "request-revision" }>["changes"]) {
+  const seen = new Set<string>();
+  return changes.map((change): EstimateRevisionChange => {
+    const line = estimate.lineItems?.find((item) => item.id === change.lineId);
+    const material = line?.materials?.find((item) => item.id === change.materialLineId);
+    if (!line || !material) throw new BillingError("A material you picked is no longer in this estimate. Reload it and try again.", 409);
+    if (seen.has(material.id)) throw new BillingError(`Ask for one change to ${material.name} only.`);
+    seen.add(material.id);
+    if (materialNameKey(change.wants) === materialNameKey(material.name)) throw new BillingError(`Enter a different material than ${material.name}.`);
+    return { scope: line.item, material: material.name, wants: change.wants };
+  });
+}
+
+async function requestRevision(
+  db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, input: Extract<EstimateAction, { action: "request-revision" }>,
+) {
   if (estimate.status !== "Sent") throw new BillingError("Only a sent estimate can be sent back for revision.", 409);
+  const { reason } = input;
+  const changes = revisionChangesOf(estimate, input.changes);
   await guardedEstimateUpdate(db, session, estimate, {
-    $set: { status: "Revision requested", revisionNote: reason, updatedAt: new Date() },
+    $set: { status: "Revision requested", revisionChanges: changes, updatedAt: new Date(), ...(reason ? { revisionNote: reason } : {}) },
+    ...(reason ? {} : { $unset: { revisionNote: "" } }),
   }, "This estimate changed. Reload it and try again.");
+  const summary = [
+    ...changes.map((change) => `${change.material} → ${change.wants}`),
+    ...(reason ? [reason] : []),
+  ].join("; ");
   await notify(db, session, (await activeUsers(db, session, "admin")).map((admin) => admin._id), {
     title: "Estimate revision requested",
-    body: `${actor.name} asked for changes to ${estimate.reference}: ${reason.length > 120 ? `${reason.slice(0, 117)}…` : reason}`,
+    body: `${actor.name} asked for changes to ${estimate.reference}: ${summary.length > 120 ? `${summary.slice(0, 117)}…` : summary}`,
     href: `/admin/cost-estimates?estimate=${estimate._id.toHexString()}`, kind: "construction-revision", entityId: estimate._id,
   });
-  await audit(db, session, actor, "estimate.revision-requested", "estimate", estimate._id, { reference: estimate.reference, reason });
+  await audit(db, session, actor, "estimate.revision-requested", "estimate", estimate._id, {
+    reference: estimate.reference, reason, materialChanges: changes.length,
+  });
   return {};
 }
 
