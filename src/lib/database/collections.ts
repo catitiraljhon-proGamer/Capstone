@@ -112,6 +112,8 @@ export type HouseDesignDocument = {
   /** Missing on designs saved before the counts had their own fields; read from `rooms` instead. */
   bedrooms?: number;
   bathrooms?: number;
+  /** Missing on designs saved before designs had a finish level. */
+  finish?: FinishLevel;
   rooms: string;
   rate: number;
   images: string[];

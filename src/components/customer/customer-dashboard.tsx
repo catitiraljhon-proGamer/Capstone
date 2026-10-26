@@ -446,6 +446,7 @@ function FinishedDesignsBrowser() {
                         </h2>
                         <p className="mt-1 text-xs text-stone-600">
                           {design.style || design.houseType ? `${design.style || design.houseType} - ` : ""}{design.area} sqm
+                          {design.finish ? ` · ${design.finish} finish` : ""}
                         </p>
                       </div>
                     </button>

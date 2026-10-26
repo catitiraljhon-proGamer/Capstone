@@ -74,6 +74,8 @@ export type HouseDesign = {
   area: number;
   bedrooms: number;
   bathrooms: number;
+  /** Missing on designs saved before designs had a finish level; the Admin sets one when editing. */
+  finish?: FinishLevel;
   /** Readable room setup built from the bedroom and bathroom counts, copied onto design requests. */
   rooms: string;
   rate: number;

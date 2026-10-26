@@ -80,6 +80,18 @@ test("requesting a published design keeps its identity and specifications withou
   assert.equal(history[0].floorArea, design.area);
 });
 
+test("a request for a published design shows the design's finish level as it was when requested", async () => {
+  const design = await publishedHouseDesign();
+  await db.collection("house_designs").updateOne({ _id: design._id }, { $set: { finish: "Luxury" } });
+  await agree();
+  const result = await createDesignRequest(db, customer, { houseDesignId: design._id.toHexString(), ...requestBasics });
+  assert.equal(result.selectedDesign?.finish, "Luxury");
+  assert.equal(result.finish, "Luxury");
+  // Changing the design later does not change what was requested.
+  await db.collection("house_designs").updateOne({ _id: design._id }, { $set: { finish: "Standard" } });
+  assert.equal((await listCustomerDesigns(db, customer))[0].finish, "Luxury");
+});
+
 test("selected designs reject unavailable records, forged specifications, unauthorized roles, and missing terms", async () => {
   const design = await publishedHouseDesign();
   await agree();

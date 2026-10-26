@@ -14,7 +14,7 @@ import { defaultRoomSizes } from "@/lib/system-settings";
 const fence = { id: "fence", item: "Fence", material: "Steel", unit: "lm", quantity: 2.5, unitPrice: 10.25 };
 const designInput = {
   name: "Test House", houseType: "Bungalow", area: 100,
-  bedrooms: 3, bathrooms: 2, rate: 20000, images: ["/test-house.jpg"], notes: "",
+  bedrooms: 3, bathrooms: 2, finish: "Standard", rate: 20000, images: ["/test-house.jpg"], notes: "",
   status: "Published", customItems: [],
 };
 
@@ -47,6 +47,20 @@ test("legacy records with saved materials and a text room setup stay compatible"
   assert.equal(dto.bathrooms, 3);
   assert.equal("defaultSelections" in dto, false);
   assert.equal(getDesignEstimate(dto).estimate, 2_000_000);
+});
+
+test("a design has one of the three finish levels, and older designs without one still load", () => {
+  assert.equal(houseDesignInputSchema.parse(designInput).finish, "Standard");
+  assert.equal(houseDesignInputSchema.safeParse({ ...designInput, finish: undefined }).success, false);
+  assert.equal(houseDesignInputSchema.safeParse({ ...designInput, finish: "Ultra" }).success, false);
+  assert.deepEqual(houseDesignPatchSchema.parse({ finish: "Luxury" }), { finish: "Luxury" });
+
+  const saved = {
+    ...houseDesignInputSchema.parse(designInput), rooms: "3 bedrooms, 2 bathrooms", _id: new ObjectId(),
+    createdBy: new ObjectId(), createdByName: "Test Admin", createdAt: new Date(), updatedAt: new Date(),
+  } as HouseDesignDocument;
+  assert.equal(toHouseDesignDto(saved).finish, "Standard");
+  assert.equal("finish" in toHouseDesignDto({ ...saved, finish: undefined }), false);
 });
 
 test("room counts are whole numbers saved together", () => {

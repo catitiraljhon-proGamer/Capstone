@@ -87,6 +87,7 @@ export async function createDesignRequest(db: Db, actor: SessionUser, raw: unkno
       houseDesignId: design._id,
       selectedDesign: {
         id: design._id.toHexString(), name: design.name, floorArea: design.area, rooms: design.rooms,
+        ...(design.finish ? { finish: design.finish } : {}),
       },
       floorArea: design.area, rooms: design.rooms,
       ...(design.houseType ? { houseType: design.houseType } : {}),

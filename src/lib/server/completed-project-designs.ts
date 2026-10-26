@@ -90,6 +90,8 @@ async function createDesignFromProject(
   const label = project.name.replace(constructionSuffix, "") || "Completed project";
   const completedAt = project.completedAt ?? project.updatedAt;
   const houseType = choice.houseType ?? request?.houseType ?? sourceDesign?.houseType;
+  // The finish the customer chose in a custom request, else the finish of the published design they requested.
+  const finish = (request?.selectedDesign ? request.selectedDesign.finish : request?.finish) ?? sourceDesign?.finish;
 
   // The rate is set so the design's estimate, with its custom items, equals what the project cost.
   const customItems = sourceDesign?.customItems ?? [];
@@ -103,6 +105,7 @@ async function createDesignFromProject(
     style: sourceDesign?.style ?? "Completed Project",
     // Filed under the Admin's choice, else the house type the customer chose, else the chosen design's type.
     ...(houseType ? { houseType } : {}),
+    ...(finish ? { finish } : {}),
     area,
     rooms,
     rate,

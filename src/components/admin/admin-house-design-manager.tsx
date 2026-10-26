@@ -525,6 +525,7 @@ export function AdminHouseDesignManager() {
                           ? `${design.style || design.houseType} - `
                           : ""}
                         <span className="tabular-nums">{design.area}</span> sqm
+                        {design.finish ? ` · ${design.finish} finish` : ""}
                       </p>
                       {design.sourceProject ? (
                         <p className="mt-1 flex items-center gap-1 text-xs font-medium text-red-700">

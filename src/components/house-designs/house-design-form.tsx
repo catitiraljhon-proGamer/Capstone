@@ -10,7 +10,10 @@ import {
   formatPeso,
   getDesignEstimate,
   isDataImage,
+  finishLevelDescriptions,
+  finishLevels,
   type CustomExteriorItem,
+  type FinishLevel,
   type HouseDesign,
   type HouseDesignStatus,
   type HouseType,
@@ -42,6 +45,7 @@ type FieldName =
   | "cost"
   | "bedrooms"
   | "bathrooms"
+  | "finish"
   | "images"
   | "customItems";
 
@@ -54,6 +58,8 @@ type FormValues = {
   cost: string;
   bedrooms: string;
   bathrooms: string;
+  /** A finish level, or "" until one is chosen. */
+  finish: string;
 };
 
 const fieldOrder: FieldName[] = [
@@ -63,6 +69,7 @@ const fieldOrder: FieldName[] = [
   "cost",
   "bedrooms",
   "bathrooms",
+  "finish",
   "images",
   "customItems",
 ];
@@ -74,6 +81,7 @@ const fieldLabels: Record<FieldName, string> = {
   cost: "Estimated Project Cost",
   bedrooms: "Bedrooms",
   bathrooms: "Bathrooms",
+  finish: "Finish Level",
   images: "Design Images",
   customItems: "Custom Exterior Items",
 };
@@ -85,6 +93,7 @@ const fieldIds: Record<FieldName, string> = {
   cost: "design-cost",
   bedrooms: "design-bedrooms",
   bathrooms: "design-bathrooms",
+  finish: "design-finish",
   images: "design-images",
   customItems: "design-custom-items",
 };
@@ -169,6 +178,10 @@ function validate(
 
   const bathroomsMessage = numberError(values.bathrooms, { label: "Number of bathrooms", integer: true, min: 0, max: maxRoomCount });
   if (bathroomsMessage) errors.bathrooms = bathroomsMessage;
+
+  if (!values.finish) {
+    errors.finish = "Choose the finish level of this design.";
+  }
 
   if (images.length === 0) {
     errors.images = "Upload at least one design image.";
@@ -267,6 +280,7 @@ export function HouseDesignForm({
     cost: design ? String(getDesignEstimate({ area: design.area, rate: design.rate }).baseEstimate) : "",
     bedrooms: design ? String(design.bedrooms) : "",
     bathrooms: design ? String(design.bathrooms) : "",
+    finish: design?.finish ?? "",
   });
   const [style, setStyle] = useState(design?.style ?? "");
   const [status, setStatus] = useState<HouseDesignStatus>(
@@ -452,6 +466,7 @@ export function HouseDesignForm({
       area: areaValue,
       bedrooms: Number(values.bedrooms),
       bathrooms: Number(values.bathrooms),
+      finish: values.finish as FinishLevel,
       rate: rateValue,
       images,
       notes: notes.trim(),
@@ -714,6 +729,41 @@ export function HouseDesignForm({
                       {roomsPhrase(Number(values.bedrooms), Number(values.bathrooms))} usually need at least {roomShortfall} sqm
                       of floor area, but this design is {values.area.trim()} sqm. Check the floor area or the number of rooms.
                     </span>
+                  </p>
+                ) : null}
+              </Field>
+
+              <Field
+                htmlFor={fieldIds.finish}
+                label={fieldLabels.finish}
+                hint="The quality of materials and fixtures in this design. Customers see it on the design."
+                required
+                error={errors.finish}
+              >
+                <select
+                  id={fieldIds.finish}
+                  name="finish"
+                  className={`${inputClass} ${errors.finish ? invalidInputClass : ""}`}
+                  value={values.finish}
+                  onChange={(event) => setValue("finish", event.target.value)}
+                  onBlur={() => handleBlur("finish")}
+                  aria-invalid={Boolean(errors.finish)}
+                  aria-describedby={describedBy(
+                    fieldIds.finish,
+                    true,
+                    Boolean(errors.finish),
+                  )}
+                >
+                  <option value="">Select a finish level</option>
+                  {finishLevels.map((level) => (
+                    <option key={level} value={level}>
+                      {level}
+                    </option>
+                  ))}
+                </select>
+                {values.finish ? (
+                  <p className="mt-2 text-xs leading-5 text-stone-500">
+                    {finishLevelDescriptions[values.finish as FinishLevel]}
                   </p>
                 ) : null}
               </Field>

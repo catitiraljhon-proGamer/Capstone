@@ -96,8 +96,8 @@ export async function customerDesignDto(db: Db, design: DesignRequestDocument): 
   return {
     id: design._id.toHexString(), workflow, floorArea: design.floorArea, bedrooms: design.bedrooms, bathrooms: design.bathrooms,
     selectedDesign: design.selectedDesign, houseType: design.houseType,
-    // Only custom requests carry a finish; older published-design requests may still hold one.
-    finish: design.selectedDesign ? undefined : design.finish,
+    // A published-design request takes the design's finish level; an old finish on the request itself does not apply.
+    finish: design.selectedDesign ? design.selectedDesign.finish : design.finish,
     rooms: design.rooms, notes: design.notes,
     inspirationImages: design.inspirationImages ?? (design.inspirationImage ? [design.inspirationImage] : []),
     ...(design.lotAddress ? { lotAddress: design.lotAddress } : {}),

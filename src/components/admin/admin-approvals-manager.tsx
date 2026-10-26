@@ -321,7 +321,9 @@ function ApprovalReviewDialog({
             <section className="rounded-lg border border-stone-200 bg-stone-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Published Design</p>
               <h3 className="mt-2 font-semibold">{approval.selectedDesign.name}</h3>
-              <p className="mt-1 text-sm text-stone-600">{approval.selectedDesign.floorArea} sqm · {approval.selectedDesign.rooms}</p>
+              <p className="mt-1 text-sm text-stone-600">
+                {approval.selectedDesign.floorArea} sqm{approval.selectedDesign.finish ? ` · ${approval.selectedDesign.finish} finish` : ""} · {approval.selectedDesign.rooms}
+              </p>
               {approval.selectedDesignImages?.[0] ? (
                 <div className="relative mt-3 aspect-[16/9] overflow-hidden rounded-lg bg-stone-100">
                   <Image src={approval.selectedDesignImages[0]} alt={approval.selectedDesign.name} fill unoptimized className="object-contain" />

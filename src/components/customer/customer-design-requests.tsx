@@ -435,7 +435,7 @@ function DesignRequestForm({ houseDesignId }: {
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Selected Design</p>
                     <h2 className="mt-1 text-lg font-semibold tracking-tight">{selectedDesign.name}</h2>
-                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType ? `${selectedDesign.houseType} · ` : ""}{selectedDesign.area} sqm</p>
+                    <p className="mt-1 text-sm text-stone-600">{selectedDesign.houseType ? `${selectedDesign.houseType} · ` : ""}{selectedDesign.area} sqm{selectedDesign.finish ? ` · ${selectedDesign.finish} finish` : ""}</p>
                     <p className="mt-1 text-sm text-stone-600">{selectedDesign.rooms}</p>
                     <p className="mt-2 text-xs text-stone-500">These specifications will be included with your request. The design review is free; only the blueprint is billed.</p>
                   </div>

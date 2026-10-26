@@ -1,4 +1,4 @@
-import type { HouseDesign, HouseType } from "@/lib/house-design-data";
+import { finishLevels, type HouseDesign, type HouseType } from "@/lib/house-design-data";
 import {
   collections,
   type HouseDesignDocument,
@@ -25,6 +25,7 @@ export const houseDesignInputSchema = z.object({
   area: z.number().finite().positive().max(100_000),
   bedrooms: z.number().int().nonnegative().max(maxRoomCount, `Bedrooms cannot be more than ${maxRoomCount}.`),
   bathrooms: z.number().int().nonnegative().max(maxRoomCount, `Bathrooms cannot be more than ${maxRoomCount}.`),
+  finish: z.enum(finishLevels, "Choose a finish level."),
   rate: z.number().finite().nonnegative().max(100_000_000),
   images: z.array(z.string().min(1).max(2_100_000)).min(1).max(6),
   notes: z.string().trim().max(4_000),
@@ -106,6 +107,7 @@ export function toHouseDesignDto(
     area: document.area,
     bedrooms: document.bedrooms ?? countFromRoomSetup(document.rooms, /(\d+)\s*bed/i),
     bathrooms: document.bathrooms ?? countFromRoomSetup(document.rooms, /(\d+)\s*(?:bath|toilet|t&b|cr\b)/i),
+    ...(document.finish ? { finish: document.finish } : {}),
     rooms: document.rooms,
     rate: document.rate,
     images: document.images,

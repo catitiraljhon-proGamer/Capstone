@@ -1,4 +1,5 @@
 
+import type { FinishLevel } from "@/lib/house-design-data";
 import type { LotFacing, SiteInspectionStatus } from "@/lib/site-inspection";
 import type { AddressDetails } from "@/types/clients";
 
@@ -27,6 +28,8 @@ export type RequestedHouseDesign = {
   name: string;
   floorArea: number;
   rooms: string;
+  /** The design's finish level when it was requested; missing on older requests and designs without one. */
+  finish?: FinishLevel;
 };
 
 /**
