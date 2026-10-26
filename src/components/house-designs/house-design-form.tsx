@@ -13,20 +13,16 @@ import {
   isDataImage,
   finishLevelDescriptions,
   finishLevels,
-  type CustomExteriorItem,
   type FinishLevel,
   type HouseDesign,
   type HouseDesignStatus,
   type HouseType,
 } from "@/lib/house-design-data";
-import {
-  createCustomItemId,
-  type NewHouseDesignInput,
-} from "@/lib/house-design-store";
+import type { NewHouseDesignInput } from "@/lib/house-design-store";
 import type { ManagedProfessional } from "@/lib/professionals";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
 import { usePublicSettings } from "@/lib/use-public-settings";
-import { AlertCircle, AlertTriangle, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ImagePlus, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import {
   useRef,
@@ -47,8 +43,7 @@ type FieldName =
   | "bedrooms"
   | "bathrooms"
   | "finish"
-  | "images"
-  | "customItems";
+  | "images";
 
 type FieldErrors = Partial<Record<FieldName, string>>;
 
@@ -72,7 +67,6 @@ const fieldOrder: FieldName[] = [
   "bathrooms",
   "finish",
   "images",
-  "customItems",
 ];
 
 const fieldLabels: Record<FieldName, string> = {
@@ -84,7 +78,6 @@ const fieldLabels: Record<FieldName, string> = {
   bathrooms: "Bathrooms",
   finish: "Finish Level",
   images: "Design Images",
-  customItems: "Custom Exterior Items",
 };
 
 const fieldIds: Record<FieldName, string> = {
@@ -96,7 +89,6 @@ const fieldIds: Record<FieldName, string> = {
   bathrooms: "design-bathrooms",
   finish: "design-finish",
   images: "design-images",
-  customItems: "design-custom-items",
 };
 
 const inputClass =
@@ -104,48 +96,11 @@ const inputClass =
 
 const invalidInputClass = "border-red-600";
 
-/** Quantity and unit price stay as typed text until the form is saved. */
-type CustomItemDraft = Omit<CustomExteriorItem, "quantity" | "unitPrice"> & {
-  quantity: string;
-  unitPrice: string;
-};
-
-type CustomItemField = "item" | "material" | "unit" | "quantity" | "unitPrice";
-type CustomItemErrors = Partial<Record<CustomItemField, string | null>>;
-
 const maxProjectCost = 10_000_000_000;
-
-function customItemErrors(item: CustomItemDraft): CustomItemErrors {
-  return {
-    item: textError(item.item, { label: "Item name", max: 120 }),
-    material: textError(item.material, { label: "Material", max: 160 }),
-    unit: textError(item.unit, { label: "Unit", max: 30 }),
-    quantity:
-      numberError(item.quantity, { label: "Quantity" }) ??
-      (Number(item.quantity) <= 0 ? "Quantity must be more than 0." : null),
-    unitPrice: amountError(item.unitPrice, { label: "Unit price", allowZero: true }),
-  };
-}
-
-function isCustomItemComplete(item: CustomItemDraft) {
-  return Object.values(customItemErrors(item)).every((message) => !message);
-}
-
-function toCustomItem(item: CustomItemDraft): CustomExteriorItem {
-  return {
-    ...item,
-    item: item.item.trim(),
-    material: item.material.trim(),
-    unit: item.unit.trim(),
-    quantity: Number(item.quantity),
-    unitPrice: Number(item.unitPrice),
-  };
-}
 
 function validate(
   values: FormValues,
   images: string[],
-  customItems: CustomItemDraft[],
   existingNames: string[],
 ): FieldErrors {
   const errors: FieldErrors = {};
@@ -186,11 +141,6 @@ function validate(
 
   if (images.length === 0) {
     errors.images = "Upload at least one design image.";
-  }
-
-  if (customItems.some((item) => !isCustomItemComplete(item))) {
-    errors.customItems =
-      "Complete every custom item, or remove the unfinished rows.";
   }
 
   return errors;
@@ -290,15 +240,6 @@ export function HouseDesignForm({
   const [notes, setNotes] = useState(design?.notes ?? "");
   const [designedBy, setDesignedBy] = useState(design?.designedBy ?? "");
   const [images, setImages] = useState<string[]>(design?.images ?? []);
-  const [customItems, setCustomItems] = useState<CustomItemDraft[]>(() =>
-    (design?.customItems ?? []).map((item) => ({
-      ...item,
-      quantity: String(item.quantity),
-      unitPrice: pesoInputValue(item.unitPrice),
-    })),
-  );
-  const [submitted, setSubmitted] = useState(false);
-  const [touchedItemFields, setTouchedItemFields] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showSummary, setShowSummary] = useState(false);
   const roomSizes = usePublicSettings();
@@ -307,42 +248,14 @@ export function HouseDesignForm({
     setValues((current) => ({ ...current, [field]: value }));
 
   const runValidation = (): FieldErrors =>
-    validate(values, images, customItems, existingNames);
-
-  const touchItemField = (id: string, field: CustomItemField) =>
-    setTouchedItemFields((current) => (current[`${id}-${field}`] ? current : { ...current, [`${id}-${field}`]: true }));
-
-  /** A custom item field's message, shown after it was left or a save was attempted. */
-  const itemError = (item: CustomItemDraft, field: CustomItemField) =>
-    submitted || touchedItemFields[`${item.id}-${field}`] ? customItemErrors(item)[field] ?? null : null;
-
-  const itemFieldProps = (item: CustomItemDraft, field: CustomItemField) => {
-    const message = itemError(item, field);
-    return {
-      onBlur: () => touchItemField(item.id, field),
-      "aria-invalid": message ? true : undefined,
-      "aria-describedby": message ? `${item.id}-${field === "unitPrice" ? "price" : field}-error` : undefined,
-    } as const;
-  };
+    validate(values, images, existingNames);
 
   /** Validate on blur so errors appear after the user finishes a field. */
   const handleBlur = (field: FieldName) =>
     setErrors((current) => ({ ...current, [field]: runValidation()[field] }));
 
   const focusField = (field: FieldName) => {
-    // Custom items have per-row ids, so aim at the first incomplete row.
-    const invalidItem = customItems.find((item) => !isCustomItemComplete(item));
-    const invalidItemField = invalidItem
-      ? (Object.entries(customItemErrors(invalidItem)).find(([, message]) => message)?.[0] as CustomItemField | undefined)
-      : undefined;
-    const targetId =
-      field === "customItems"
-        ? `${invalidItem?.id ?? ""}-${invalidItemField === "unitPrice" ? "price" : invalidItemField ?? "item"}`
-        : fieldIds[field];
-    const element =
-      document.getElementById(targetId) ??
-      document.getElementById(fieldIds.customItems);
-
+    const element = document.getElementById(fieldIds[field]);
     element?.focus();
     element?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
@@ -355,12 +268,6 @@ export function HouseDesignForm({
   const costValue = Number.isFinite(Number(values.cost)) ? Number(values.cost) : 0;
   // The Admin keeps the project cost current; the per-sqm rate is worked out from it and the floor area.
   const rateValue = Number.isFinite(areaValue) && areaValue > 0 ? costValue / areaValue : 0;
-  const { customTotal } = getDesignEstimate({
-    area: 0,
-    rate: 0,
-    customItems: customItems.filter(isCustomItemComplete).map(toCustomItem),
-  });
-  const preview = { baseEstimate: costValue, customTotal, estimate: Math.round((costValue + customTotal) * 100) / 100 };
 
   const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
@@ -421,34 +328,9 @@ export function HouseDesignForm({
       ...current.filter((_, position) => position !== index),
     ]);
 
-  const addCustomItem = () =>
-    setCustomItems((current) => [
-      ...current,
-      {
-        id: createCustomItemId(),
-        item: "",
-        material: "",
-        unit: "sqm",
-        quantity: "1",
-        unitPrice: "",
-      },
-    ]);
-
-  const updateCustomItem = (
-    id: string,
-    changes: Partial<CustomItemDraft>,
-  ) =>
-    setCustomItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...changes } : item)),
-    );
-
-  const removeCustomItem = (id: string) =>
-    setCustomItems((current) => current.filter((item) => item.id !== id));
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setSubmitted(true);
     const nextErrors = runValidation();
     const invalidFields = fieldOrder.filter((field) => nextErrors[field]);
 
@@ -472,7 +354,6 @@ export function HouseDesignForm({
       images,
       notes: notes.trim(),
       status,
-      customItems: customItems.map(toCustomItem),
       designedBy: designedBy || null,
     });
   };
@@ -832,196 +713,6 @@ export function HouseDesignForm({
               </Field>
             </div>
           </fieldset>
-
-          <fieldset className="rounded-xl border border-stone-200 p-5">
-            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
-              Custom Exterior Items
-            </legend>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              Add exterior work for this design, such as perimeter fencing or a
-              carport canopy. Each item is added to the estimate. Customers
-              suggest other items when they request the design.
-            </p>
-
-            {customItems.length > 0 ? (
-              <ul className="mt-4 space-y-4">
-                {customItems.map((item, index) => {
-                  const incomplete =
-                    (submitted || Boolean(errors.customItems)) && !isCustomItemComplete(item);
-
-                  return (
-                    <li
-                      key={item.id}
-                      className={[
-                        "rounded-lg border p-4",
-                        incomplete ? "border-red-600 bg-red-50/40" : "border-stone-200",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-stone-950">
-                          Custom item {index + 1}
-                        </p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeCustomItem(item.id)}
-                          aria-label={`Remove custom item ${index + 1}`}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                          Remove
-                        </Button>
-                      </div>
-
-                      <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <Field
-                          htmlFor={`${item.id}-item`}
-                          label="Item Name"
-                          required
-                          error={itemError(item, "item") ?? undefined}
-                        >
-                          <input
-                            id={`${item.id}-item`}
-                            className={`${inputClass} aria-invalid:border-red-600`}
-                            {...itemFieldProps(item, "item")}
-                            value={item.item}
-                            onChange={(event) =>
-                              updateCustomItem(item.id, {
-                                item: event.target.value,
-                              })
-                            }
-                            placeholder="Enter item name"
-                          />
-                        </Field>
-                        <Field
-                          htmlFor={`${item.id}-material`}
-                          label="Material"
-                          required
-                          error={itemError(item, "material") ?? undefined}
-                        >
-                          <input
-                            id={`${item.id}-material`}
-                            className={`${inputClass} aria-invalid:border-red-600`}
-                            {...itemFieldProps(item, "material")}
-                            value={item.material}
-                            onChange={(event) =>
-                              updateCustomItem(item.id, {
-                                material: event.target.value,
-                              })
-                            }
-                            placeholder="Enter material"
-                          />
-                        </Field>
-                        <Field
-                          htmlFor={`${item.id}-unit`}
-                          label="Unit"
-                          required
-                          error={itemError(item, "unit") ?? undefined}
-                        >
-                          <input
-                            id={`${item.id}-unit`}
-                            className={`${inputClass} aria-invalid:border-red-600`}
-                            {...itemFieldProps(item, "unit")}
-                            value={item.unit}
-                            onChange={(event) =>
-                              updateCustomItem(item.id, {
-                                unit: event.target.value,
-                              })
-                            }
-                            placeholder="Enter unit"
-                          />
-                        </Field>
-                        <Field
-                          htmlFor={`${item.id}-quantity`}
-                          label="Quantity"
-                          required
-                          error={itemError(item, "quantity") ?? undefined}
-                        >
-                          <input
-                            id={`${item.id}-quantity`}
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="any"
-                            className={`${inputClass} tabular-nums aria-invalid:border-red-600`}
-                            {...itemFieldProps(item, "quantity")}
-                            value={item.quantity}
-                            onChange={(event) =>
-                              updateCustomItem(item.id, {
-                                quantity: event.target.value,
-                              })
-                            }
-                          />
-                        </Field>
-                        <Field
-                          htmlFor={`${item.id}-price`}
-                          label="Unit Price (PHP)"
-                          required
-                          error={itemError(item, "unitPrice") ?? undefined}
-                        >
-                          <PesoInput
-                            id={`${item.id}-price`}
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            {...itemFieldProps(item, "unitPrice")}
-                            value={item.unitPrice}
-                            onChange={(event) =>
-                              updateCustomItem(item.id, {
-                                unitPrice: event.target.value,
-                              })
-                            }
-                          />
-                        </Field>
-                        <div className="self-end rounded-lg border border-stone-200 px-3 py-2.5">
-                          <p className="text-xs font-semibold uppercase text-stone-500">
-                            Amount
-                          </p>
-                          <p className="mt-1 text-sm font-semibold tabular-nums text-stone-950">
-                            {formatPeso(
-                              (Number.isFinite(Number(item.quantity))
-                                ? Number(item.quantity)
-                                : 0) *
-                                (Number.isFinite(Number(item.unitPrice))
-                                  ? Number(item.unitPrice)
-                                  : 0),
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <div className="mt-4 rounded-lg border border-dashed border-stone-200 p-6 text-center">
-                <p className="text-sm font-semibold text-stone-950">
-                  No custom items yet.
-                </p>
-                <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-stone-600">
-                  The estimate is the Estimated Project Cost above.
-                </p>
-              </div>
-            )}
-
-            {errors.customItems ? (
-              <FieldError
-                id={`${fieldIds.customItems}-error`}
-                message={errors.customItems}
-              />
-            ) : null}
-
-            <Button
-              type="button"
-              variant="outline"
-              className="mt-4"
-              onClick={addCustomItem}
-              id={customItems.length === 0 ? fieldIds.customItems : undefined}
-            >
-              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
-              Add Custom Item
-            </Button>
-          </fieldset>
         </div>
 
         <div className="space-y-6">
@@ -1134,24 +825,11 @@ export function HouseDesignForm({
               aria-live="polite"
               className="mt-3 text-3xl font-semibold tracking-tight tabular-nums text-red-700"
             >
-              {formatPeso(preview.estimate)}
+              {formatPeso(costValue)}
             </p>
-            <dl className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Project Cost</dt>
-                <dd className="font-medium tabular-nums">
-                  {formatPeso(preview.baseEstimate)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-stone-600">Custom Items</dt>
-                <dd className="font-medium tabular-nums">
-                  {formatPeso(preview.customTotal)}
-                </dd>
-              </div>
-            </dl>
             <p className="mt-4 text-xs leading-5 text-stone-600">
-              The Estimated Project Cost plus any completed custom items.
+              Customers see this as the design&apos;s estimated price. The exact price comes later from the cost estimate,
+              where materials are listed for each scope of works.
             </p>
           </section>
         </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  CustomExteriorItem,
   HouseDesign,
   HouseDesignCatalog,
   HouseDesignStatus,
@@ -26,10 +25,6 @@ async function readJson<T>(response: Response): Promise<T> {
   }
 
   return payload;
-}
-
-export function createCustomItemId(): CustomExteriorItem["id"] {
-  return `custom-${crypto.randomUUID()}`;
 }
 
 /** MongoDB-backed house-design catalog shared by customer and admin screens. */

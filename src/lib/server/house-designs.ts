@@ -9,15 +9,6 @@ import defaultHouseTypes from "../../../database/seeds/house-types.json";
 import { ObjectId, type Db } from "mongodb";
 import { z } from "zod";
 
-const customExteriorItemSchema = z.object({
-  id: z.string().trim().min(1).max(100),
-  item: z.string().trim().min(1).max(120),
-  material: z.string().trim().min(1).max(160),
-  unit: z.string().trim().min(1).max(30),
-  quantity: z.number().finite().positive(),
-  unitPrice: z.number().finite().nonnegative(),
-});
-
 export const houseDesignInputSchema = z.object({
   name: z.string().trim().min(2).max(120),
   style: z.string().trim().max(80).optional(),
@@ -30,7 +21,6 @@ export const houseDesignInputSchema = z.object({
   images: z.array(z.string().min(1).max(2_100_000)).min(1).max(6),
   notes: z.string().trim().max(4_000),
   status: z.enum(["Draft", "Published", "Archived"]),
-  customItems: z.array(customExteriorItemSchema).max(100),
   /** The team member the design is credited to; null clears it. */
   designedBy: z.string().regex(/^[a-f0-9]{24}$/, "Choose who designed it from the list.").nullable().optional(),
 });
@@ -113,7 +103,6 @@ export function toHouseDesignDto(
     images: document.images,
     notes: document.notes,
     status: document.status,
-    customItems: document.customItems,
     ...(document.designedBy ? { designedBy: document.designedBy.toHexString() } : {}),
     ...(includeSource && source
       ? {

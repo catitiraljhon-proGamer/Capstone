@@ -35,16 +35,6 @@ export type HouseDesignCatalog = {
   houseTypes: HouseType[];
 };
 
-/** Exterior work the Admin adds to a design's estimate, such as perimeter fencing. */
-export type CustomExteriorItem = {
-  id: string;
-  item: string;
-  material: string;
-  unit: string;
-  quantity: number;
-  unitPrice: number;
-};
-
 /** The completed construction project a design was created from, with its accepted cost estimate. Admin only. */
 export type CompletedProjectSource = {
   projectId: string;
@@ -83,7 +73,6 @@ export type HouseDesign = {
   images: string[];
   notes: string;
   status: HouseDesignStatus;
-  customItems: CustomExteriorItem[];
   /** Id of the team member the design is credited to on the About Us page. */
   designedBy?: string;
   /** Set on designs created automatically when a construction project is completed. */
@@ -112,15 +101,11 @@ export const pesoInputValue = (value: number) => (Math.round((value + Number.EPS
 
 const roundAmount = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-/** Floor area times the cost rate, plus the custom exterior items the Admin added to the design. */
-export function getDesignEstimate(
-  design: Pick<HouseDesign, "area" | "rate"> & { customItems?: CustomExteriorItem[] },
-) {
+/**
+ * A design's estimated price: floor area times the cost rate. It is a starting guide for customers; the exact price
+ * comes from the cost estimate, where materials are listed for each scope of works.
+ */
+export function getDesignEstimate(design: Pick<HouseDesign, "area" | "rate">) {
   const baseEstimate = roundAmount(design.area * design.rate);
-  const customTotal = roundAmount((design.customItems ?? []).reduce(
-    (total, item) => total + roundAmount(item.quantity * item.unitPrice),
-    0,
-  ));
-
-  return { baseEstimate, customTotal, estimate: roundAmount(baseEstimate + customTotal) };
+  return { baseEstimate, estimate: baseEstimate };
 }

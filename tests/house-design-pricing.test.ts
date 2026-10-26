@@ -15,18 +15,23 @@ const fence = { id: "fence", item: "Fence", material: "Steel", unit: "lm", quant
 const designInput = {
   name: "Test House", houseType: "Bungalow", area: 100,
   bedrooms: 3, bathrooms: 2, finish: "Standard", rate: 20000, images: ["/test-house.jpg"], notes: "",
-  status: "Published", customItems: [],
+  status: "Published",
 };
 
 test("a design's estimate is the floor area times the cost rate", () => {
-  assert.deepEqual(getDesignEstimate({ area: 100, rate: 20000 }), { baseEstimate: 2_000_000, customTotal: 0, estimate: 2_000_000 });
+  assert.deepEqual(getDesignEstimate({ area: 100, rate: 20000 }), { baseEstimate: 2_000_000, estimate: 2_000_000 });
   assert.equal(getDesignEstimate({ area: 120.5, rate: 35000.5 }).estimate, 4_217_560.25);
 });
 
-test("custom exterior items are added to the estimate", () => {
-  const estimate = getDesignEstimate({ area: 100, rate: 20000, customItems: [fence, { ...fence, id: "canopy", quantity: 1, unitPrice: 85000 }] });
-  assert.equal(estimate.customTotal, 85025.63);
-  assert.equal(estimate.estimate, 2_085_025.63);
+test("custom exterior items were removed: they are not saved and older ones no longer change the price", () => {
+  assert.equal("customItems" in houseDesignInputSchema.parse({ ...designInput, customItems: [fence] }), false);
+  const older = {
+    ...houseDesignInputSchema.parse(designInput), customItems: [fence], rooms: "3 bedrooms, 2 bathrooms", _id: new ObjectId(),
+    createdBy: new ObjectId(), createdByName: "Test Admin", createdAt: new Date(), updatedAt: new Date(),
+  } as HouseDesignDocument;
+  const dto = toHouseDesignDto(older);
+  assert.equal("customItems" in dto, false);
+  assert.equal(getDesignEstimate(dto).estimate, 2_000_000);
 });
 
 test("default exterior material fields from an outdated page are ignored", () => {

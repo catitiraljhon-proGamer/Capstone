@@ -9,7 +9,7 @@ import {
   type ProjectDocument,
   type UserDocument,
 } from "@/lib/database/collections";
-import { formatPeso, getDesignEstimate } from "@/lib/house-design-data";
+import { formatPeso } from "@/lib/house-design-data";
 import { listHouseTypes } from "@/lib/server/house-designs";
 import type { SessionUser } from "@/types/domain";
 
@@ -93,10 +93,8 @@ async function createDesignFromProject(
   // The finish the customer chose in a custom request, else the finish of the published design they requested.
   const finish = (request?.selectedDesign ? request.selectedDesign.finish : request?.finish) ?? sourceDesign?.finish;
 
-  // The rate is set so the design's estimate, with its custom items, equals what the project cost.
-  const customItems = sourceDesign?.customItems ?? [];
-  const { customTotal } = getDesignEstimate({ area, rate: 0, customItems });
-  const rate = Math.max(0, roundAmount((project.contractPrice - customTotal) / area));
+  // The rate is set so the design's estimate equals what the project cost.
+  const rate = Math.max(0, roundAmount(project.contractPrice / area));
 
   const now = new Date();
   const document: HouseDesignDocument = {
@@ -112,7 +110,6 @@ async function createDesignFromProject(
     images: await designImages(db, request, sourceDesign),
     notes: `Built under project ${project.reference} and completed on ${completedAt.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long" })}. ${area} sqm, ${rooms}. Contract price ${formatPeso(project.contractPrice)}.`,
     status: "Draft",
-    customItems,
     sourceProject: {
       projectId: project._id,
       projectReference: project.reference,

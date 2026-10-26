@@ -710,7 +710,7 @@ test("an admin controls project status, and completion waits until every milesto
   const now = new Date();
   await db.collection<HouseDesignDocument>("house_designs").insertOne({
     _id: new ObjectId(), name: "Taken Name", area: 90, rooms: "2 bedrooms", rate: 1, images: [], notes: "", status: "Draft",
-    customItems: [], createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
+    createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
   });
   const complete = (extra: object) => changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed", ...extra });
   await assert.rejects(complete({ designName: "taken name", houseType: "Tudor" }), isError(409));

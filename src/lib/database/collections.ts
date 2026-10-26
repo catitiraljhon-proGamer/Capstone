@@ -1,5 +1,4 @@
 import type {
-  CustomExteriorItem,
   ExteriorItemChoice,
   FinishLevel,
   HouseDesignStatus,
@@ -122,7 +121,6 @@ export type HouseDesignDocument = {
   images: string[];
   notes: string;
   status: HouseDesignStatus;
-  customItems: CustomExteriorItem[];
   /** The team member the design is credited to on the About Us page. */
   designedBy?: ObjectId;
   /** The completed project this design was created from, with a snapshot of its accepted estimate. */
