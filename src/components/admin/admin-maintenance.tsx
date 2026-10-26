@@ -6,8 +6,11 @@ import { AdminMaintenanceContact } from "@/components/admin/admin-maintenance-co
 import { AdminMaintenanceMode } from "@/components/admin/admin-maintenance-mode";
 import { AdminMaintenanceSlideshow } from "@/components/admin/admin-maintenance-slideshow";
 import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
+import { AdminMaintenanceWarranty } from "@/components/admin/admin-maintenance-warranty";
 import { Button } from "@/components/ui/button";
+import { manilaDate } from "@/lib/billing";
 import { minimumFloorArea } from "@/lib/room-space";
+import { addMonths, warrantyDate } from "@/lib/warranty";
 import {
   settingFields,
   settingKeys,
@@ -17,10 +20,11 @@ import {
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, Ruler, ScrollText, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Phone, Ruler, ScrollText, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-type Section = "mode" | "security" | "email" | "notifications" | "rooms" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
+export type MaintenanceSection = "mode" | "security" | "email" | "notifications" | "rooms" | "warranty" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
+type Section = MaintenanceSection;
 type Draft = Record<SettingKey, string | boolean>;
 /** `note` adds a line under the group worked out from the typed values. */
 type SettingGroup = { title: string; description?: string; keys: SettingKey[]; note?: (draft: Draft) => string | null };
@@ -31,6 +35,12 @@ function roomSizesExample(draft: Draft) {
   if (roomSizeKeys.some((key) => String(draft[key]).trim() === "" || !Number.isFinite(Number(draft[key])))) return null;
   const sizes = Object.fromEntries(roomSizeKeys.map((key) => [key, Number(draft[key])])) as RoomSizes;
   return `Example: 3 bedrooms and 2 bathrooms need at least ${minimumFloorArea(3, 2, sizes)} sqm, and 10 bedrooms and 11 bathrooms need at least ${minimumFloorArea(10, 11, sizes)} sqm.`;
+}
+
+function warrantyExample(draft: Draft) {
+  const months = Number(draft.warrantyMonths);
+  if (String(draft.warrantyMonths).trim() === "" || !Number.isInteger(months) || months < 1) return null;
+  return `Example: a project completed today is covered until ${warrantyDate(addMonths(manilaDate(), months))}.`;
 }
 
 const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
@@ -62,6 +72,16 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
       },
     ],
   },
+  {
+    id: "warranty", label: "Warranty", icon: ShieldCheck, groups: [
+      {
+        title: "Warranty Period",
+        description: "Saved on each project when it is marked Completed. A change applies only to projects completed after it, so warranties already given stay the same.",
+        keys: ["warrantyMonths", "warrantyCloseDays"],
+        note: warrantyExample,
+      },
+    ],
+  },
   { id: "contact", label: "Contact Us", icon: Phone, groups: [] },
   { id: "terms", label: "Terms and Conditions", icon: ScrollText, groups: [] },
   { id: "slideshow", label: "Home Page Slideshow", icon: Images, groups: [] },
@@ -82,8 +102,8 @@ function changedLine(view: SystemSettingsView, key: SettingKey) {
   return `${change.by} · ${date}`;
 }
 
-export function AdminMaintenance() {
-  const [section, setSection] = useState<Section>("mode");
+export function AdminMaintenance({ initialSection = "mode" }: { initialSection?: Section }) {
+  const [section, setSection] = useState<Section>(initialSection);
   const [view, setView] = useState<SystemSettingsView | null>(null);
   /** Typed values; numbers stay as text until saved so a field can be cleared while editing. */
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -214,6 +234,7 @@ export function AdminMaintenance() {
           )
         ) : null}
 
+        {section === "warranty" ? <AdminMaintenanceWarranty onError={setError} onSuccess={setSuccess} /> : null}
         {section === "contact" ? <AdminMaintenanceContact onError={setError} onSuccess={setSuccess} /> : null}
         {section === "terms" ? <AdminMaintenanceTerms onError={setError} onSuccess={setSuccess} /> : null}
         {section === "slideshow" ? <AdminMaintenanceSlideshow onError={setError} onSuccess={setSuccess} /> : null}

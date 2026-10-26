@@ -27,6 +27,7 @@ import type { AccountTermsContent } from "@/lib/account-terms";
 import type { ProfessionalRole } from "@/lib/professionals";
 import type { AboutUsContent } from "@/lib/about-us";
 import type { LotFacing, SiteInspectionStatus } from "@/lib/site-inspection";
+import type { WarrantyClaimStatus, WarrantyLists } from "@/lib/warranty";
 
 export type { ProjectStatus } from "@/types/construction";
 
@@ -56,6 +57,7 @@ export const collections = {
   emailVerifications: "email_verifications",
   backupUploads: "backup_uploads",
   professionals: "professionals",
+  warrantyClaims: "warranty_claims",
 } as const;
 
 export type UserDocument = {
@@ -202,6 +204,58 @@ export type ProjectDocument = {
   completedAt?: Date;
   /** When the draft design made from this completed project was removed, so it is not recreated. */
   completedDesignRemovedAt?: Date;
+  /**
+   * Saved when the project is completed, so a later change to the Warranty length in Maintenance does not change a
+   * warranty already given. `warrantyEndsAt` is the last covered day at midnight UTC (a Manila calendar date).
+   */
+  warrantyMonths?: number;
+  warrantyEndsAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** A booked visit to the customer's house for a warranty claim, kept in the calendar as a client meeting. */
+export type WarrantyVisitDocument = {
+  scheduleId: ObjectId;
+  scheduledFor: Date;
+  durationMinutes: number;
+  location: string;
+  scheduledByName: string;
+};
+
+/** A problem the customer reported with their completed house while its warranty ran. */
+export type WarrantyClaimDocument = {
+  _id: ObjectId;
+  reference: string;
+  customerId: ObjectId;
+  customerName: string;
+  projectId: ObjectId;
+  projectReference: string;
+  projectName: string;
+  /** Snapshot of the problem type's name, so renaming or hiding it in Maintenance leaves old claims as filed. */
+  problemType: string;
+  /** YYYY-MM-DD day the customer first noticed the problem, at midnight UTC. */
+  noticedOn: Date;
+  location: string;
+  description: string;
+  photos: string[];
+  /** The project's last covered day when the claim was filed. */
+  warrantyEndsAt: Date;
+  status: WarrantyClaimStatus;
+  inspection?: WarrantyVisitDocument;
+  result?: {
+    inspectedOn: Date;
+    inspectedBy: string;
+    findings: string;
+    covered: boolean;
+    reason?: string;
+    photos?: string[];
+    recordedAt: Date;
+    recordedByName: string;
+  };
+  repair?: WarrantyVisitDocument & { repairedAt?: Date; notes?: string; repairedByName?: string };
+  closedAt?: Date;
+  closedBy?: "customer" | "automatic";
   createdAt: Date;
   updatedAt: Date;
 };
@@ -636,6 +690,14 @@ export type ProfessionalDocument = {
 export type AboutUsDocument = {
   _id: "about-us";
   content: AboutUsContent;
+  changedBy: string;
+  updatedAt: Date;
+};
+
+/** The problem types and not-covered reasons the Admin saved (Maintenance > Warranty); none yet means the built-in lists. */
+export type WarrantyListsDocument = {
+  _id: "warranty";
+  lists: WarrantyLists;
   changedBy: string;
   updatedAt: Date;
 };

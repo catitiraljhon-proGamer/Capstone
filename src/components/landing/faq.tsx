@@ -110,6 +110,10 @@ const categories: FaqCategory[] = [
         question: "Where can I see what I have paid?",
         answer: "Your account shows each stage of the payment schedule with its invoice, the amount paid, and the remaining balance. All receipts are in Billing Status.",
       },
+      {
+        question: "Is my house under warranty?",
+        answer: "Yes. Every house we complete comes with a warranty, counted from the day the project is completed. Your Warranty Certificate in Dream House shows the exact dates. If something needs fixing, such as a leak or a crack, use Report a Problem in Dream House. We inspect it at your house, and covered problems are repaired for free.",
+      },
     ],
   },
 ];

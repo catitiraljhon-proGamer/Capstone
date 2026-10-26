@@ -79,6 +79,15 @@ const actionLabels: Record<string, string> = {
   "payment.reverse": "Voided a payment",
   "cash-report.submitted": "Submitted a daily cash report",
   "cash-report.verified": "Verified a daily cash report",
+  "warranty-claim.submitted": "Reported a warranty problem",
+  "warranty-claim.inspection-scheduled": "Scheduled a warranty inspection",
+  "warranty-claim.inspection-moved": "Moved a warranty inspection",
+  "warranty-claim.covered": "Recorded a warranty problem as covered",
+  "warranty-claim.not-covered": "Recorded a warranty problem as not covered",
+  "warranty-claim.repair-scheduled": "Scheduled a warranty repair",
+  "warranty-claim.repair-moved": "Moved a warranty repair",
+  "warranty-claim.repaired": "Marked a warranty repair finished",
+  "warranty-claim.confirmed": "Confirmed a warranty repair",
 };
 
 function humanize(value: string) {

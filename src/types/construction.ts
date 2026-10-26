@@ -1,4 +1,5 @@
 import type { AddressDetails } from "@/types/clients";
+import type { ProjectWarrantyDto } from "@/types/warranty";
 
 /**
  * Construction phase: after a design is unlocked, the customer asks to build it,
@@ -120,6 +121,8 @@ export type ConstructionProjectDto = {
   milestones: PaymentMilestoneDto[];
   /** First milestone that is not fully paid. */
   nextMilestone: PaymentMilestoneDto | null;
+  /** Set once the project is Completed. */
+  warranty: ProjectWarrantyDto | null;
   createdAt: string;
 };
 

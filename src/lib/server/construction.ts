@@ -24,10 +24,12 @@ import { BillingError, audit, autoIssueDownpayment, billingTransaction, nextRefe
 import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
 import { isActiveHouseType } from "@/lib/server/house-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
+import { getSystemSettings } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
 import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/lib/server/project-milestones";
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import { ensureVatRemoved } from "@/lib/server/vat-cleanup";
+import { ensureWarrantyDates, projectWarranty, warrantyOnCompletion, warrantySummary } from "@/lib/server/warranty";
 import type {
   ConstructionProjectDto,
   CostEstimateDto,
@@ -417,11 +419,12 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
   const customerIds = [...new Set(projects.map((project) => project.customerId.toHexString()))].map((id) => new ObjectId(id));
   const estimateIds = projects.flatMap((project) => (project.estimateId ? [project.estimateId] : []));
   const requestIds = projects.flatMap((project) => (project.designRequestId ? [project.designRequestId] : []));
-  const [billing, customers, estimates, requests] = await Promise.all([
+  const [billing, customers, estimates, requests, { warrantyMonths }] = await Promise.all([
     loadProjectBilling(db, projects.map((project) => project._id), session),
     db.collection<UserDocument>(collections.users).find({ _id: { $in: customerIds } }, { session, projection: { name: 1 } }).toArray(),
     estimateIds.length ? db.collection<EstimateDocument>(collections.estimates).find({ _id: { $in: estimateIds } }, { session, projection: { reference: 1 } }).toArray() : [],
     requestIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: requestIds } }, { session, projection: { houseType: 1 } }).toArray() : [],
+    getSystemSettings(db),
   ]);
   const customerNames = new Map(customers.map((customer) => [customer._id.toHexString(), customer.name]));
   const estimateReferences = new Map(estimates.map((estimate) => [estimate._id.toHexString(), estimate.reference]));
@@ -440,6 +443,7 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
       startDate: isoDate(project.startDate), neededBy: isoDate(project.targetCompletionDate),
       paid, balance: Math.max(0, Math.round((project.contractPrice - paid) * 100) / 100),
       milestones, nextMilestone: milestones.find((milestone) => milestone.status !== "Paid") ?? null,
+      warranty: projectWarranty(project, warrantyMonths),
       createdAt: project.createdAt.toISOString(),
     };
   });
@@ -449,6 +453,7 @@ export async function listProjects(db: Db, actor: SessionUser): Promise<Construc
   requireRole(actor, ["customer", "admin", "billing-clerk"], "You do not have access to construction projects.");
   await promoteScheduledProjects(db);
   await ensureVatRemoved(db);
+  await ensureWarrantyDates(db);
   const projects = await db.collection<ProjectDocument>(collections.projects)
     .find(actor.role === "customer" ? { customerId: new ObjectId(actor.id) } : {}).sort({ createdAt: -1 }).limit(500).toArray();
   return toProjectDtos(db, projects, actor.role);
@@ -467,6 +472,8 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
     throw new BillingError("Choose one of the available house types.", 400);
   }
   await promoteScheduledProjects(db);
+  // The warranty length in force on the day of completion is saved with the project.
+  const { warrantyMonths } = await getSystemSettings(db);
   const result = await billingTransaction(db, async (session) => {
     const projects = db.collection<ProjectDocument>(collections.projects);
     const project = await projects.findOneAndUpdate({ _id: projectId }, { $inc: { billingVersion: 1 } }, { session, returnDocument: "after" });
@@ -483,13 +490,15 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
       if (milestones.some((milestone) => milestone.status !== "Paid")) throw new BillingError("Every payment milestone must be fully paid before the project is completed.", 409);
     }
     const now = new Date();
+    const warranty = input.status === "Completed" ? warrantyOnCompletion(now, warrantyMonths) : null;
     const moved = await projects.updateOne({ _id: project._id, status: from }, {
-      $set: { status: input.status, updatedAt: now, ...(input.status === "Completed" ? { completedAt: now } : {}) },
+      $set: { status: input.status, updatedAt: now, ...(warranty ? { completedAt: now, ...warranty } : {}) },
     }, { session });
     if (!moved.matchedCount) throw new BillingError("The project changed. Reload it and try again.", 409);
+    const completed = warranty ? projectWarranty({ status: "Completed", completedAt: now, updatedAt: now, ...warranty }, warrantyMonths) : null;
     await notify(db, session, [project.customerId], {
       title: `Project ${input.status === "Completed" ? "completed" : input.status === "On hold" ? "put on hold" : "is active"}`,
-      body: `${project.name} is now ${input.status.toLowerCase()}.`,
+      body: `${project.name} is now ${input.status.toLowerCase()}.${completed ? ` ${warrantySummary(completed)} Use Report a Problem in Dream House if something needs fixing.` : ""}`,
       href: "/customer/dream-house", kind: "construction-project", entityId: project._id,
     });
     await audit(db, session, actor, "project.status-changed", "project", project._id, { reference: project.reference, from, to: input.status });

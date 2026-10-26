@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { formatPeso } from "@/lib/house-design-data";
+import { warrantyDate } from "@/lib/warranty";
 import type { ConstructionProjectDto, CostEstimateDto } from "@/types/construction";
 import type { DesignRequestDto } from "@/types/design-requests";
 
@@ -51,7 +52,13 @@ const billingLink = (invoiceId: string) => `/customer/billing?invoice=${encodeUR
 function constructionStep(design: DesignRequestDto, estimate?: CostEstimateDto, project?: ConstructionProjectDto): NextStep | null {
   if (project) {
     if (project.status === "Completed") {
-      return { tone: "done", title: "Your house is complete", detail: "Thank you for building with G4 Builders Inc. Your billing history stays in Billing Status." };
+      return {
+        tone: "done", title: "Your house is complete",
+        detail: project.warranty?.active
+          ? `Thank you for building with G4 Builders Inc. Your house is under warranty until ${warrantyDate(project.warranty.endsOn)}. If something needs fixing, use Report a Problem below.`
+          : "Thank you for building with G4 Builders Inc. Your billing history stays in Billing Status.",
+        ...(project.warranty?.active ? { action: { label: "View Warranty", target: `warranty-${project.id}` } } : {}),
+      };
     }
     const due = project.milestones.find((milestone) => milestone.invoice && !["Draft", "Void"].includes(milestone.invoice.status) && milestone.invoice.balance > 0);
     if (due?.invoice) {

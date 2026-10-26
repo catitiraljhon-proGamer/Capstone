@@ -23,6 +23,8 @@ export type SystemSettings = {
   roomKitchenSqm: number;
   roomLivingSqm: number;
   roomWallsPercent: number;
+  warrantyMonths: number;
+  warrantyCloseDays: number;
 };
 
 export type SettingKey = keyof SystemSettings;
@@ -52,6 +54,9 @@ export const defaultSystemSettings: SystemSettings = {
   roomKitchenSqm: 6,
   roomLivingSqm: 12,
   roomWallsPercent: 20,
+  // The 1-year warranty the panel asked for.
+  warrantyMonths: 12,
+  warrantyCloseDays: 7,
 };
 
 export type NumberSettingField = { kind: "number"; label: string; hint?: string; unit: string; min: number; max: number };
@@ -74,7 +79,7 @@ export const settingFields: Record<SettingKey, SettingField> = {
   emailCopiesCustomer: { kind: "toggle", label: "Customer", hint: "Email a copy of each notification." },
   dueReminderDays: { kind: "number", label: "Payment due reminder", hint: "Days before an unpaid invoice is due.", unit: "day/s before", min: 1, max: 30 },
   inactiveNoticeDays: { kind: "number", label: "Warn inactive clients", hint: "Days of warning before archiving.", unit: "day/s before", min: 1, max: 60 },
-  inactiveArchiveDays: { kind: "number", label: "Archive inactive clients after", hint: "Days with no open work after the last project is completed.", unit: "day/s", min: 7, max: 365 },
+  inactiveArchiveDays: { kind: "number", label: "Archive inactive clients after", hint: "Days with no open work after the last project's warranty ends.", unit: "day/s", min: 7, max: 365 },
   autoBackup: { kind: "toggle", label: "Automatic daily backup" },
   keepAutomaticBackups: { kind: "number", label: "Keep the last", hint: "Older automatic backups are deleted. Manual ones are kept.", unit: "automatic backups", min: 1, max: 30 },
   roomBedroomSqm: { kind: "number", label: "Bedroom", hint: "For each bedroom.", unit: "sqm", min: 1, max: 100 },
@@ -82,6 +87,8 @@ export const settingFields: Record<SettingKey, SettingField> = {
   roomKitchenSqm: { kind: "number", label: "Kitchen", hint: "One per house.", unit: "sqm", min: 1, max: 100 },
   roomLivingSqm: { kind: "number", label: "Living and dining", hint: "One per house.", unit: "sqm", min: 1, max: 200 },
   roomWallsPercent: { kind: "number", label: "Walls and hallways", hint: "Added on top of the rooms.", unit: "percent", min: 0, max: 100 },
+  warrantyMonths: { kind: "number", label: "Warranty length", hint: "Counted from the day a project is marked Completed. 12 months is 1 year.", unit: "months", min: 1, max: 60 },
+  warrantyCloseDays: { kind: "number", label: "Close repaired claims after", hint: "If the customer doesn't confirm the repair first.", unit: "days", min: 1, max: 30 },
 };
 
 export const settingKeys = Object.keys(defaultSystemSettings) as SettingKey[];

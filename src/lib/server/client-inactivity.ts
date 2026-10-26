@@ -1,20 +1,22 @@
 import { ObjectId, type Db } from "mongodb";
 import {
   collections, type DesignRequestDocument, type EstimateDocument, type InvoiceDocument, type PaymentDocument,
-  type ProjectDocument, type UserDocument,
+  type ProjectDocument, type UserDocument, type WarrantyClaimDocument,
 } from "@/lib/database/collections";
 import { invoiceState, sumMoney } from "@/lib/billing";
 import { recordAuditLog } from "@/lib/server/audit";
 import { getSystemSettings } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
+import { warrantyOverAt } from "@/lib/server/warranty";
+import { openWarrantyClaimStatuses } from "@/lib/warranty";
 
 
 const day = 86_400_000;
 const systemActor = { id: "000000000000000000000000", name: "System (automatic)", role: "admin" as const };
 
-/** Anything still open keeps the client active: unfinished work, a new request, or money still owed. */
+/** Anything still open keeps the client active: unfinished work, a new request, money still owed, or a warranty claim. */
 async function hasOpenWork(db: Db, customerId: ObjectId, since: Date) {
-  const [designs, estimates, pendingPayments] = await Promise.all([
+  const [designs, estimates, pendingPayments, warrantyClaims] = await Promise.all([
     db.collection<DesignRequestDocument>(collections.designRequests).countDocuments({
       customerId,
       $or: [
@@ -24,8 +26,9 @@ async function hasOpenWork(db: Db, customerId: ObjectId, since: Date) {
     }),
     db.collection<EstimateDocument>(collections.estimates).countDocuments({ customerId, status: { $in: ["Requested", "Draft", "Sent", "Revision requested"] } }),
     db.collection<PaymentDocument>(collections.payments).countDocuments({ customerId, status: "Pending" }),
+    db.collection<WarrantyClaimDocument>(collections.warrantyClaims).countDocuments({ customerId, status: { $in: [...openWarrantyClaimStatuses] } }),
   ]);
-  if (designs || estimates || pendingPayments) return true;
+  if (designs || estimates || pendingPayments || warrantyClaims) return true;
   const invoices = await db.collection<InvoiceDocument>(collections.invoices)
     .find({ customerId, status: { $in: ["Sent", "Partially Paid", "Overdue"] } }).toArray();
   for (const invoice of invoices) {
@@ -37,12 +40,13 @@ async function hasOpenWork(db: Db, customerId: ObjectId, since: Date) {
 }
 
 /**
- * Daily job. When every project of a client is Completed and nothing else is open, the client is warned, then archived
- * and disabled a set number of days after the last completion (30 by default) and at least the warning period (7 by
- * default) after the warning. Both are Admin settings. Unarchiving restores access.
+ * Daily job. When every project of a client is Completed, their warranties have ended, and nothing else is open, the
+ * client is warned, then archived and disabled a set number of days after that (30 by default) and at least the
+ * warning period (7 by default) after the warning. Both are Admin settings. Unarchiving restores access. The account
+ * stays open while a warranty runs, so the homeowner can still report a problem.
  */
 export async function archiveInactiveClients(db: Db, now = new Date()) {
-  const { inactiveArchiveDays, inactiveNoticeDays } = await getSystemSettings(db);
+  const { inactiveArchiveDays, inactiveNoticeDays, warrantyMonths } = await getSystemSettings(db);
   const users = db.collection<UserDocument>(collections.users);
   const projects = db.collection<ProjectDocument>(collections.projects);
   const candidateIds = (await projects.find({ status: "Completed" }, { projection: { customerId: 1 } }).toArray())
@@ -54,9 +58,10 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
     if (!customer) continue;
     const owned = await projects.find({ customerId: customer._id }).toArray();
     if (owned.some((project) => project.status !== "Completed")) continue;
-    const completedAt = new Date(Math.max(...owned.map((project) => (project.completedAt ?? project.updatedAt).getTime())));
+    const warrantyOver = new Date(Math.max(...owned.map((project) =>
+      (warrantyOverAt(project, warrantyMonths) ?? project.completedAt ?? project.updatedAt).getTime())));
     // An admin unarchiving the client restarts the count.
-    const inactiveSince = new Date(Math.max(completedAt.getTime(), customer.reactivatedAt?.getTime() ?? 0));
+    const inactiveSince = new Date(Math.max(warrantyOver.getTime(), customer.reactivatedAt?.getTime() ?? 0));
     if (await hasOpenWork(db, customer._id, inactiveSince)) continue;
 
     const archiveOn = new Date(inactiveSince.getTime() + inactiveArchiveDays * day);
@@ -72,13 +77,13 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
       if (!archived.modifiedCount) continue;
       await recordAuditLog({
         db, actor: systemActor, action: "client.auto-archived", entityType: "user", entityId: customer._id,
-        details: { reason: `No open work for ${inactiveArchiveDays} days after the last project was completed`, inactiveSince: inactiveSince.toISOString() },
+        details: { reason: `No open work for ${inactiveArchiveDays} days after the last project's warranty ended`, inactiveSince: inactiveSince.toISOString() },
         createdAt: now,
       });
       const admins = await users.find({ role: "admin", status: "active" }, { projection: { _id: 1 } }).toArray();
       await insertNotifications(db, admins.map((admin) => ({
         _id: new ObjectId(), userId: admin._id, title: "Client archived automatically",
-        body: `${customer.name} was archived and their account disabled after ${inactiveArchiveDays} days with no open work since their project was completed. Unarchive them in Client to restore access.`,
+        body: `${customer.name} was archived and their account disabled after ${inactiveArchiveDays} days with no open work since their project's warranty ended. Unarchive them in Client to restore access.`,
         href: "/admin/clients", kind: "client-auto-archived", entityId: customer._id, createdAt: now,
       })));
       result.archived += 1;
@@ -92,7 +97,7 @@ export async function archiveInactiveClients(db: Db, now = new Date()) {
         .toLocaleDateString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long" });
       await insertNotifications(db, [{
         _id: new ObjectId(), userId: customer._id, title: `Your account will be archived on ${closeOn}`,
-        body: `Your project is complete. With no new requests, your account will be archived and closed on ${closeOn}. Download your blueprint and receipts before then, or contact G4 Builders if you need more work.`,
+        body: `Your project is complete and its warranty has ended. With no new requests, your account will be archived and closed on ${closeOn}. Download your blueprint and receipts before then, or contact G4 Builders if you need more work.`,
         href: "/customer/dream-house", kind: "client-inactivity-notice", entityId: customer._id, createdAt: now,
       }]);
       result.noticed += 1;

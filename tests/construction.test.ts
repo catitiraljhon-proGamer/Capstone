@@ -161,13 +161,15 @@ test("estimates saved with VAT drop it, unless billing already started on the ac
   assert.equal((await projectDto(projectId!)).contractPrice, 6_000_000);
 });
 
-test("clients are warned, then archived and disabled 30 days after their last project completes with nothing open", async () => {
+test("clients are warned, then archived and disabled 30 days after their last project's warranty ends with nothing open", async () => {
+  // The project was completed a year earlier; its warranty's last covered day was December 31.
   const completedAt = new Date("2026-01-01T02:00:00.000Z");
   const at = (days: number) => new Date(completedAt.getTime() + days * 86_400_000);
   const projectId = new ObjectId();
   await db.collection<ProjectDocument>("projects").insertOne({
     _id: projectId, reference: "PRJ-DONE", name: "Finished home", customerId: new ObjectId(customer.id),
-    status: "Completed", contractPrice: 1_000_000, completedAt, createdAt: completedAt, updatedAt: completedAt,
+    status: "Completed", contractPrice: 1_000_000, completedAt: new Date("2025-01-01T02:00:00.000Z"),
+    warrantyMonths: 12, warrantyEndsAt: new Date("2025-12-31T00:00:00.000Z"), createdAt: completedAt, updatedAt: completedAt,
   });
   const user = () => db.collection<UserDocument>("users").findOne({ _id: new ObjectId(customer.id) });
 
@@ -207,10 +209,11 @@ test("clients are warned, then archived and disabled 30 days after their last pr
 });
 
 test("clients already past 30 days when the job first runs are warned, not archived on the spot", async () => {
-  const completedAt = new Date("2026-01-01T02:00:00.000Z");
+  const completedAt = new Date("2025-01-01T02:00:00.000Z");
   await db.collection<ProjectDocument>("projects").insertOne({
     _id: new ObjectId(), reference: "PRJ-OLD", name: "Long done", customerId: new ObjectId(customer.id),
-    status: "Completed", contractPrice: 1, completedAt, createdAt: completedAt, updatedAt: completedAt,
+    status: "Completed", contractPrice: 1, completedAt, warrantyMonths: 12, warrantyEndsAt: new Date("2025-12-31T00:00:00.000Z"),
+    createdAt: completedAt, updatedAt: completedAt,
   });
   const firstRun = new Date("2026-06-01T00:30:00.000Z");
   assert.deepEqual(await archiveInactiveClients(db, firstRun), { noticed: 1, archived: 0 });

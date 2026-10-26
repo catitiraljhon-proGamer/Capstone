@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, HardHat } from "lucide-react";
 import { BillingPanel } from "@/components/billing/billing-primitives";
 import { dateOrDash, Eyebrow, Fact, ScheduleTable } from "@/components/customer/construction-shared";
+import { ProjectWarranty } from "@/components/customer/project-warranty";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
 import type { ConstructionProjectDto, PaymentMilestoneDto } from "@/types/construction";
@@ -77,7 +78,7 @@ function NextPayment({ milestone }: { milestone: PaymentMilestoneDto | null }) {
 export function ConstructionProjectCard({ project }: { project: ConstructionProjectDto }) {
   const progress = project.contractPrice > 0 ? Math.min(100, Math.max(0, (project.paid / project.contractPrice) * 100)) : 0;
   return (
-    <div id={`project-${project.id}`} className="scroll-mt-28">
+    <div id={`project-${project.id}`} className="scroll-mt-28 space-y-5">
       <BillingPanel className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-start gap-3">
@@ -127,6 +128,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
           </>
         )}
       </BillingPanel>
+      {project.warranty ? <ProjectWarranty project={{ ...project, warranty: project.warranty }} /> : null}
     </div>
   );
 }
