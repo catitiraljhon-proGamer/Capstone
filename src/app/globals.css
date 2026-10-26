@@ -43,6 +43,17 @@ input[type="month"] {
   max-width: 100%;
 }
 
+/*
+ * A box that scrolls sideways anchors what is positioned inside it. Otherwise the screen-reader labels in a wide
+ * table's last column are placed against the page, stretch it, and phones and tablets scroll sideways. It sits in the
+ * base layer, so an element's own absolute, fixed, or sticky class still wins.
+ */
+@layer base {
+  .overflow-x-auto {
+    position: relative;
+  }
+}
+
 @keyframes fadeSlideIn {
   to {
     opacity: 1;
