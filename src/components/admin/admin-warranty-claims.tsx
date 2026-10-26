@@ -34,7 +34,8 @@ const filters: { label: string; statuses: WarrantyClaimStatus[] | null }[] = [
   { label: "Submitted", statuses: ["Submitted"] },
   { label: "Inspection", statuses: ["Inspection scheduled"] },
   { label: "Repair", statuses: ["Covered", "Repair scheduled", "Repaired"] },
-  { label: "Closed", statuses: ["Closed", "Not covered"] },
+  // Finished either way: repaired and closed, or found not covered.
+  { label: "Handled", statuses: ["Closed", "Not covered"] },
 ];
 
 function StatusBadge({ status }: { status: WarrantyClaimStatus }) {
