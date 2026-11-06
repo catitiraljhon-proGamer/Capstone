@@ -1,17 +1,15 @@
 "use client";
 
 import { CollectionsPrintReport, monthLabel, type CollectionsExport, type MonthRow } from "@/components/billing/collections-print-report";
-import { Button } from "@/components/ui/button";
+import { ExportMenu, reportGeneratedAt, useReportAuthor } from "@/components/billing/report-export";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
-import { useSessionUser } from "@/lib/session-store";
 import type { CollectionsReport, CollectedEntry, InvoicedEntry } from "@/types/collections-report";
-import { roleLabels } from "@/types/domain";
-import { AlertTriangle, Banknote, ChevronDown, Download, FileSpreadsheet, FileText, HandCoins, Printer, Wallet, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Banknote, FileText, HandCoins, Wallet, type LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type SummaryRow = { item: string; value: string | number };
 
@@ -55,9 +53,6 @@ const paymentColumns: XlsxColumn<CollectedEntry>[] = [
   { header: "Amount", width: 16, format: "peso", value: (entry) => entry.amount },
   { header: "Receipt", width: 18, value: (entry) => entry.receiptNumber },
 ];
-const generatedAt = () =>
-  new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" });
-
 export type CollectionsView = "overview" | "monthly";
 
 /** Overview: contract value, billed, collected, and outstanding totals. Monthly: the month-by-month summary and its export. */
@@ -71,7 +66,7 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
   const [selectedMonths, setSelectedMonths] = useState<ReadonlySet<string>>(new Set());
   /** The export shown as a printable report, or null when it is closed. */
   const [printData, setPrintData] = useState<CollectionsExport | null>(null);
-  const { user } = useSessionUser();
+  const author = useReportAuthor();
 
   useEffect(() => {
     let active = true;
@@ -134,9 +129,8 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
     const included = (entryProjectId: string, date: string) => inScope(entryProjectId) && inRange(date) && selectedMonths.has(date.slice(0, 7));
     const project = projects.find((item) => item.id === projectId);
     return {
-      generated: generatedAt(),
-      // Whoever is signed in made the export; the Reports page is for the Billing Clerk.
-      generatedBy: { name: user?.name ?? "—", role: roleLabels[user?.role ?? "billing-clerk"] },
+      generated: reportGeneratedAt(),
+      generatedBy: author,
       project: project ? `${project.reference} · ${project.name}` : "All projects (including design and blueprint fees)",
       status: status || "All statuses",
       dateRange: from || to ? `${from || "Start"} to ${to || "Today"}` : "All dates",
@@ -330,77 +324,13 @@ function ReportHeader({ title, summary, exportCount, onExcel, onPdf }: {
   onExcel: () => void;
   onPdf: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  /** Opens the menu toward the right when the button sits near the left edge, as it does once the header wraps on phones. */
-  const [alignLeft, setAlignLeft] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const isOpen = menuOpen && exportCount > 0;
-  const toggleMenu = () => {
-    const button = buttonRef.current?.getBoundingClientRect();
-    // The menu is 18rem wide; aligned to the button's right edge it would run past the left of the screen.
-    setAlignLeft(Boolean(button && button.right < 18 * 16 + 16));
-    setMenuOpen((open) => !open);
-  };
-
-  // The format menu closes on a click outside it or on Escape.
-  useEffect(() => {
-    if (!isOpen) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isOpen]);
-
-  const choose = (action: () => void) => {
-    setMenuOpen(false);
-    action();
-  };
-  const formats = [
-    { label: "Excel (.xlsx)", hint: "Summary, By Month, Invoices, and Payments sheets", icon: FileSpreadsheet, action: onExcel },
-    { label: "PDF (printable)", hint: "A printable report to save as PDF or print", icon: Printer, action: onPdf },
-  ];
-
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         <p className="mt-1 text-sm text-stone-600">{summary}</p>
       </div>
-      <div ref={menuRef} className="relative">
-        <Button ref={buttonRef} variant="outline" disabled={exportCount === 0} onClick={toggleMenu} aria-haspopup="menu" aria-expanded={isOpen}>
-          <Download className="mr-2 h-4 w-4" />
-          {exportCount ? `Export Selected (${exportCount})` : "Select Rows to Export"}
-          {exportCount ? <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" /> : null}
-        </Button>
-        {isOpen ? (
-          <div role="menu" aria-label="Export format" className={`absolute ${alignLeft ? "left-0" : "right-0"} z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg`}>
-            {formats.map(({ label, hint, icon: Icon, action }) => (
-              <button
-                key={label}
-                type="button"
-                role="menuitem"
-                onClick={() => choose(action)}
-                className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-rose-50 focus:bg-rose-50 focus:outline-none"
-              >
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-red-700"><Icon className="h-4 w-4" aria-hidden="true" /></span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-stone-950">{label}</span>
-                  <span className="block text-xs text-stone-500">{hint}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <ExportMenu count={exportCount} onExcel={onExcel} onPdf={onPdf} />
     </div>
   );
 }

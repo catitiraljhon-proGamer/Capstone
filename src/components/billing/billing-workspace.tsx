@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, CircleCheck, CircleX, Download, FileText, Landmark, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
+import { Check, CircleCheck, CircleX, FileText, Landmark, Plus, RefreshCw, Search, Smartphone, WalletCards, Clock3, ReceiptText, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-row";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -14,8 +14,9 @@ import {
 } from "@/components/billing/billing-forms";
 import { InvoiceTable, PaymentTable } from "@/components/billing/billing-tables";
 import { CashDrawerPanel } from "@/components/billing/cash-reports";
+import { ExportMenu, PrintableReport, ReportTable, printColumnsFrom, reportGeneratedAt, useReportAuthor } from "@/components/billing/report-export";
 import { manilaDate, sumMoney } from "@/lib/billing";
-import { exportXlsx, type XlsxColumn } from "@/lib/export-xlsx";
+import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
 import type { PaymongoCheckoutDto } from "@/types/paymongo";
 import { designFeeLabels, paymentMethods, type BillingData, type BillingInvoice, type BillingPayment, type BillingSection } from "@/types/billing";
 
@@ -50,6 +51,14 @@ const outstandingColumns: XlsxColumn<BillingInvoice>[] = [
   { header: "Status", width: 14, value: (invoice) => invoice.status },
   { header: "Overdue", width: 10, value: (invoice) => (invoice.overdue ? "Yes" : "No") },
 ];
+type ReportSummaryRow = { item: string; value: string | number };
+const reportSummaryColumns: XlsxColumn<ReportSummaryRow>[] = [
+  { header: "Report Summary", width: 30, value: (row) => row.item },
+  { header: "Details", width: 44, format: "peso", value: (row) => row.value },
+];
+// Reference numbers stay on one line in the printable report.
+const collectionPrintColumns = printColumnsFrom(collectionColumns, ["Payment", "Invoice", "Receipt"]);
+const outstandingPrintColumns = printColumnsFrom(outstandingColumns, ["Invoice"]);
 
 const checkoutPollMs = 2000;
 const checkoutPollMaxMs = 30_000;
@@ -157,6 +166,9 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<ReadonlySet<string>>(new Set());
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<ReadonlySet<string>>(new Set());
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  /** The report tab shown as a printable report, with the time it was generated; null when closed. */
+  const [printing, setPrinting] = useState<{ generated: string } | null>(null);
+  const author = useReportAuthor();
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const linkedInvoiceOpened = useRef(false);
   const load = useCallback((signal?: AbortSignal) => {
@@ -221,9 +233,36 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
       const invoices = issued.filter((invoice) => invoice.customerId === account.id);
       return { ...account, projects, billed: sumMoney(invoices.map((invoice) => invoice.amount)), paid: sumMoney(verified.filter((payment) => payment.customerId === account.id).map((payment) => payment.amount)), outstanding: sumMoney(invoices.map((invoice) => invoice.balance)) };
     }).filter((account) => matches([account.name, ...account.projects.map((project) => project.name)]) && (!projectId || account.projects.some((project) => project.id === projectId)));
-  const exportReport = <Row,>(filename: string, sheetName: string, columns: XlsxColumn<Row>[], rows: Row[]) => {
-    exportXlsx({ filename, sheetName, columns, rows }).catch(() => setError("Unable to create the Excel file. Try again."));
+  // The checked rows of the open report tab, with their total, as both export formats use them.
+  const isCollections = reportView === "collections";
+  const reportTitle = isCollections ? "Verified Collections" : "Outstanding Invoices";
+  const reportTotal: [string, number] = isCollections
+    ? ["Total Collected", sumMoney(exportPayments.map((payment) => payment.amount))]
+    : ["Total Balance", sumMoney(exportInvoices.map((invoice) => invoice.balance))];
+  const reportProject = data.projects.find((project) => project.id === projectId);
+  const reportScope: [string, string][] = [
+    ["Project", reportProject ? `${reportProject.reference} · ${reportProject.name}` : "All projects"],
+    ["Date range", from || to ? `${from || "Start"} to ${to || "Today"}` : "All dates"],
+    [isCollections ? "Payments" : "Invoices", `${isCollections ? exportPayments.length : exportInvoices.length}`],
+  ];
+  const exportExcel = () => {
+    const summary: ReportSummaryRow[] = [
+      { item: "Company", value: "G4 Builders Inc" },
+      { item: "Report", value: reportTitle },
+      { item: "Generated", value: reportGeneratedAt() },
+      { item: "Generated By", value: `${author.name} (${author.role})` },
+      ...reportScope.map(([item, value]) => ({ item: item === "Date range" ? "Date Range" : item, value })),
+      { item: reportTotal[0], value: reportTotal[1] },
+    ];
+    const rowsSheet = isCollections
+      ? xlsxSheet({ name: reportTitle, columns: collectionColumns, rows: exportPayments })
+      : xlsxSheet({ name: reportTitle, columns: outstandingColumns, rows: exportInvoices });
+    exportWorkbook(isCollections ? "g4-collections.xlsx" : "g4-outstanding-invoices.xlsx", [
+      xlsxSheet({ name: "Summary", columns: reportSummaryColumns, rows: summary, filters: false }),
+      rowsSheet,
+    ]).catch(() => setError("Unable to create the Excel file. Try again."));
   };
+  const invalidReportRange = Boolean(from && to && from > to);
   const close = () => setDialog(null);
   const viewInvoice = (invoice: BillingInvoice) => setDialog({ type: "invoice", invoice });
   const viewPayment = (payment: BillingPayment) => setDialog({ type: "payment", payment });
@@ -278,14 +317,24 @@ export function BillingWorkspace({ section = "Dashboard", customer = false, repo
         {section === "Customer Accounts" && <BillingPanel><h2 className="mb-5 text-lg font-semibold tracking-tight">Customer Balances</h2>{!accounts.length ? <BillingEmpty /> : <div className="divide-y divide-stone-200">{accounts.map((account) => <div key={account.id} {...clickableRowProps(`View ${account.name}'s account`, () => setDialog({ type: "account", customerId: account.id, customerName: account.name }))} className={`${clickableRowClass} -mx-3 flex flex-wrap items-center justify-between gap-4 rounded-lg px-3 py-5`}><div><p className="font-semibold">{account.name}</p><p className="mt-1 text-xs text-stone-500">{countLabel(account.projects.length, "project")} · {formatPeso(account.billed)} invoiced · {formatPeso(account.paid)} paid</p></div><div className="text-right"><p className="font-semibold text-red-700">{formatPeso(account.outstanding)}</p><p className="text-xs text-stone-500">Outstanding</p></div></div>)}</div>}</BillingPanel>}
         {section === "Reports" && <>
           <p className="text-sm text-stone-600">{reportView === "collections" ? "Collections use the payment date and currently verified payments. Pending, rejected, and void payments are excluded." : "Outstanding invoices use their due date and current balance."} Check the rows you want, then use Export Selected.</p>
-          {reportView === "collections" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><Button variant="outline" disabled={!exportPayments.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-collections.xlsx", "Verified Collections", collectionColumns, exportPayments)}><Download className="mr-2 h-4 w-4" />{exportPayments.length ? `Export Selected (${exportPayments.length})` : "Select Rows to Export"}</Button></div>
+          {reportView === "collections" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Verified Collections</h2><p className="mt-1 text-sm text-stone-600">{reportPayments.length} payments · <strong>{formatPeso(sumMoney(reportPayments.map((payment) => payment.amount)))}</strong></p></div><ExportMenu count={exportPayments.length} disabled={invalidReportRange} onExcel={exportExcel} onPdf={() => setPrinting({ generated: reportGeneratedAt() })} /></div>
             <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{paymentMethods.map((method) => <div className="rounded-lg bg-stone-50 p-3" key={method}><p className="text-xs text-stone-500">{method}</p><p className="mt-2 font-semibold">{formatPeso(sumMoney(reportPayments.filter((payment) => payment.method === method).map((payment) => payment.amount)))}</p></div>)}</div>
             <PaymentTable key={from + to + projectId} payments={reportPayments} customer={false} onView={viewPayment} selection={{ selected: selectedPaymentIds, onChange: setSelectedPaymentIds }} />
           </BillingPanel>}
-          {reportView === "outstanding" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><Button variant="outline" disabled={!exportInvoices.length || Boolean(from && to && from > to)} onClick={() => exportReport("g4-outstanding-invoices.xlsx", "Outstanding Invoices", outstandingColumns, exportInvoices)}><Download className="mr-2 h-4 w-4" />{exportInvoices.length ? `Export Selected (${exportInvoices.length})` : "Select Rows to Export"}</Button></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>}
+          {reportView === "outstanding" && <BillingPanel><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold tracking-tight">Outstanding Invoices</h2><p className="mt-1 text-sm text-stone-600">{reportInvoices.length} invoices · <strong>{formatPeso(sumMoney(reportInvoices.map((invoice) => invoice.balance)))}</strong></p></div><ExportMenu count={exportInvoices.length} disabled={invalidReportRange} onExcel={exportExcel} onPdf={() => setPrinting({ generated: reportGeneratedAt() })} /></div><InvoiceTable key={from + to + projectId} invoices={reportInvoices} onView={viewInvoice} selection={{ selected: selectedInvoiceIds, onChange: setSelectedInvoiceIds }} /></BillingPanel>}
         </>}
       </>}
     </>}
+    {section === "Reports" && printing && <PrintableReport title={reportTitle} generated={printing.generated} author={author} details={reportScope} onClose={() => setPrinting(null)}>
+      {isCollections
+        ? <ReportTable title="Payments" columns={collectionPrintColumns} rows={exportPayments} total={["Total", "", "", "", "", "", formatPeso(reportTotal[1]), ""]} />
+        : <ReportTable title="Invoices" columns={outstandingPrintColumns} rows={exportInvoices} total={[
+          "Total", "", "", "",
+          formatPeso(sumMoney(exportInvoices.map((invoice) => invoice.amount))),
+          formatPeso(sumMoney(exportInvoices.map((invoice) => invoice.paid))),
+          formatPeso(reportTotal[1]), "", "",
+        ]} />}
+    </PrintableReport>}
     {dialog?.type === "invoice-form" && <InvoiceForm projects={data.projects} designRequests={data.designRequests} approvers={data.approvers ?? []} designRequestId={dialog.designRequestId} invoice={dialog.invoice} mutate={mutate} onClose={close} />}
     {dialog?.type === "payment-form" && (customer
       ? dialog.invoice && <CustomerPaymentForm invoice={dialog.invoice} pending={pendingFor(dialog.invoice)} mutate={mutate} onClose={close} onPayOnline={() => dialog.invoice && setDialog({ type: "pay-online", invoice: dialog.invoice })} />
