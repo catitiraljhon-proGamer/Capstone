@@ -6,7 +6,6 @@ import { clickableRowClass, clickableRowProps } from "@/components/ui/clickable-
 import {
   roleLabels,
   type ManagedUserDto,
-  type UserManagementSummary,
   type UserRole,
   type UserStatus,
 } from "@/types/domain";
@@ -17,10 +16,8 @@ import {
   ReceiptText,
   Search,
   ShieldCheck,
-  UserCheck,
   UserPlus,
   UserRound,
-  UserRoundX,
   Users,
   X,
 } from "lucide-react";
@@ -28,7 +25,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 type UserManagementPayload = {
   users: ManagedUserDto[];
-  summary: UserManagementSummary;
   currentUserId: string;
 };
 
@@ -38,14 +34,6 @@ type AccountForm = {
   password: string;
   role: UserRole;
   status: UserStatus;
-};
-
-const emptySummary: UserManagementSummary = {
-  total: 0,
-  active: 0,
-  customers: 0,
-  staff: 0,
-  disabled: 0,
 };
 
 const emptyForm: AccountForm = {
@@ -120,8 +108,6 @@ function initials(name: string) {
 
 export function AdminUsersRolesManager() {
   const [users, setUsers] = useState<ManagedUserDto[]>([]);
-  const [summary, setSummary] =
-    useState<UserManagementSummary>(emptySummary);
   const [currentUserId, setCurrentUserId] = useState("");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
@@ -142,7 +128,6 @@ export function AdminUsersRolesManager() {
       const response = await fetch("/api/users", { cache: "no-store" });
       const payload = await readJson<UserManagementPayload>(response);
       setUsers(payload.users);
-      setSummary(payload.summary);
       setCurrentUserId(payload.currentUserId);
       setError(null);
     } catch (loadError) {
@@ -164,7 +149,6 @@ export function AdminUsersRolesManager() {
       .then((payload) => {
         if (!active) return;
         setUsers(payload.users);
-        setSummary(payload.summary);
         setCurrentUserId(payload.currentUserId);
         setError(null);
       })
@@ -305,33 +289,6 @@ export function AdminUsersRolesManager() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {[
-          { label: "Total Accounts", value: summary.total, icon: Users },
-          { label: "Active", value: summary.active, icon: UserCheck },
-          { label: "Customers", value: summary.customers, icon: UserRound },
-          { label: "Staff Access", value: summary.staff, icon: ShieldCheck },
-          { label: "Disabled", value: summary.disabled, icon: UserRoundX },
-        ].map((item) => (
-          <section
-            key={item.label}
-            className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm text-stone-500">{item.label}</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight">
-                  {item.value}
-                </p>
-              </div>
-              <span className="grid h-11 w-11 place-items-center rounded-lg bg-red-50 text-red-700">
-                <item.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-          </section>
-        ))}
-      </div>
-
       {error ? (
         <p
           role="alert"

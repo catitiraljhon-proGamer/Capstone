@@ -25,7 +25,6 @@ import {
   CalendarDays,
   Clock3,
   FileClock,
-  Inbox,
   MapPin,
   PhoneCall,
   Plus,
@@ -126,20 +125,15 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
   const clientProjects = data.projects.filter((project) => project.clientId === form.clientId);
   const clientOptions = useMemo(() => data.clients.map((client) => ({ value: client.id, label: client.name })), [data.clients]);
 
-  const metrics: { label: string; value: number; note?: string; icon: ComponentType<{ className?: string }> }[] = role === "admin"
+  // Only the Billing Clerk's calendar has summary cards; the Admin's has none.
+  const metrics: { label: string; value: number; note?: string; icon: ComponentType<{ className?: string }> }[] = role === "billing-clerk"
     ? [
-      { label: "Meetings Scheduled This Month", value: managedThisMonth.filter((schedule) => schedule.status === "Scheduled").length, icon: Users },
-      { label: "Completed Meetings", value: managedThisMonth.filter((schedule) => schedule.status === "Completed").length, icon: CalendarDays },
-      { label: "Meeting Requests", value: data.meetingRequests.length, note: data.meetingRequests.length ? "Waiting for your reply" : "None waiting", icon: Inbox },
-      { label: "Customer Payments Due This Month", value: unpaidMonthDues.length, note: `${formatPeso(sum(unpaidMonthDues.map((due) => due.balance)))} outstanding`, icon: Banknote },
-      { label: "Overdue Customer Payments", value: overdueDues.length, note: overdueDues.length ? `${formatPeso(sum(overdueDues.map((due) => due.balance)))} past due` : "None past due", icon: AlertTriangle },
-    ]
-    : [
       { label: "Payments Due This Month", value: unpaidMonthDues.length, note: `${formatPeso(sum(unpaidMonthDues.map((due) => due.balance)))} outstanding`, icon: Banknote },
       { label: "Overdue Payments", value: overdueDues.length, note: overdueDues.length ? `${formatPeso(sum(overdueDues.map((due) => due.balance)))} past due` : "None past due", icon: AlertTriangle },
       { label: "Not Yet Invoiced This Month", value: monthDues.filter((due) => due.status === "Upcoming").length, note: "Milestones still to bill", icon: FileClock },
       { label: "Follow-Ups This Month", value: managedThisMonth.filter((schedule) => schedule.status === "Scheduled").length, note: "Scheduled calls and reminders", icon: PhoneCall },
-    ];
+    ]
+    : [];
 
   const chipsFor = (key: string): CalendarChip[] => [
     ...(schedulesByDay.get(key) ?? []).map((schedule) => ({
@@ -233,22 +227,24 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
 
   return (
     <div className="space-y-6">
-      <div className={`grid gap-4 sm:grid-cols-2 ${role === "admin" ? "xl:grid-cols-5" : "xl:grid-cols-4"}`}>
-        {metrics.map((item) => (
-          <section key={item.label} className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm text-stone-500">{item.label}</p>
-                <p className="mt-2 text-3xl font-semibold tracking-tight">{item.value}</p>
-                {item.note ? <p className="mt-1 text-xs text-stone-500">{item.note}</p> : null}
+      {metrics.length ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {metrics.map((item) => (
+            <section key={item.label} className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm text-stone-500">{item.label}</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-tight">{item.value}</p>
+                  {item.note ? <p className="mt-1 text-xs text-stone-500">{item.note}</p> : null}
+                </div>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-red-50 text-red-700">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                </span>
               </div>
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-red-50 text-red-700">
-                <item.icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
-          </section>
-        ))}
-      </div>
+            </section>
+          ))}
+        </div>
+      ) : null}
 
       {error && !isFormOpen ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {successMessage ? (

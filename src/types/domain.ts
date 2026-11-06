@@ -21,14 +21,6 @@ export type ManagedUserDto = {
   updatedAt: string;
 };
 
-export type UserManagementSummary = {
-  total: number;
-  active: number;
-  customers: number;
-  staff: number;
-  disabled: number;
-};
-
 export const roleLabels: Record<UserRole, string> = {
   customer: "Customer",
   "billing-clerk": "Billing Clerk",

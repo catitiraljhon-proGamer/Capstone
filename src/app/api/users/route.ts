@@ -19,20 +19,15 @@ export async function GET() {
     if (session.role !== "admin") return forbidden();
 
     const db = await getDatabase();
-    const users = db.collection<UserDocument>(collections.users);
-    const [documents, total, active, customers, staff, disabled] =
-      await Promise.all([
-        users.find().sort({ createdAt: -1, name: 1 }).limit(1000).toArray(),
-        users.countDocuments(),
-        users.countDocuments({ status: "active" }),
-        users.countDocuments({ role: "customer" }),
-        users.countDocuments({ role: { $in: ["billing-clerk", "admin"] } }),
-        users.countDocuments({ status: "disabled" }),
-      ]);
+    const documents = await db
+      .collection<UserDocument>(collections.users)
+      .find()
+      .sort({ createdAt: -1, name: 1 })
+      .limit(1000)
+      .toArray();
 
     return NextResponse.json({
       users: documents.map(toManagedUserDto),
-      summary: { total, active, customers, staff, disabled },
       currentUserId: session.id,
     });
   } catch (error) {
