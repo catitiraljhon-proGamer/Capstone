@@ -163,9 +163,16 @@ export function PrintableReport({ title, generated, author, details, onClose, ch
         {children}
 
         {/* Tighter on paper, so a short report keeps its signature lines on the same page. */}
+        {/* Signature blocks: the name sits above the line, the role below it; Checked by leaves the name blank. */}
         <div className="report-section mt-12 grid gap-10 text-xs text-stone-600 sm:grid-cols-2 print:mt-6">
-          <p className="border-t border-stone-400 pt-2">Prepared by: {preparedBy}</p>
-          <p className="border-t border-stone-400 pt-2">Checked by:</p>
+          <div>
+            <p className="h-5 text-sm font-semibold text-stone-950">{author.name}</p>
+            <p className="mt-1 border-t border-stone-400 pt-2">Prepared by: {author.role}</p>
+          </div>
+          <div>
+            <p className="h-5" aria-hidden="true" />
+            <p className="mt-1 border-t border-stone-400 pt-2">Checked by:</p>
+          </div>
         </div>
       </article>
     </div>,
