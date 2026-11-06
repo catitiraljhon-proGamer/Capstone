@@ -41,16 +41,20 @@ const printStyles = `@media print {
   .collections-print .print-sheet { max-width: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
   .collections-print .overflow-x-auto { overflow: visible !important; }
   .collections-print table { min-width: 0 !important; }
+  .collections-print .report-section { break-inside: avoid; }
+  .collections-print h2 { break-after: avoid; }
+  .collections-print tr { break-inside: avoid; }
   .collections-print * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: A4 landscape; margin: 12mm; }
 }`;
 
-type Column<Row> = { header: string; value: (row: Row) => string; numeric?: boolean };
+/** `nowrap` keeps reference numbers and dates on one line instead of breaking at the hyphen or comma. */
+type Column<Row> = { header: string; value: (row: Row) => string; numeric?: boolean; nowrap?: boolean };
 
 const invoiceColumns: Column<InvoicedEntry>[] = [
-  { header: "Invoice", value: (entry) => entry.invoiceNumber },
-  { header: "Issued", value: (entry) => billingDate(entry.issuedOn) },
-  { header: "Due", value: (entry) => billingDate(entry.dueDate) },
+  { header: "Invoice", value: (entry) => entry.invoiceNumber, nowrap: true },
+  { header: "Issued", value: (entry) => billingDate(entry.issuedOn), nowrap: true },
+  { header: "Due", value: (entry) => billingDate(entry.dueDate), nowrap: true },
   { header: "Client", value: (entry) => entry.customerName },
   { header: "Project / Billing Stage", value: (entry) => `${entry.projectName} · ${entry.label}` },
   { header: "Amount", value: (entry) => formatPeso(entry.amount), numeric: true },
@@ -59,14 +63,14 @@ const invoiceColumns: Column<InvoicedEntry>[] = [
   { header: "Status", value: (entry) => entry.status },
 ];
 const paymentColumns: Column<CollectedEntry>[] = [
-  { header: "Payment", value: (entry) => entry.reference },
-  { header: "Date", value: (entry) => billingDate(entry.paidOn) },
+  { header: "Payment", value: (entry) => entry.reference, nowrap: true },
+  { header: "Date", value: (entry) => billingDate(entry.paidOn), nowrap: true },
   { header: "Client", value: (entry) => entry.customerName },
   { header: "Project", value: (entry) => entry.projectName },
-  { header: "Invoice", value: (entry) => entry.invoiceNumber },
+  { header: "Invoice", value: (entry) => entry.invoiceNumber, nowrap: true },
   { header: "Method", value: (entry) => entry.method },
   { header: "Amount", value: (entry) => formatPeso(entry.amount), numeric: true },
-  { header: "Receipt", value: (entry) => entry.receiptNumber },
+  { header: "Receipt", value: (entry) => entry.receiptNumber, nowrap: true },
 ];
 const monthColumns: Column<MonthRow>[] = [
   { header: "Month", value: (row) => monthLabel(row.month) },
@@ -149,7 +153,7 @@ export function CollectionsPrintReport({ data, onClose }: { data: CollectionsExp
         ]} />
         <ReportTable title="Payments" columns={paymentColumns} rows={data.payments} total={["Total", "", "", "", "", "", formatPeso(data.collectedTotal), ""]} />
 
-        <div className="mt-12 grid gap-10 text-xs text-stone-600 sm:grid-cols-2">
+        <div className="report-section mt-12 grid gap-10 text-xs text-stone-600 sm:grid-cols-2">
           <p className="border-t border-stone-400 pt-2">Prepared by: {preparedBy}</p>
           <p className="border-t border-stone-400 pt-2">Checked by:</p>
         </div>
@@ -161,7 +165,7 @@ export function CollectionsPrintReport({ data, onClose }: { data: CollectionsExp
 
 function SummaryList({ title, rows }: { title: string; rows: [string, string][] }) {
   return (
-    <section className="min-w-0">
+    <section className="report-section min-w-0">
       <h2 className="text-base font-semibold tracking-tight">{title}</h2>
       <dl className="mt-2 divide-y divide-stone-200 border-y border-stone-200">
         {rows.map(([label, value]) => (
@@ -176,9 +180,10 @@ function SummaryList({ title, rows }: { title: string; rows: [string, string][] 
 }
 
 function ReportTable<Row extends { id: string }>({ title, columns, rows, total }: { title: string; columns: Column<Row>[]; rows: Row[]; total: string[] }) {
-  const align = (column: Column<Row>) => (column.numeric ? "text-right tabular-nums" : "text-left");
+  const align = (column: Column<Row>) =>
+    `${column.numeric ? "text-right tabular-nums whitespace-nowrap" : "text-left"} ${column.nowrap ? "whitespace-nowrap" : ""}`;
   return (
-    <section className="mt-8">
+    <section className="report-section mt-8">
       <h2 className="text-base font-semibold tracking-tight">{title}</h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-stone-500">None in the selected months.</p>
