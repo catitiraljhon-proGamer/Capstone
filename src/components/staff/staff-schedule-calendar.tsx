@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { formatPeso } from "@/lib/house-design-data";
 import {
   eventTypeClass,
   formatScheduleDateTime,
@@ -19,18 +18,16 @@ import {
 import type { PaymentDueDto } from "@/types/billing";
 import type { MeetingRequestDto, ScheduleDto, ScheduleEventType, ScheduleStatus, StaffScheduleData } from "@/types/schedules";
 import {
-  AlertTriangle,
   Banknote,
   CalendarClock,
   CalendarDays,
   Clock3,
-  FileClock,
   MapPin,
   PhoneCall,
   Plus,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type StaffRole = "admin" | "billing-clerk";
 
@@ -81,10 +78,6 @@ function emptyForm(day: string, prefill: Partial<ScheduleForm> = {}): ScheduleFo
   };
 }
 
-function sum(values: number[]) {
-  return values.reduce((total, value) => total + value, 0);
-}
-
 export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
   const copy = roleCopy[role];
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
@@ -116,24 +109,8 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
   const selectedSchedules = schedulesByDay.get(selectedDate) ?? [];
   const selectedDues = duesByDay.get(selectedDate) ?? [];
 
-  const monthPrefix = dateKey(visibleMonth).slice(0, 7);
-  const monthSchedules = data.schedules.filter((schedule) => dateKey(new Date(schedule.scheduledFor)).startsWith(monthPrefix));
-  const managedThisMonth = monthSchedules.filter((schedule) => schedule.eventType === copy.managed);
-  const monthDues = data.paymentDues.filter((due) => due.dueDate.startsWith(monthPrefix));
-  const unpaidMonthDues = monthDues.filter((due) => due.status !== "Paid");
-  const overdueDues = data.paymentDues.filter((due) => due.status === "Overdue");
   const clientProjects = data.projects.filter((project) => project.clientId === form.clientId);
   const clientOptions = useMemo(() => data.clients.map((client) => ({ value: client.id, label: client.name })), [data.clients]);
-
-  // Only the Billing Clerk's calendar has summary cards; the Admin's has none.
-  const metrics: { label: string; value: number; note?: string; icon: ComponentType<{ className?: string }> }[] = role === "billing-clerk"
-    ? [
-      { label: "Payments Due This Month", value: unpaidMonthDues.length, note: `${formatPeso(sum(unpaidMonthDues.map((due) => due.balance)))} outstanding`, icon: Banknote },
-      { label: "Overdue Payments", value: overdueDues.length, note: overdueDues.length ? `${formatPeso(sum(overdueDues.map((due) => due.balance)))} past due` : "None past due", icon: AlertTriangle },
-      { label: "Not Yet Invoiced This Month", value: monthDues.filter((due) => due.status === "Upcoming").length, note: "Milestones still to bill", icon: FileClock },
-      { label: "Follow-Ups This Month", value: managedThisMonth.filter((schedule) => schedule.status === "Scheduled").length, note: "Scheduled calls and reminders", icon: PhoneCall },
-    ]
-    : [];
 
   const chipsFor = (key: string): CalendarChip[] => [
     ...(schedulesByDay.get(key) ?? []).map((schedule) => ({
@@ -227,25 +204,6 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
 
   return (
     <div className="space-y-6">
-      {metrics.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((item) => (
-            <section key={item.label} className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-stone-500">{item.label}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight">{item.value}</p>
-                  {item.note ? <p className="mt-1 text-xs text-stone-500">{item.note}</p> : null}
-                </div>
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-red-50 text-red-700">
-                  <item.icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-              </div>
-            </section>
-          ))}
-        </div>
-      ) : null}
-
       {error && !isFormOpen ? <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
       {successMessage ? (
         <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{successMessage}</p>
