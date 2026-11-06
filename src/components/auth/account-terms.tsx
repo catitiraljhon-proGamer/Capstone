@@ -13,16 +13,17 @@ export function AccountTermsDialog({ onClose }: { onClose: () => void }) {
 }
 
 /**
- * Opens first on the register page: the sign-up form can be filled in only after the customer agrees. The agreement
- * is saved with the new account, so these terms are never asked again.
+ * Opens from the terms checkbox on the register page. I Agree sits after the last term, so the customer scrolls
+ * through the terms to reach it, and agreeing ticks the checkbox. The agreement is saved with the new account, so
+ * these terms are never asked again.
  */
 export function AccountTermsConsent({ onAgree, onDecline }: { onAgree: (version: string) => void; onDecline: () => void }) {
   const { terms, failed, retry } = useAccountTerms();
   return (
     <TermsDialog
       terms={terms} loadFailed={failed} onRetry={retry} onAgree={onAgree} onDecline={onDecline}
-      agreeLabel="I Agree, Continue to Sign Up" declineLabel="Go Back"
-      helperText="You only agree once. Next, fill in your details to create your account."
+      agreeAtEnd agreeLabel="I Agree" declineLabel="Go Back"
+      helperText="You only agree once. Your agreement is saved with your new account."
     />
   );
 }

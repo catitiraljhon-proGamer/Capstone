@@ -134,12 +134,14 @@ export function RegisterAccountPage({
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
-  /** The Terms and Conditions open first; the form can be filled in only after the customer agrees to a version. */
+  /** The terms version agreed to with the checkbox; null while it is unticked. Only I Agree in the terms ticks it. */
   const [agreedVersion, setAgreedVersion] = useState<string | null>(null);
-  /** Newer terms were published while the form was open: they open again on top of it, keeping what was typed. */
-  const [termsUpdated, setTermsUpdated] = useState(false);
+  /** What opened the terms: the checkbox, or Sign up with Google, which goes on to Google after I Agree. */
+  const [termsOpenFor, setTermsOpenFor] = useState<"checkbox" | "google" | null>(null);
+  const [termsError, setTermsError] = useState("");
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
+  const termsRef = useRef<HTMLInputElement>(null);
   const emailField = describe("email");
   // The field's own validation may already show the same message.
   const sendCodeMessage = sendCodeError !== fieldError("email") ? sendCodeError : "";
@@ -160,17 +162,26 @@ export function RegisterAccountPage({
 
   const focusCode = () => setTimeout(() => codeRef.current?.focus(), 0);
 
+  /** Newer terms were published while the form was open: the box is unticked and the new terms open, keeping what was typed. */
   const askTermsAgain = () => {
     refreshAccountTerms();
-    setTermsUpdated(true);
+    setAgreedVersion(null);
+    setTermsOpenFor("checkbox");
     setErrorMessage("The Terms and Conditions were just updated. Read and agree to the new version, then try again.");
+  };
+
+  const startGoogleSignUp = (version: string) => {
+    const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: version });
+    window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
   };
 
   const agreeToTerms = (version: string) => {
     setAgreedVersion(version);
     setDetails((current) => (current ? { ...current, termsVersion: version } : current));
-    setTermsUpdated(false);
+    setTermsOpenFor(null);
+    setTermsError("");
     setErrorMessage("");
+    if (termsOpenFor === "google") startGoogleSignUp(version);
   };
 
   /** Step 1: the server checks every detail, then emails the code. Nothing is saved to an account yet. */
@@ -182,10 +193,16 @@ export function RegisterAccountPage({
     setSendCodeError("");
     setCodeNotice("");
 
-    // Show every message under its field and focus the first invalid one.
-    if (!validation.validate(event.currentTarget)) return;
+    // Show every message under its field and focus the first invalid one; the terms checkbox comes last.
+    const fieldsValid = validation.validate(event.currentTarget);
+    setTermsError(agreedVersion ? "" : "Read and agree to the Terms and Conditions to continue.");
+    if (!fieldsValid) return;
+    if (!agreedVersion) {
+      termsRef.current?.focus();
+      return;
+    }
 
-    const next = readRegistrationDetails(event.currentTarget, agreedVersion ?? "");
+    const next = readRegistrationDetails(event.currentTarget, agreedVersion);
     setIsSendingCode(true);
     try {
       const { response, payload } = await postJson("/api/auth/register/send-code", next);
@@ -328,8 +345,6 @@ export function RegisterAccountPage({
             </p>
           </div>
 
-          {agreedVersion ? (
-          <>
           {step === "details" ? (
           <div className="mt-8 max-w-xl space-y-6">
             {googleError ? (
@@ -343,10 +358,8 @@ export function RegisterAccountPage({
             <GoogleAuthButton
               mode="register"
               disabled={isSendingCode}
-              onClick={() => {
-                const query = new URLSearchParams({ mode: "register", rememberMe: "false", terms: agreedVersion });
-                window.location.assign(new URL(`/api/auth/google?${query}`, window.location.origin));
-              }}
+              // Google sign-ups agree to the terms too: unticked, the terms open first and I Agree goes on to Google.
+              onClick={() => (agreedVersion ? startGoogleSignUp(agreedVersion) : setTermsOpenFor("google"))}
             />
             <p className="text-xs leading-5 text-stone-500">
               Registering with Google? Add your contact number and address
@@ -522,9 +535,37 @@ export function RegisterAccountPage({
               </div>
             </div>
 
+            <div>
+              <div className="flex items-start gap-3">
+                <input
+                  ref={termsRef}
+                  id="termsAgreement"
+                  type="checkbox"
+                  checked={Boolean(agreedVersion)}
+                  // Ticking opens the terms instead; only I Agree at the end of them ticks the box. Unticking works as usual.
+                  onChange={() => (agreedVersion ? setAgreedVersion(null) : setTermsOpenFor("checkbox"))}
+                  aria-invalid={termsError ? true : undefined}
+                  aria-describedby={["terms-agreement-hint", termsError ? "terms-agreement-error" : undefined].filter(Boolean).join(" ")}
+                  className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-red-700"
+                />
+                <label htmlFor="termsAgreement" className="cursor-pointer text-sm leading-6 text-stone-700">
+                  I have read and agree to the G4 Builders Inc{" "}
+                  <span className="whitespace-nowrap">
+                    <span className="font-semibold text-red-700 underline underline-offset-4">Terms and Conditions</span>{" "}
+                    <RequiredIndicator />
+                  </span>
+                </label>
+              </div>
+              <div className="pl-7">
+                <p id="terms-agreement-hint" className="mt-1 text-xs leading-5 text-stone-500">
+                  The terms open when you click the box. Read them to the end, then click I Agree.
+                </p>
+                <FieldError id="terms-agreement-error" message={termsError} />
+              </div>
+            </div>
+
             <p className="text-xs leading-5 text-stone-500">
-              Client registration cannot create staff or administrator accounts. Your agreement to the Terms and
-              Conditions is saved with your new account.
+              Client registration cannot create staff or administrator accounts.
             </p>
 
             {step === "details" ? errorAlert : null}
@@ -633,13 +674,6 @@ export function RegisterAccountPage({
             </p>
           </form>
           ) : null}
-          </>
-          ) : (
-          <div className="mt-8 max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-5">
-            <p className="text-sm font-semibold text-red-900">Read and agree to the Terms and Conditions first</p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">The sign-up form opens after you agree. You only agree once.</p>
-          </div>
-          )}
         </section>
 
         <aside className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-950 via-red-800 to-rose-700 p-7 text-white shadow-lg lg:p-9">
@@ -670,12 +704,7 @@ export function RegisterAccountPage({
           </div>
         </aside>
       </main>
-      {(!agreedVersion || termsUpdated) && (
-        <AccountTermsConsent
-          onAgree={agreeToTerms}
-          onDecline={() => window.location.assign(backHref)}
-        />
-      )}
+      {termsOpenFor && <AccountTermsConsent onAgree={agreeToTerms} onDecline={() => setTermsOpenFor(null)} />}
     </div>
   );
 }

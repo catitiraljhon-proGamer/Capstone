@@ -1,6 +1,6 @@
 "use client";
 
-import { FileCheck2, LoaderCircle, ShieldAlert } from "lucide-react";
+import { FileCheck2, LoaderCircle, ShieldAlert, X } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { AccountTermsContent } from "@/lib/account-terms";
@@ -17,6 +17,8 @@ type TermsDialogProps<T> = {
   onAgree?: (version: string) => void;
   /** Label for the agree button; defaults to "Yes, I have read and agree". */
   agreeLabel?: string;
+  /** Puts the agree and decline buttons after the last term, so they are reached only by scrolling through the terms. */
+  agreeAtEnd?: boolean;
   declineLabel: string;
   helperText: string;
   onAccept?: (acceptance: T) => void;
@@ -33,6 +35,7 @@ export function TermsDialog<T>({
   acceptUrl,
   onAgree,
   agreeLabel = "Yes, I Have Read and Agree",
+  agreeAtEnd = false,
   declineLabel,
   helperText,
   onAccept,
@@ -88,6 +91,23 @@ export function TermsDialog<T>({
     }
   }
 
+  const choices = onClose ? (
+    <Button type="button" variant="outline" onClick={onClose} className="w-full">{closeLabel}</Button>
+  ) : (
+    <>
+      {terms ? <p className="mb-4 text-sm leading-6 text-stone-600">{terms.acknowledgment}</p> : null}
+      {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button type="button" variant="outline" disabled={isSaving} onClick={onDecline} className="h-11">{declineLabel}</Button>
+        <Button type="button" disabled={isSaving || !terms} onClick={() => void accept()} className="h-11">
+          {isSaving ? <LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {isSaving ? "Recording agreement…" : agreeLabel}
+        </Button>
+      </div>
+      <p className="mt-2 text-center text-xs leading-5 text-stone-500">{helperText}</p>
+    </>
+  );
+
   return (
     <dialog
       ref={dialogRef}
@@ -100,7 +120,15 @@ export function TermsDialog<T>({
       }}
       className="fixed inset-0 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden rounded-xl border border-stone-200 bg-white p-0 text-stone-950 shadow-xl backdrop:bg-stone-950/50 open:flex"
     >
-      <header className="shrink-0 border-b border-stone-200 px-5 py-4 sm:px-6">
+      <header className={`relative shrink-0 border-b border-stone-200 px-5 py-4 sm:px-6 ${agreeAtEnd ? "pr-14 sm:pr-14" : ""}`}>
+        {agreeAtEnd ? (
+          <button
+            type="button" aria-label="Close" disabled={isSaving} onClick={onClose ?? onDecline}
+            className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-lg text-stone-500 transition hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-red-600 disabled:opacity-60"
+          >
+            <X aria-hidden="true" className="h-5 w-5" />
+          </button>
+        ) : null}
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-red-700">
           <FileCheck2 aria-hidden="true" className="h-4 w-4" /> G4 Builders Inc
         </p>
@@ -110,6 +138,11 @@ export function TermsDialog<T>({
         <p id={descriptionId} className="mt-2 text-sm leading-6 text-stone-600">
           {terms?.introduction ?? "Please read these terms before continuing."}
         </p>
+        {agreeAtEnd ? (
+          <p className="mt-2 text-xs font-medium leading-5 text-stone-500">
+            Scroll down to read the terms. The {agreeLabel} button is at the end.
+          </p>
+        ) : null}
       </header>
 
       <div tabIndex={0} aria-label="Terms and conditions details" className="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-600 sm:px-6">
@@ -169,26 +202,12 @@ export function TermsDialog<T>({
             <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> Loading the Terms and Conditions…
           </p>
         )}
+        {agreeAtEnd ? <div className="mt-6 border-t border-stone-200 pt-5">{choices}</div> : null}
       </div>
 
-      <footer className="shrink-0 border-t border-stone-200 bg-white px-5 py-4 sm:px-6">
-        {onClose ? (
-          <Button type="button" variant="outline" onClick={onClose} className="w-full">{closeLabel}</Button>
-        ) : (
-          <>
-            {terms ? <p className="mb-4 text-sm leading-6 text-stone-600">{terms.acknowledgment}</p> : null}
-            {error ? <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button type="button" variant="outline" disabled={isSaving} onClick={onDecline} className="h-11">{declineLabel}</Button>
-              <Button type="button" disabled={isSaving || !terms} onClick={() => void accept()} className="h-11">
-                {isSaving ? <LoaderCircle aria-hidden="true" className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {isSaving ? "Recording agreement…" : agreeLabel}
-              </Button>
-            </div>
-            <p className="mt-2 text-center text-xs leading-5 text-stone-500">{helperText}</p>
-          </>
-        )}
-      </footer>
+      {agreeAtEnd ? null : (
+        <footer className="shrink-0 border-t border-stone-200 bg-white px-5 py-4 sm:px-6">{choices}</footer>
+      )}
     </dialog>
   );
 }
