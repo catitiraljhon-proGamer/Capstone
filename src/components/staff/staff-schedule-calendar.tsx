@@ -24,7 +24,6 @@ import {
   Clock3,
   MapPin,
   PhoneCall,
-  Plus,
   Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -54,15 +53,15 @@ const roleCopy: Record<StaffRole, {
     managed: "Client meeting",
     newLabel: "New Meeting",
     formDescription: "Arrange a client meeting and record its agenda. The client is notified.",
-    subtitle: "Client meetings and customer payment dates in one calendar.",
-    emptyHint: "Use New Meeting above to add one to this date.",
+    subtitle: "Client meetings and customer payment dates. Click a date to set a meeting.",
+    emptyHint: "Click a date on the calendar to set a meeting.",
   },
   "billing-clerk": {
     managed: "Payment follow-up",
     newLabel: "New Follow-Up",
     formDescription: "Plan a call or reminder about a customer payment. Follow-ups are internal; customers do not see them.",
-    subtitle: "Customer payment dates, your follow-ups, and client meetings.",
-    emptyHint: "Use New Follow-Up above to add one to this date.",
+    subtitle: "Customer payment dates, your follow-ups, and client meetings. Click a date to add a follow-up.",
+    emptyHint: "Click a date on the calendar to add a follow-up.",
   },
 };
 
@@ -122,8 +121,8 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
     ...(duesByDay.get(key) ?? []).map((due) => ({ id: due.id, label: `${due.kind} · ${due.clientName}`, className: paymentDueClass[due.status], icon: Banknote })),
   ];
 
-  const openForm = (prefill: Partial<ScheduleForm> = {}) => {
-    setForm(emptyForm(selectedDate, prefill));
+  const openForm = (day: string, prefill: Partial<ScheduleForm> = {}) => {
+    setForm(emptyForm(day, prefill));
     setError(null);
     setSuccessMessage(null);
     setIsFormOpen(true);
@@ -184,6 +183,11 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
     }
   };
 
+  // The day the form's date points at, with what is already on it, so a clash is easy to spot.
+  const formDay = form.scheduledFor.slice(0, 10);
+  const formDayValid = /^\d{4}-\d{2}-\d{2}$/.test(formDay);
+  const formDayChips = formDayValid ? chipsFor(formDay) : [];
+
   // Placed next to Duration for meetings, and next to Date and Time for follow-ups.
   const statusField = (
     <label className="text-sm font-medium text-stone-700">
@@ -216,6 +220,24 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
       {isFormOpen ? (
         <FormDialog title={copy.newLabel} description={copy.formDescription} error={error} busy={isSaving} onClose={() => setIsFormOpen(false)}>
           <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+            {formDayValid ? (
+              <div className="sm:col-span-2">
+                <p className="text-sm font-semibold text-red-700">{formatSelectedDay(formDay)}</p>
+                {formDayChips.length > 0 ? (
+                  <>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-stone-500">Already on this day</p>
+                    <ul className="mt-2 space-y-1">
+                      {formDayChips.map((chip) => (
+                        <li key={chip.id} className={`flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium ${chip.className}`}>
+                          {chip.icon ? <chip.icon className="h-3.5 w-3.5 shrink-0" /> : null}
+                          <span className="truncate">{chip.label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
             <label className="text-sm font-medium text-stone-700 sm:col-span-2">
               Title
               <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Enter title" className={fieldClass} />
@@ -290,11 +312,11 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
           month={visibleMonth}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          onDayClick={(day) => openForm(day)}
           onMonthChange={setVisibleMonth}
           chipsFor={chipsFor}
           subtitle={copy.subtitle}
           isLoading={isLoading}
-          actions={<Button type="button" onClick={() => openForm()}><Plus className="mr-2 h-4 w-4" />{copy.newLabel}</Button>}
         />
 
         <aside className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -309,7 +331,7 @@ export function StaffScheduleCalendar({ role }: { role: StaffRole }) {
                   key={due.id}
                   due={due}
                   action={role === "billing-clerk" && due.status !== "Paid" ? (
-                    <Button type="button" size="sm" variant="outline" onClick={() => openForm({ clientId: due.clientId, title: `Follow up: ${due.label}` })}>
+                    <Button type="button" size="sm" variant="outline" onClick={() => openForm(selectedDate, { clientId: due.clientId, title: `Follow up: ${due.label}` })}>
                       <PhoneCall className="mr-2 h-3.5 w-3.5" />Add Follow-Up
                     </Button>
                   ) : undefined}

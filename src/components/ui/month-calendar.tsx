@@ -38,6 +38,7 @@ export function MonthCalendar({
   month,
   selectedDate,
   onSelectDate,
+  onDayClick,
   onMonthChange,
   chipsFor,
   subtitle,
@@ -47,6 +48,8 @@ export function MonthCalendar({
   month: Date;
   selectedDate: string;
   onSelectDate: (key: string) => void;
+  /** Called after a day in the grid is clicked (not for Today), such as to open a form for that day. */
+  onDayClick?: (key: string) => void;
   onMonthChange: (month: Date) => void;
   chipsFor: (key: string) => CalendarChip[];
   subtitle: string;
@@ -111,6 +114,7 @@ export function MonthCalendar({
                     onClick={() => {
                       onSelectDate(key);
                       if (!isCurrentMonth) onMonthChange(startOfMonth(day));
+                      onDayClick?.(key);
                     }}
                     className={[
                       "min-h-28 border-b border-r border-stone-200 p-2 text-left align-top transition hover:bg-red-50/50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-600",
