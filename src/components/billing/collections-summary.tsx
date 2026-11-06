@@ -1,16 +1,18 @@
 "use client";
 
+import { CollectionsPrintReport, monthLabel, type CollectionsExport, type MonthRow } from "@/components/billing/collections-print-report";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { SelectAllHeader, SelectRowCell } from "@/components/ui/row-selection";
 import { manilaDate, sumMoney } from "@/lib/billing";
 import { exportWorkbook, xlsxSheet, type XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
+import { useSessionUser } from "@/lib/session-store";
 import type { CollectionsReport, CollectedEntry, InvoicedEntry } from "@/types/collections-report";
-import { AlertTriangle, Banknote, Download, FileText, HandCoins, Wallet, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { roleLabels } from "@/types/domain";
+import { AlertTriangle, Banknote, ChevronDown, Download, FileSpreadsheet, FileText, HandCoins, Printer, Wallet, type LucideIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type MonthRow = { id: string; month: string; invoiceCount: number; invoiced: number; paymentCount: number; collected: number };
 type SummaryRow = { item: string; value: string | number };
 
 const panel = "rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
@@ -19,9 +21,6 @@ const head = "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide 
 const headRight = head.replace("text-left", "text-right");
 const cell = "px-4 py-4 align-top text-sm";
 const money = `${cell} whitespace-nowrap text-right tabular-nums`;
-
-const monthLabel = (month: string) =>
-  new Date(`${month}-01T00:00:00Z`).toLocaleDateString("en-PH", { month: "long", year: "numeric", timeZone: "UTC" });
 
 const monthColumns: XlsxColumn<MonthRow>[] = [
   { header: "Month", width: 18, format: "month", value: (row) => row.month },
@@ -70,6 +69,9 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selectedMonths, setSelectedMonths] = useState<ReadonlySet<string>>(new Set());
+  /** The export shown as a printable report, or null when it is closed. */
+  const [printData, setPrintData] = useState<CollectionsExport | null>(null);
+  const { user } = useSessionUser();
 
   useEffect(() => {
     let active = true;
@@ -127,28 +129,44 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
     overdue: sumMoney(visibleProjects.map((project) => project.overdue)),
   };
   const exportMonths = months.filter((row) => selectedMonths.has(row.id));
-  const exportReport = () => {
+  /** The checked months with their filters, totals, invoices, and payments, as both export formats use them. */
+  const buildExport = (): CollectionsExport => {
     const included = (entryProjectId: string, date: string) => inScope(entryProjectId) && inRange(date) && selectedMonths.has(date.slice(0, 7));
-    const invoices = (report?.invoiced ?? []).filter((entry) => included(entry.projectId, entry.issuedOn));
-    const payments = (report?.collected ?? []).filter((entry) => included(entry.projectId, entry.paidOn));
     const project = projects.find((item) => item.id === projectId);
-    const invoicedTotal = sumMoney(exportMonths.map((row) => row.invoiced));
-    const collectedTotal = sumMoney(exportMonths.map((row) => row.collected));
+    return {
+      generated: generatedAt(),
+      // Whoever is signed in made the export; the Reports page is for the Billing Clerk.
+      generatedBy: { name: user?.name ?? "—", role: roleLabels[user?.role ?? "billing-clerk"] },
+      project: project ? `${project.reference} · ${project.name}` : "All projects (including design and blueprint fees)",
+      status: status || "All statuses",
+      dateRange: from || to ? `${from || "Start"} to ${to || "Today"}` : "All dates",
+      monthsIncluded: [...exportMonths].reverse().map((row) => monthLabel(row.month)).join(", "),
+      position: { projects: visibleProjects.length, ...totals },
+      months: exportMonths,
+      invoices: (report?.invoiced ?? []).filter((entry) => included(entry.projectId, entry.issuedOn)),
+      payments: (report?.collected ?? []).filter((entry) => included(entry.projectId, entry.paidOn)),
+      invoicedTotal: sumMoney(exportMonths.map((row) => row.invoiced)),
+      collectedTotal: sumMoney(exportMonths.map((row) => row.collected)),
+    };
+  };
+  const exportExcel = () => {
+    const { invoices, payments, invoicedTotal, collectedTotal, ...data } = buildExport();
     const summary: SummaryRow[] = [
       { item: "Company", value: "G4 Builders Inc" },
-      { item: "Generated", value: generatedAt() },
-      { item: "Project", value: project ? `${project.reference} · ${project.name}` : "All projects (including design and blueprint fees)" },
-      { item: "Project Status", value: status || "All statuses" },
-      { item: "Date Range", value: from || to ? `${from || "Start"} to ${to || "Today"}` : "All dates" },
-      { item: "Months Included", value: [...exportMonths].reverse().map((row) => monthLabel(row.month)).join(", ") },
+      { item: "Generated", value: data.generated },
+      { item: "Generated By", value: `${data.generatedBy.name} (${data.generatedBy.role})` },
+      { item: "Project", value: data.project },
+      { item: "Project Status", value: data.status },
+      { item: "Date Range", value: data.dateRange },
+      { item: "Months Included", value: data.monthsIncluded },
       { item: "", value: "" },
       { item: "Current Position", value: "" },
-      { item: "Projects", value: `${visibleProjects.length}` },
-      { item: "Contract Value", value: totals.contract },
-      { item: "Billed (issued invoices)", value: totals.billed },
-      { item: "Collected (verified payments)", value: totals.collected },
-      { item: "Outstanding", value: totals.outstanding },
-      { item: "Overdue", value: totals.overdue },
+      { item: "Projects", value: `${data.position.projects}` },
+      { item: "Contract Value", value: data.position.contract },
+      { item: "Billed (issued invoices)", value: data.position.billed },
+      { item: "Collected (verified payments)", value: data.position.collected },
+      { item: "Outstanding", value: data.position.outstanding },
+      { item: "Overdue", value: data.position.overdue },
       { item: "", value: "" },
       { item: "Selected Months", value: "" },
       { item: "Invoiced", value: invoicedTotal },
@@ -159,7 +177,7 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
     exportWorkbook(`g4-collections-report-${manilaDate()}.xlsx`, [
       xlsxSheet({ name: "Summary", columns: summaryColumns, rows: summary, filters: false }),
       xlsxSheet({
-        name: "By Month", columns: monthColumns, rows: exportMonths,
+        name: "By Month", columns: monthColumns, rows: data.months,
         totalRow: { Month: "Total", "Invoices Issued": invoices.length, Invoiced: invoicedTotal, "Verified Payments": payments.length, Collected: collectedTotal },
       }),
       xlsxSheet({
@@ -246,8 +264,10 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
             title="Months"
             summary={`${isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}. The export adds a summary and every invoice and payment in the checked months.`}
             exportCount={invalidRange ? 0 : exportMonths.length}
-            onExport={exportReport}
+            onExcel={exportExcel}
+            onPdf={() => setPrintData(buildExport())}
           />
+          {printData ? <CollectionsPrintReport data={printData} onClose={() => setPrintData(null)} /> : null}
           {invalidRange ? (
             <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">The From date must be on or before the To date.</p>
           ) : months.length === 0 ? <EmptyRow /> : (
@@ -303,17 +323,84 @@ function Metric({ label, value, note, icon: Icon }: { label: string; value: stri
   );
 }
 
-function ReportHeader({ title, summary, exportCount, onExport }: { title: string; summary: string; exportCount: number; onExport: () => void }) {
+function ReportHeader({ title, summary, exportCount, onExcel, onPdf }: {
+  title: string;
+  summary: string;
+  exportCount: number;
+  onExcel: () => void;
+  onPdf: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  /** Opens the menu toward the right when the button sits near the left edge, as it does once the header wraps on phones. */
+  const [alignLeft, setAlignLeft] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const isOpen = menuOpen && exportCount > 0;
+  const toggleMenu = () => {
+    const button = buttonRef.current?.getBoundingClientRect();
+    // The menu is 18rem wide; aligned to the button's right edge it would run past the left of the screen.
+    setAlignLeft(Boolean(button && button.right < 18 * 16 + 16));
+    setMenuOpen((open) => !open);
+  };
+
+  // The format menu closes on a click outside it or on Escape.
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  const choose = (action: () => void) => {
+    setMenuOpen(false);
+    action();
+  };
+  const formats = [
+    { label: "Excel (.xlsx)", hint: "Summary, By Month, Invoices, and Payments sheets", icon: FileSpreadsheet, action: onExcel },
+    { label: "PDF (printable)", hint: "A printable report to save as PDF or print", icon: Printer, action: onPdf },
+  ];
+
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
         <p className="mt-1 text-sm text-stone-600">{summary}</p>
       </div>
-      <Button variant="outline" disabled={exportCount === 0} onClick={onExport}>
-        <Download className="mr-2 h-4 w-4" />
-        {exportCount ? `Export Selected (${exportCount})` : "Select Rows to Export"}
-      </Button>
+      <div ref={menuRef} className="relative">
+        <Button ref={buttonRef} variant="outline" disabled={exportCount === 0} onClick={toggleMenu} aria-haspopup="menu" aria-expanded={isOpen}>
+          <Download className="mr-2 h-4 w-4" />
+          {exportCount ? `Export Selected (${exportCount})` : "Select Rows to Export"}
+          {exportCount ? <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" /> : null}
+        </Button>
+        {isOpen ? (
+          <div role="menu" aria-label="Export format" className={`absolute ${alignLeft ? "left-0" : "right-0"} z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg`}>
+            {formats.map(({ label, hint, icon: Icon, action }) => (
+              <button
+                key={label}
+                type="button"
+                role="menuitem"
+                onClick={() => choose(action)}
+                className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-rose-50 focus:bg-rose-50 focus:outline-none"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-rose-50 text-red-700"><Icon className="h-4 w-4" aria-hidden="true" /></span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-stone-950">{label}</span>
+                  <span className="block text-xs text-stone-500">{hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
