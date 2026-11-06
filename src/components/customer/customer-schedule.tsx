@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FormDialog } from "@/components/ui/form-dialog";
 import { dateKey, formatSelectedDay, MonthCalendar, startOfMonth, type CalendarChip } from "@/components/ui/month-calendar";
 import { formatPeso } from "@/lib/house-design-data";
-import { officeHoursText } from "@/lib/office-hours";
+import { manilaDateTime, officeHoursText, officeTimeSlots } from "@/lib/office-hours";
 import {
   eventTypeClass,
   formatScheduleDateTime,
@@ -20,7 +20,7 @@ import {
 } from "@/lib/schedule-display";
 import type { PaymentDueDto } from "@/types/billing";
 import type { CustomerMeetingDto, CustomerScheduleData, MeetingMode, MeetingRequestDto } from "@/types/schedules";
-import { Banknote, CalendarDays, CalendarPlus, Clock3, Inbox, MapPin, Monitor, Plus, Trash2, Users } from "lucide-react";
+import { Banknote, CalendarDays, Clock3, Inbox, MapPin, Monitor, Plus, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -44,8 +44,37 @@ function firstSuggestedTime() {
   return date;
 }
 
-function emptyRequest(): RequestForm {
-  return { topic: "", relatedTo: "", mode: "In person", preferredTimes: [toDateTimeInput(firstSuggestedTime())], details: "" };
+function emptyRequest(firstTime = firstSuggestedTime()): RequestForm {
+  return { topic: "", relatedTo: "", mode: "In person", preferredTimes: [toDateTimeInput(firstTime)], details: "" };
+}
+
+const dayMs = 86_400_000;
+
+/** A YYYY-MM-DD calendar date `days` later. */
+function addDays(key: string, days: number) {
+  const date = new Date(`${key}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The first preferred time for a date clicked on the calendar: its first office-hours slot from 9:00 AM that the
+ * server accepts (at least a day ahead, within 90 days). A closed or too-soon date moves to the next day that has one.
+ */
+function firstRequestTime(fromKey: string) {
+  const now = Date.now();
+  // Half an hour of slack, so the time is still a day ahead when the customer finishes the form.
+  const earliest = now + dayMs + 30 * 60_000;
+  const latest = now + 90 * dayMs;
+  for (let offset = 0; offset <= 90; offset += 1) {
+    const key = addDays(fromKey, offset);
+    for (const slot of officeTimeSlots(key).filter((start) => start >= "09:00")) {
+      const time = new Date(manilaDateTime(key, slot));
+      if (time.getTime() > latest) return null;
+      if (time.getTime() >= earliest) return { key, time };
+    }
+  }
+  return null;
 }
 
 /** The customer's own meetings and payment dates, plus requesting a meeting that the admin approves. */
@@ -56,6 +85,8 @@ export function CustomerSchedule() {
   const [form, setForm] = useState<RequestForm>(emptyRequest);
   const [isLoading, setIsLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  /** The clicked date when it could not be requested and the first choice moved to a later day. */
+  const [movedFrom, setMovedFrom] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,8 +126,12 @@ export function CustomerSchedule() {
     ...(duesByDay.get(key) ?? []).map((due) => ({ id: due.id, label: `${due.kind} · ${formatPeso(due.balance)}`, className: paymentDueClass[due.status], icon: Banknote })),
   ];
 
-  const openForm = () => {
-    setForm(emptyRequest());
+  /** Opens Request a Meeting for a clicked date, with that date as the first choice when it can be requested. */
+  const openForm = (day: string) => {
+    const today = dateKey(new Date());
+    const first = firstRequestTime(day < today ? today : day) ?? firstRequestTime(today);
+    setForm(emptyRequest(first?.time));
+    setMovedFrom(first && first.key !== day ? day : null);
     setError(null);
     setSuccessMessage(null);
     setIsFormOpen(true);
@@ -174,7 +209,7 @@ export function CustomerSchedule() {
         <SummaryCard
           label="Meeting Requests"
           value={pendingRequests.length ? `${pendingRequests.length} waiting` : "None waiting"}
-          note={pendingRequests.length ? "The admin will confirm the time" : "Request one anytime"}
+          note={pendingRequests.length ? "The admin will confirm the time" : "Click a date to request one"}
           icon={Inbox}
         />
       </div>
@@ -233,6 +268,11 @@ export function CustomerSchedule() {
             <fieldset className="sm:col-span-2">
               <legend className="text-sm font-medium text-stone-700">Preferred Times</legend>
               <p className="mt-1 text-xs text-stone-500">Office hours: {officeHoursText}. From tomorrow up to 90 days ahead.</p>
+              {movedFrom ? (
+                <p role="status" className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                  {formatSelectedDay(movedFrom)} can&apos;t be requested, so your first choice is set to the next open day. You can change it.
+                </p>
+              ) : null}
               <div className="mt-2 grid gap-3">
                 {form.preferredTimes.map((time, index) => (
                   <div key={index} className="flex items-end gap-2">
@@ -294,11 +334,11 @@ export function CustomerSchedule() {
           month={visibleMonth}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          onDayClick={openForm}
           onMonthChange={setVisibleMonth}
           chipsFor={chipsFor}
-          subtitle="Your meetings and payment due dates."
+          subtitle="Your meetings and payment due dates. Click a date to request a meeting."
           isLoading={isLoading}
-          actions={<Button type="button" onClick={openForm}><CalendarPlus className="mr-2 h-4 w-4" />Request a Meeting</Button>}
         />
 
         <aside className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -332,7 +372,7 @@ export function CustomerSchedule() {
             <div className="mt-5 rounded-xl border border-dashed border-stone-200 p-6 text-center">
               <CalendarDays className="mx-auto h-8 w-8 text-stone-400" />
               <p className="mt-3 text-sm font-medium text-stone-700">Nothing Scheduled for This Day</p>
-              <p className="mt-1 text-xs leading-5 text-stone-500">Need to talk with the team? Use Request a Meeting above the calendar.</p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Need to talk with the team? Click a date on the calendar to request a meeting.</p>
             </div>
           ) : null}
         </aside>
