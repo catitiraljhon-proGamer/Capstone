@@ -31,7 +31,8 @@ export function BillingDocument({ id, customer, kind }: { id: string; customer: 
     ["Status", invoice.status === "Sent" ? "Issued" : invoice.status],
   ] : [];
   const ready = Boolean(receipt || invoice);
-  return <main className="billing-document mx-auto max-w-3xl px-5 py-8 text-stone-950">
+  // w-full: as a flex item of the body, mx-auto alone sizes it to the receipt table, wider than a phone.
+  return <main className="billing-document mx-auto w-full min-w-0 max-w-3xl px-5 py-8 text-stone-950">
     <style>{`@media print { .document-toolbar, [data-chat-widget] { display: none !important; } .billing-document { max-width: none; padding: 0; } .document-sheet { border: 0; box-shadow: none; } .document-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { margin: 18mm; } }`}</style>
     <div className="document-toolbar mb-6 flex flex-wrap items-center justify-between gap-3">
       <Button variant="outline" asChild><a href={customer ? "/customer/billing" : kind === "receipt" ? "/billing-clerk/payments" : "/billing-clerk/invoices"}><ArrowLeft className="mr-2 h-4 w-4" />Back to Billing</a></Button>

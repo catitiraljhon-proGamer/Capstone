@@ -26,7 +26,7 @@ export function WarrantyCertificate({ projectId, backHref, backLabel }: { projec
   }, [projectId]);
 
   return (
-    <main className="billing-document mx-auto max-w-3xl px-5 py-8 text-stone-950">
+    <main className="billing-document mx-auto w-full min-w-0 max-w-3xl px-5 py-8 text-stone-950">
       <style>{`@media print { .document-toolbar, [data-chat-widget] { display: none !important; } .billing-document { max-width: none; padding: 0; } .document-sheet { border: 0; box-shadow: none; } .document-sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { margin: 16mm; } }`}</style>
       <div className="document-toolbar mb-6 flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" asChild><a href={backHref}><ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />{backLabel}</a></Button>

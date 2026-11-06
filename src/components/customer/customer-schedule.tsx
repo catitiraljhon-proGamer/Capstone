@@ -193,7 +193,7 @@ export function CustomerSchedule() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <SummaryCard
           label="Next Meeting"
           value={nextMeeting ? formatScheduleDateTime(nextMeeting.scheduledFor) : "None scheduled"}
