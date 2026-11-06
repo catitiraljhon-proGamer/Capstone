@@ -5,7 +5,8 @@
 //   PSGC_CACHE=dir node scripts/build-ph-address.mjs   # reuse a downloaded copy
 //
 // ZIP codes from this source are unreliable (e.g. Balayan is listed as 4207,
-// not 4213), so postal codes are typed by the user instead.
+// not 4213), so postal codes come from PHLPost instead: run
+// scripts/build-ph-postal-codes.mjs after this script to add them back.
 //
 // Outputs:
 //   public/ph-address/provinces.json       sorted province list (browser)

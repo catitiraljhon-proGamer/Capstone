@@ -60,7 +60,9 @@ export function addressFieldErrors(values: Record<string, string | undefined>): 
   const street = textError(get(fieldNames.street), { label: "House no. / street", required: false, min: 2, max: 200 });
   if (street) errors[fieldNames.street] = street;
 
+  // The postal code fills in from the city or barangay, so it is only checked once a barangay is chosen.
   const postal = get(fieldNames.postalCode);
+  if (!get(fieldNames.barangayCode)) return errors;
   if (!postal) errors[fieldNames.postalCode] = "Enter the 4-digit postal code.";
   else if (!/^\d{4}$/.test(postal)) errors[fieldNames.postalCode] = "Postal code must be exactly 4 digits.";
   return errors;
@@ -78,7 +80,9 @@ type PhAddressFieldsProps = {
 
 /**
  * Luzon province, city/municipality, and barangay dropdowns (PSA PSGC, sorted A to Z)
- * plus street and postal code. Each list depends on the choice before it.
+ * plus street and postal code. Each list depends on the choice before it. The postal code
+ * fills itself in from the city (or the barangay in Metro Manila) and is typed only where
+ * no code is known.
  */
 export function PhAddressFields({
   defaultValue,
@@ -132,6 +136,16 @@ export function PhAddressFields({
   const city = cities.find((item) => item.code === cityCode);
   const barangays = city?.barangays ?? [];
   const barangay = barangays.find((item) => item.code === barangayCode);
+  // Filled in from the place; typed only once a barangay is chosen and no code is known for it.
+  const autoPostalCode = city?.postalCode ?? barangay?.postalCode;
+  const typesPostalCode = !autoPostalCode && Boolean(barangay);
+  const postalHint = autoPostalCode
+    ? `Filled in from your ${city?.postalCode ? "city or municipality" : "barangay"}.`
+    : typesPostalCode
+      ? "We don't have this barangay's postal code. Enter it here."
+      : city
+        ? "Fills in after you choose your barangay."
+        : "Fills in after you choose your city or municipality.";
   const selectClassName = `${inputClassName} aria-invalid:border-red-600 disabled:cursor-not-allowed disabled:opacity-60`;
   const invalidClassName = `${inputClassName} aria-invalid:border-red-600`;
   const errorFor = (name: AddressFieldName) => errors?.[name] ?? null;
@@ -171,6 +185,7 @@ export function PhAddressFields({
                 setCities([]);
                 setCityCode("");
                 setBarangayCode("");
+                setPostalCode("");
                 setLoadingCities(Boolean(code));
               }}
               options={provinces.map((item) => ({ value: item.code, label: item.name }))}
@@ -194,6 +209,7 @@ export function PhAddressFields({
               onChange={(code) => {
                 setCityCode(code);
                 setBarangayCode("");
+                setPostalCode("");
               }}
               options={cities.map((item) => ({ value: item.code, label: item.name }))}
               placeholder={!provinceCode ? "Select province first" : loadingCities ? "Loading…" : "Search city / municipality"}
@@ -213,7 +229,10 @@ export function PhAddressFields({
               required
               disabled={!city}
               value={barangayCode}
-              onChange={setBarangayCode}
+              onChange={(code) => {
+                setBarangayCode(code);
+                setPostalCode("");
+              }}
               options={barangays.map((item) => ({ value: item.code, label: item.name }))}
               placeholder={city ? "Search barangay" : "Select city first"}
               emptyMessage="No barangay matches that name."
@@ -249,18 +268,21 @@ export function PhAddressFields({
               id={`${id}-postal`}
               name={fieldNames.postalCode}
               {...describe(fieldNames.postalCode, "postal")}
+              aria-describedby={[errorFor(fieldNames.postalCode) ? `${id}-postal-error` : undefined, `${id}-postal-hint`].filter(Boolean).join(" ")}
               autoComplete="postal-code"
               inputMode="numeric"
               required
+              readOnly={!typesPostalCode}
               pattern="\d{4}"
               maxLength={4}
-              placeholder="Enter postal code"
+              placeholder={typesPostalCode ? "Enter postal code" : "Auto-filled"}
               title="Enter a 4-digit postal code."
-              value={postalCode}
+              value={autoPostalCode ?? (typesPostalCode ? postalCode : "")}
               onChange={(event) => setPostalCode(event.target.value.replace(/\D/g, "").slice(0, 4))}
-              className={invalidClassName}
+              className={`${invalidClassName} read-only:cursor-default read-only:bg-stone-50 read-only:text-stone-700 read-only:focus:border-stone-200 read-only:focus:ring-0`}
             />
           </label>
+          <p id={`${id}-postal-hint`} className="mt-1 text-xs text-stone-500">{postalHint}</p>
           <FieldError id={`${id}-postal-error`} message={errorFor(fieldNames.postalCode)} />
         </div>
       </div>

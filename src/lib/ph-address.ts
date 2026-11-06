@@ -1,6 +1,10 @@
 import type { AddressDetails } from "@/types/clients";
 
-export type PhPlace = { code: string; name: string };
+/**
+ * `postalCode` is the PHLPost code (see scripts/build-ph-postal-codes.mjs): on a city or municipality when it has
+ * one code, on a Metro Manila barangay when the code follows the area, missing when it is not known.
+ */
+export type PhPlace = { code: string; name: string; postalCode?: string };
 export type PhCity = PhPlace & { barangays: PhPlace[] };
 
 /** Barangay codes start with their city's prefix; Manila's run through its districts. */
