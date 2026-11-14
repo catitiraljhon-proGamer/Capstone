@@ -1,6 +1,6 @@
 "use client";
 
-import { AccountTermsConsent } from "@/components/auth/account-terms";
+import { AccountTermsConsent, AccountTermsDialog } from "@/components/auth/account-terms";
 import { BackButton } from "@/components/ui/back-button";
 import { refreshAccountTerms } from "@/lib/use-account-terms";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -134,10 +134,13 @@ export function RegisterAccountPage({
   const [resendIn, setResendIn] = useState(0);
   const [verificationCode, setVerificationCode] = useState("");
   const [codeError, setCodeError] = useState("");
-  /** The terms version agreed to with the checkbox; null while it is unticked. Only I Agree in the terms ticks it. */
+  /** The terms version agreed to with the checkbox; null while it is unticked. Only I Agree in the terms ticks it, and it stays ticked. */
   const [agreedVersion, setAgreedVersion] = useState<string | null>(null);
-  /** What opened the terms: the checkbox, or Sign up with Google, which goes on to Google after I Agree. */
-  const [termsOpenFor, setTermsOpenFor] = useState<"checkbox" | "google" | null>(null);
+  /**
+   * What opened the terms: the checkbox, or Sign up with Google, which goes on to Google after I Agree.
+   * "review" is the box clicked after agreeing: the terms open read-only and the box stays ticked.
+   */
+  const [termsOpenFor, setTermsOpenFor] = useState<"checkbox" | "google" | "review" | null>(null);
   const [termsError, setTermsError] = useState("");
   const emailRef = useRef<HTMLInputElement>(null);
   const codeRef = useRef<HTMLInputElement>(null);
@@ -542,8 +545,9 @@ export function RegisterAccountPage({
                   id="termsAgreement"
                   type="checkbox"
                   checked={Boolean(agreedVersion)}
-                  // Ticking opens the terms instead; only I Agree at the end of them ticks the box. Unticking works as usual.
-                  onChange={() => (agreedVersion ? setAgreedVersion(null) : setTermsOpenFor("checkbox"))}
+                  // Ticking opens the terms instead; only I Agree at the end of them ticks the box. Once ticked, clicking the
+                  // box or its label opens the terms to read again and the box stays ticked.
+                  onChange={() => setTermsOpenFor(agreedVersion ? "review" : "checkbox")}
                   aria-invalid={termsError ? true : undefined}
                   aria-describedby={["terms-agreement-hint", termsError ? "terms-agreement-error" : undefined].filter(Boolean).join(" ")}
                   className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-red-700"
@@ -558,7 +562,9 @@ export function RegisterAccountPage({
               </div>
               <div className="pl-7">
                 <p id="terms-agreement-hint" className="mt-1 text-xs leading-5 text-stone-500">
-                  The terms open when you click the box. Read them to the end, then click I Agree.
+                  {agreedVersion
+                    ? "You agreed to the terms. Click the box to read them again."
+                    : "The terms open when you click the box. Read them to the end, then click I Agree."}
                 </p>
                 <FieldError id="terms-agreement-error" message={termsError} />
               </div>
@@ -704,7 +710,11 @@ export function RegisterAccountPage({
           </div>
         </aside>
       </main>
-      {termsOpenFor && <AccountTermsConsent onAgree={agreeToTerms} onDecline={() => setTermsOpenFor(null)} />}
+      {termsOpenFor === "review" ? (
+        <AccountTermsDialog onClose={() => setTermsOpenFor(null)} />
+      ) : termsOpenFor ? (
+        <AccountTermsConsent onAgree={agreeToTerms} onDecline={() => setTermsOpenFor(null)} />
+      ) : null}
     </div>
   );
 }
