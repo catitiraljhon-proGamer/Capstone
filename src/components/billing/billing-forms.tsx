@@ -395,9 +395,13 @@ export function RecordPaymentForm({ invoices, selectedInvoice, mutate, onClose }
   const [recorded, setRecorded] = useState<RecordedPayment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The invoice as it was when submitted. Saving refreshes the list, which drops an invoice it pays in full, so the
+  // form would otherwise flash "Choose the invoice being paid" until the receipt shows.
+  const [saving, setSaving] = useState<BillingInvoice | null>(null);
   const fields = useFieldMessages();
   const payable = invoices.filter((invoice) => !["Draft", "Void"].includes(invoice.status) && invoice.balance > 0);
-  const invoice = payable.find((item) => item.id === form.invoiceId);
+  const invoice = saving ?? payable.find((item) => item.id === form.invoiceId);
+  const options = saving && !payable.some((item) => item.id === saving.id) ? [...payable, saving] : payable;
   const messages = {
     invoice: invoice ? null : "Choose the invoice being paid.",
     amount: amountError(form.amount, { label: "Amount", max: invoice?.balance, maxLabel: "the remaining invoice balance" }),
@@ -406,14 +410,14 @@ export function RecordPaymentForm({ invoices, selectedInvoice, mutate, onClose }
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (fields.blocked(messages) || !invoice) return;
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setSaving(invoice);
     try {
       const { id } = await mutate<{ id: string }>("/api/billing/payments", "POST", {
         invoiceId: form.invoiceId, amount: Number(form.amount), method: "Cash", transactionReference: "",
         notes: form.notes, submissionKey: form.submissionKey, cashReceived: true,
       });
       setRecorded({ id, amount: Number(form.amount), invoiceNumber: invoice.invoiceNumber, receipt: await loadReceipt(id) });
-    } catch (error) { setError(errorText(error)); } finally { setBusy(false); }
+    } catch (error) { setError(errorText(error)); } finally { setBusy(false); setSaving(null); }
   }
   function recordAnother() {
     setForm(blankForm(payable.some((item) => item.id === form.invoiceId) ? form.invoiceId : ""));
@@ -423,7 +427,7 @@ export function RecordPaymentForm({ invoices, selectedInvoice, mutate, onClose }
     {recorded ? <RecordedPaymentSummary recorded={recorded} onAgain={recordAnother} /> : <form onSubmit={submit} noValidate className="space-y-4">
       <BillingErrorMessage message={error} />
       <div><label className="block text-sm font-medium">Invoice<SearchableSelect required className={invalidField} {...fields.props("invoice", messages.invoice)} value={form.invoiceId} onChange={(invoiceId) => setForm({ ...form, invoiceId, cashReceived: false })}
-        options={payable.map((item) => ({ value: item.id, label: `${item.invoiceNumber} — ${item.customerName} · ${item.label}` }))}
+        options={options.map((item) => ({ value: item.id, label: `${item.invoiceNumber} — ${item.customerName} · ${item.label}` }))}
         placeholder="Search invoice number or customer" emptyMessage="No unpaid invoice matches that search." /></label>{fields.error("invoice", messages.invoice)}</div>
       {invoice && <p className="rounded-lg bg-rose-50 p-3 text-sm">Remaining invoice balance: <strong>{formatPeso(invoice.balance)}</strong></p>}
       <div><label className="text-sm font-medium">Amount received (PHP)<PesoInput required min="0.01" max={invoice?.balance ?? 1000000000} step="0.01" value={form.amount} wrapperClassName="mt-1.5" {...fields.props("amount", messages.amount)} onChange={(event) => setForm({ ...form, amount: event.target.value, cashReceived: false })} /></label>{fields.error("amount", messages.amount)}</div>
