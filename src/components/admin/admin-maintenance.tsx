@@ -10,33 +10,23 @@ import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-term
 import { AdminMaintenanceWarranty } from "@/components/admin/admin-maintenance-warranty";
 import { Button } from "@/components/ui/button";
 import { manilaDate } from "@/lib/billing";
-import { minimumFloorArea } from "@/lib/room-space";
 import { addMonths, warrantyDate } from "@/lib/warranty";
 import {
   settingFields,
   settingKeys,
-  type RoomSizes,
   type SettingKey,
   type SystemSettings,
   type SystemSettingsView,
 } from "@/lib/system-settings";
 import { refreshPublicSettings } from "@/lib/use-public-settings";
-import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Package, Phone, Ruler, ScrollText, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
+import { Bell, DatabaseBackup, Images, Info, Lock, Mail, Package, Phone, ScrollText, ShieldCheck, Wrench, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export type MaintenanceSection = "mode" | "security" | "email" | "notifications" | "rooms" | "warranty" | "materials" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
+export type MaintenanceSection = "mode" | "security" | "email" | "notifications" | "warranty" | "materials" | "contact" | "terms" | "slideshow" | "about-us" | "backup";
 type Section = MaintenanceSection;
 type Draft = Record<SettingKey, string | boolean>;
 /** `note` adds a line under the group worked out from the typed values. */
 type SettingGroup = { title: string; description?: string; keys: SettingKey[]; note?: (draft: Draft) => string | null };
-
-const roomSizeKeys: (keyof RoomSizes)[] = ["roomBedroomSqm", "roomBathroomSqm", "roomKitchenSqm", "roomLivingSqm", "roomWallsPercent"];
-
-function roomSizesExample(draft: Draft) {
-  if (roomSizeKeys.some((key) => String(draft[key]).trim() === "" || !Number.isFinite(Number(draft[key])))) return null;
-  const sizes = Object.fromEntries(roomSizeKeys.map((key) => [key, Number(draft[key])])) as RoomSizes;
-  return `Example: 3 bedrooms and 2 bathrooms need at least ${minimumFloorArea(3, 2, sizes)} sqm, and 10 bedrooms and 11 bathrooms need at least ${minimumFloorArea(10, 11, sizes)} sqm.`;
-}
 
 function warrantyExample(draft: Draft) {
   const months = Number(draft.warrantyMonths);
@@ -61,16 +51,6 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
     id: "notifications", label: "Notifications and reminders", icon: Bell, groups: [
       { title: "Email copies of notifications", description: "Every notification also shows inside the system.", keys: ["emailCopiesAdmin", "emailCopiesBillingClerk", "emailCopiesCustomer"] },
       { title: "Reminders", keys: ["dueReminderDays", "inactiveNoticeDays", "inactiveArchiveDays"] },
-    ],
-  },
-  {
-    id: "rooms", label: "Room sizes", icon: Ruler, groups: [
-      {
-        title: "Floor area warning",
-        description: "Design requests and house designs show a warning when the floor area looks too small for the bedrooms and bathrooms. It is a warning only: requests are never blocked.",
-        keys: roomSizeKeys,
-        note: roomSizesExample,
-      },
     ],
   },
   {

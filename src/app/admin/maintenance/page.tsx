@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Admin Maintenance | G4 Builders Inc",
-  description: "Maintenance mode, account security, email codes, notification and reminder settings, room sizes for the floor area warning, the warranty, materials and their prices, Contact Us details, Terms and Conditions, the home page slideshow, the About Us page with its team, and database backups.",
+  description: "Maintenance mode, account security, email codes, notification and reminder settings, the warranty, materials and their prices, Contact Us details, Terms and Conditions, the home page slideshow, the About Us page with its team, and database backups.",
 };
 
 /** Sections another page may link to with ?section=…; others open on Maintenance mode. */
@@ -17,7 +17,7 @@ export default async function AdminMaintenancePage({ searchParams }: { searchPar
     <AdminSectionPage
       activeLabel="Maintenance"
       title="Maintenance"
-      description="Maintenance mode, account security, email codes, notification and reminder settings, room sizes for the floor area warning, the warranty, materials and their prices, Contact Us details, Terms and Conditions, the home page slideshow, the About Us page with its team, and database backups."
+      description="Maintenance mode, account security, email codes, notification and reminder settings, the warranty, materials and their prices, Contact Us details, Terms and Conditions, the home page slideshow, the About Us page with its team, and database backups."
       mainContent={<AdminMaintenance initialSection={wanted && linkableSections.includes(wanted) ? wanted : "mode"} />}
     />
   );

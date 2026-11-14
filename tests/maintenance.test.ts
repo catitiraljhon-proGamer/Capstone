@@ -52,7 +52,7 @@ import {
   requireAccountTerms,
   requireCurrentTerms,
 } from "@/lib/server/account-terms";
-import { defaultPasswordPolicy, defaultRoomSizes, defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
+import { defaultPasswordPolicy, defaultSystemSettings, PasswordPolicyError } from "@/lib/system-settings";
 import type { SessionUser } from "@/types/domain";
 
 let mongo: MongoMemoryReplSet;
@@ -115,17 +115,13 @@ test("saving records who changed each setting and audits old and new values", as
   assert.equal((await getSystemSettingsView(db)).settings.passwordMinLength, 12);
 });
 
-test("the Admin sets the room sizes for the floor area warning, and every form can read them", async () => {
-  assert.deepEqual(await getPublicSettings(db), { ...defaultPasswordPolicy, idleSignOutMinutes: 0, ...defaultRoomSizes });
-  await assert.rejects(updateSystemSettings(db, admin, { roomBedroomSqm: 0 }), ZodError);
-  await assert.rejects(updateSystemSettings(db, admin, { roomBathroomSqm: 1.2 }), ZodError);
-  await assert.rejects(updateSystemSettings(db, admin, { roomWallsPercent: 101 }), ZodError);
-  await updateSystemSettings(db, admin, { roomBedroomSqm: 10, roomWallsPercent: 0 });
-  const log = await db.collection("audit_logs").findOne({ action: "Updated settings" });
-  assert.deepEqual(log?.details, { Bedroom: "9 sqm → 10 sqm", "Walls and hallways": "20 percent → 0 percent" });
-  assert.deepEqual(await getPublicSettings(db), {
-    ...defaultPasswordPolicy, idleSignOutMinutes: 0, ...defaultRoomSizes, roomBedroomSqm: 10, roomWallsPercent: 0,
+test("room sizes are fixed in the code, so they are no longer a setting and older saved sizes are ignored", async () => {
+  await db.collection("system_settings").insertOne({
+    _id: "system" as never, values: { roomBedroomSqm: 10, roomWallsPercent: 0 }, changes: {}, updatedAt: new Date(),
   });
+  assert.deepEqual(await getSystemSettings(db), defaultSystemSettings);
+  assert.deepEqual(await getPublicSettings(db), { ...defaultPasswordPolicy, idleSignOutMinutes: 0 });
+  await assert.rejects(updateSystemSettings(db, admin, { roomBedroomSqm: 10 }), ZodError);
 });
 
 test("the Admin edits the Contact Us details, which are checked, stamped, and audited", async () => {

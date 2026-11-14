@@ -21,7 +21,6 @@ import {
 import type { NewHouseDesignInput } from "@/lib/house-design-store";
 import type { ManagedProfessional } from "@/lib/professionals";
 import { roomSpaceShortfall, roomsPhrase } from "@/lib/room-space";
-import { usePublicSettings } from "@/lib/use-public-settings";
 import { AlertCircle, AlertTriangle, ImagePlus, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -242,7 +241,6 @@ export function HouseDesignForm({
   const [images, setImages] = useState<string[]>(design?.images ?? []);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [showSummary, setShowSummary] = useState(false);
-  const roomSizes = usePublicSettings();
 
   const setValue = (field: keyof FormValues, value: string) =>
     setValues((current) => ({ ...current, [field]: value }));
@@ -263,7 +261,7 @@ export function HouseDesignForm({
   const areaValue = Number(values.area);
   // A warning only; the Admin may still save the design.
   const roomShortfall = values.area.trim() && values.bedrooms.trim() && values.bathrooms.trim()
-    ? roomSpaceShortfall(areaValue, Number(values.bedrooms), Number(values.bathrooms), roomSizes)
+    ? roomSpaceShortfall(areaValue, Number(values.bedrooms), Number(values.bathrooms))
     : null;
   const costValue = Number.isFinite(Number(values.cost)) ? Number(values.cost) : 0;
   // The Admin keeps the project cost current; the per-sqm rate is worked out from it and the floor area.
