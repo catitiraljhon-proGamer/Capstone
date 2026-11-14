@@ -17,7 +17,7 @@ import type { ObjectId } from "mongodb";
 import type { AddressDetails, ClientDetails } from "@/types/clients";
 import type { ReceiptSnapshot, StoredPaymentMethod } from "@/types/billing";
 import type { DesignRequestStatus, RequestedHouseDesign } from "@/types/design-requests";
-import type { EstimateRevisionChange, EstimateStatus, MilestoneTemplate, ProjectStatus } from "@/types/construction";
+import type { EstimateRevisionChange, EstimateStatus, MilestoneTemplate, PaymentTerms, ProjectStatus } from "@/types/construction";
 import type { CheckoutStatus, PaymongoMethod } from "@/types/paymongo";
 import type { MeetingMode, MeetingRequestStatus } from "@/types/schedules";
 import type { SettingKey, SystemSettings } from "@/lib/system-settings";
@@ -197,8 +197,13 @@ export type ProjectDocument = {
   subtotal?: number;
   /** Legacy: VAT on projects billed before G4 Builders became VAT-exempt. */
   vat?: number;
+  /** Missing on projects saved before the choice: they are installment. */
+  paymentTerms?: PaymentTerms;
+  /** Installment only. */
   downpaymentPercent?: number;
   paymentSchedule?: ProjectMilestoneDocument[];
+  /** Full Payment only: the estimate's stages as the work schedule, never billed. */
+  workStages?: { label: string; targetDate: Date }[];
   /** When the admin marked the project Completed; older completed projects fall back to updatedAt. */
   completedAt?: Date;
   /** When the draft design made from this completed project was removed, so it is not recreated. */
@@ -416,6 +421,9 @@ export type EstimateDocument = {
   sentAt?: Date;
   sentBy?: ObjectId;
   acceptedAt?: Date;
+  /** Chosen on acceptance; accepted estimates without it are installment. */
+  paymentTerms?: PaymentTerms;
+  /** Installment only. */
   downpaymentPercent?: number;
   /** Legacy totals from estimates created before the BOQ workflow. */
   baseEstimate?: number;

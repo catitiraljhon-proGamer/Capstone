@@ -272,7 +272,8 @@ function SchedulePreview({ total, template, downpaymentPercent }: { total: numbe
         </table>
       </div>
       <p className="mt-2 text-xs text-stone-500">
-        Customers may pay a larger downpayment; the remaining milestones then scale down proportionally.
+        Customers may pay a larger downpayment; the remaining milestones then scale down proportionally. A customer who
+        chooses Full Payment pays the whole total once, and these stages become the work schedule with no bills.
       </p>
     </div>
   );
@@ -367,11 +368,13 @@ function ReadOnlyEstimate({ estimate }: { estimate: CostEstimateDto }) {
       </Card>
 
       <Card title="Payment Schedule">
-        {estimate.status === "Accepted" && estimate.downpaymentPercent != null ? (
+        {estimate.status === "Accepted" && (estimate.paymentTerms === "full" || estimate.downpaymentPercent != null) ? (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm">
             <p>
-              Accepted on {formatEstimateDate(estimate.acceptedAt)} with a{" "}
-              <strong className="text-red-800">{estimate.downpaymentPercent}% downpayment</strong>.
+              Accepted on {formatEstimateDate(estimate.acceptedAt)} with{" "}
+              <strong className="text-red-800">
+                {estimate.paymentTerms === "full" ? "Full Payment" : `a ${estimate.downpaymentPercent}% downpayment`}
+              </strong>.
             </p>
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/projects">
@@ -686,7 +689,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
     if (issues.length > 0) return reject(issues, "sending");
     if (
       !window.confirm(
-        `Send this estimate to ${estimate.customer.name}?\n\nContract total: ${formatPeso(totals.total)}. The customer will be able to accept it with a downpayment of at least ${MIN_DOWNPAYMENT_PERCENT}%. You will not be able to edit it afterwards.`,
+        `Send this estimate to ${estimate.customer.name}?\n\nContract total: ${formatPeso(totals.total)}. The customer will be able to accept it with Full Payment or with a downpayment of at least ${MIN_DOWNPAYMENT_PERCENT}%. You will not be able to edit it afterwards.`,
       )
     ) {
       return;

@@ -95,16 +95,20 @@ const categories: FaqCategory[] = [
         answer: "No, construction is optional. After your blueprint is paid, you may request a construction cost estimate if you want us to build your house.",
       },
       {
+        question: "Can I pay the whole contract at once?",
+        answer: "Yes. When you accept the estimate, choose Full Payment instead of Installment. You get one invoice for the whole contract total, and no more bills during construction. You can pay it online, by bank deposit or cheque, or in cash at our office.",
+      },
+      {
         question: "How much is the downpayment?",
-        answer: `At least ${MIN_DOWNPAYMENT_PERCENT}% of the contract total. You choose the amount when you accept the estimate; a bigger downpayment lowers the later billings.`,
+        answer: `If you choose Installment, at least ${MIN_DOWNPAYMENT_PERCENT}% of the contract total. You choose the amount when you accept the estimate; a bigger downpayment lowers the later billings.`,
       },
       {
         question: "How does progress billing work?",
-        answer: "You are billed by stage, following the payment schedule in your accepted estimate, for example: Downpayment / Mobilization, Structural Works, Roofing, Masonry & Rough-Ins, and Completion & Turnover. Each stage gets its own invoice.",
+        answer: "With Installment, you are billed by stage, following the payment schedule in your accepted estimate, for example: Downpayment / Mobilization, Structural Works, Roofing, Masonry & Rough-Ins, and Completion & Turnover. Each stage gets its own invoice. If you want to settle the remaining stages early, contact us and we will issue their invoices so you can pay them together.",
       },
       {
         question: "When does construction start?",
-        answer: "After your downpayment is verified. Your project then shows as Scheduled until the start date, and Active once work begins.",
+        answer: "After your first payment, the full payment or the downpayment, is verified. Your project then shows as Scheduled until the start date, and Active once work begins.",
       },
       {
         question: "Where can I see what I have paid?",

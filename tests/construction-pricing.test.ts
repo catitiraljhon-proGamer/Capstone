@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildPaymentSchedule, defaultScheduleTemplate, estimateTotals, scheduleTemplateError } from "@/lib/construction";
+import {
+  buildFullPaymentSchedule,
+  buildPaymentSchedule,
+  defaultScheduleTemplate,
+  estimateTotals,
+  installmentDownpaymentError,
+  projectStatusLabel,
+  scheduleTemplateError,
+  workStageLabel,
+  workStagesOf,
+} from "@/lib/construction";
 
 const template = defaultScheduleTemplate("2027-01-04", "2027-12-20");
 const sum = (values: number[]) => Math.round(values.reduce((total, value) => total + value * 100, 0)) / 100;
@@ -43,4 +53,36 @@ test("rejects downpayments below 30% and invalid templates", () => {
 
 test("a 100% downpayment leaves a single billable row", () => {
   assert.deepEqual(buildPaymentSchedule(500_000, template, 100).map((row) => row.amount), [500_000]);
+});
+
+test("Full Payment is one bill for the whole contract total, due on the first stage's date", () => {
+  const [row, ...rest] = buildFullPaymentSchedule(1_234_567.89, template);
+  assert.equal(rest.length, 0);
+  assert.equal(row.label, "Full Payment");
+  assert.equal(row.amount, 1_234_567.89);
+  assert.equal(row.percentage, 100);
+  assert.equal(row.isDownpayment, true);
+  assert.equal(row.targetDate, "2027-01-04");
+});
+
+test("a Full Payment project keeps the stages as its work schedule, without the downpayment wording", () => {
+  assert.deepEqual(workStagesOf(template).map((stage) => stage.label), ["Mobilization", "Structural Works", "Roofing, Masonry & Rough-Ins", "Completion & Turnover"]);
+  assert.deepEqual(workStagesOf(template).map((stage) => stage.targetDate), template.map((row) => row.targetDate));
+  assert.equal(workStageLabel("Downpayment"), "Mobilization");
+  assert.equal(workStageLabel("Down-payment & Site Preparation"), "Site Preparation");
+  assert.equal(workStageLabel("Site Preparation"), "Site Preparation");
+});
+
+test("an installment downpayment is from the minimum to below 100%", () => {
+  assert.equal(installmentDownpaymentError(30), null);
+  assert.equal(installmentDownpaymentError(99.99), null);
+  assert.match(installmentDownpaymentError(29.99)!, /at least 30%/);
+  assert.match(installmentDownpaymentError(100)!, /choose Full Payment/);
+  assert.match(installmentDownpaymentError(35, 40)!, /at least 40%/);
+});
+
+test("a Full Payment project awaits its full payment; other statuses read the same", () => {
+  assert.equal(projectStatusLabel("Awaiting downpayment", "full"), "Awaiting full payment");
+  assert.equal(projectStatusLabel("Awaiting downpayment", "installment"), "Awaiting downpayment");
+  assert.equal(projectStatusLabel("Active", "full"), "Active");
 });

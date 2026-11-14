@@ -589,6 +589,62 @@ test("a larger downpayment scales the remaining milestones; less than 30% is rej
   assert.equal(project.milestones[0].invoice?.amount, 2_400_000);
 });
 
+test("installment needs a downpayment below 100%; paying everything at once is Full Payment", async () => {
+  const estimate = await sentEstimate();
+  await assert.rejects(
+    changeEstimate(db, customer, estimate.id, { action: "accept", paymentTerms: "installment", downpaymentPercent: 100 }),
+    (error) => error instanceof BillingError && /choose Full Payment/.test(error.message),
+  );
+  await assert.rejects(changeEstimate(db, customer, estimate.id, { action: "accept", paymentTerms: "installment" }), ZodError);
+  await assert.rejects(changeEstimate(db, customer, estimate.id, { action: "accept", paymentTerms: "cash" }), ZodError);
+  assert.equal((await getEstimate(db, customer, estimate.id)).status, "Sent");
+  assert.equal(await db.collection("projects").countDocuments(), 0);
+});
+
+test("Full Payment bills the whole contract once, keeps the stages as the work schedule, and schedules the project when paid", async () => {
+  const estimate = await sentEstimate();
+  const { projectId } = await changeEstimate(db, customer, estimate.id, { action: "accept", paymentTerms: "full" });
+  assert.ok(projectId);
+  const project = await projectDto(projectId);
+  assert.equal(project.status, "Awaiting downpayment");
+  assert.equal(project.paymentTerms, "full");
+  assert.equal(project.downpaymentPercent, null);
+  assert.deepEqual(project.milestones.map((milestone) => [milestone.label, milestone.amount, milestone.percentage]), [["Full Payment", 6_000_000, 100]]);
+  assert.equal(project.milestones[0].invoice?.status, "Sent");
+  assert.equal(project.milestones[0].invoice?.amount, 6_000_000);
+  assert.deepEqual(project.workStages.map((stage) => stage.label), ["Mobilization", "Structural Works", "Roofing, Masonry & Rough-Ins", "Completion & Turnover"]);
+  assert.equal(project.workStages[0].targetDate, startDate());
+
+  const accepted = await getEstimate(db, customer, estimate.id);
+  assert.equal(accepted.paymentTerms, "full");
+  assert.equal(accepted.downpaymentPercent, null);
+  const [invoice] = await db.collection<InvoiceDocument>("invoices").find({ projectId: new ObjectId(projectId) }).toArray();
+  assert.equal(invoice.label, "Full Payment");
+  assert.equal(invoice.basis, `Full payment per accepted estimate ${estimate.reference}`);
+  assert.equal(await db.collection("schedules").countDocuments({ projectId: new ObjectId(projectId), eventType: "Payment due" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(clerk.id), title: "Full payment invoice issued" }), 1);
+  const dues = (await listPaymentDues(db)).filter((due) => due.projectName.startsWith(project.reference));
+  assert.deepEqual(dues.map((due) => due.kind), ["Full payment"]);
+
+  // Paying it in two visits: the project is scheduled only once the whole contract is paid.
+  const half = await submitPayment(db, customer, payInput(invoice._id.toHexString(), 3_000_000));
+  await reviewPayment(db, clerk, half, { action: "verify" });
+  assert.equal((await projectDto(projectId)).status, "Awaiting downpayment");
+  const rest = await submitPayment(db, customer, payInput(invoice._id.toHexString(), 3_000_000));
+  await reviewPayment(db, clerk, rest, { action: "verify" });
+  const paid = await projectDto(projectId);
+  assert.equal(paid.status, "Scheduled");
+  assert.equal(paid.balance, 0);
+  assert.equal(paid.nextMilestone, null);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(customer.id), title: "Full payment verified — your project is scheduled" }), 1);
+  assert.equal(await db.collection("notifications").countDocuments({ userId: new ObjectId(admin.id), title: "Full payment verified" }), 1);
+  // Nothing else can be billed: the full payment already covers the contract.
+  await assert.rejects(createInvoice(db, clerk, {
+    projectId, label: "Structural Works", basis: "Completed stage per site inspection report", progressPercentage: 30,
+    amount: 1_000, dueDate: "2099-12-31",
+  }));
+});
+
 test("an awaiting-downpayment project only bills the downpayment, for exactly its amount", async () => {
   const { projectId } = await acceptedProject(30);
   const project = await projectDto(projectId);

@@ -403,6 +403,7 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
     { $set: { paymentStatus: fullyPaid ? "Paid" : "Expected", updatedAt: now } }, { session },
   );
   if (!milestone.isDownpayment) return;
+  const full = project.paymentTerms === "full";
   if (action === "verify" && fullyPaid && project.status === "Awaiting downpayment") {
     const startDate = project.startDate?.toISOString().slice(0, 10);
     const scheduled = Boolean(startDate && startDate > manilaDate(now));
@@ -413,12 +414,12 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
     await insertNotifications(db, [
       {
         _id: new ObjectId(), userId: project.customerId,
-        title: scheduled ? "Downpayment verified — your project is scheduled" : "Downpayment verified — your project is active",
+        title: `${full ? "Full payment" : "Downpayment"} verified — your project is ${scheduled ? "scheduled" : "active"}`,
         body: scheduled ? `${project.name} is scheduled to start on ${startDate}.` : `${project.name} is now active.`,
         href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
       },
       ...admins.map((admin) => ({
-        _id: new ObjectId(), userId: admin._id, title: "Downpayment verified",
+        _id: new ObjectId(), userId: admin._id, title: full ? "Full payment verified" : "Downpayment verified",
         body: `${project.reference} · ${project.name} is now ${status.toLowerCase()}.`,
         href: "/admin/projects", kind: "construction-project", entityId: project._id, createdAt: now,
       })),
@@ -426,8 +427,10 @@ async function syncMilestoneProject(db: Db, session: ClientSession, invoice: Inv
   } else if (action === "reverse" && !fullyPaid && project.status === "Scheduled") {
     await projects.updateOne({ _id: project._id, status: "Scheduled" }, { $set: { status: "Awaiting downpayment", updatedAt: now } }, { session });
     await insertNotifications(db, [{
-      _id: new ObjectId(), userId: project.customerId, title: "Downpayment payment voided",
-      body: `A downpayment payment for ${project.name} was voided. Settle the downpayment to keep your project schedule.`,
+      _id: new ObjectId(), userId: project.customerId, title: full ? "Full payment voided" : "Downpayment payment voided",
+      body: full
+        ? `A payment toward the full payment for ${project.name} was voided. Settle the full payment to keep your project schedule.`
+        : `A downpayment payment for ${project.name} was voided. Settle the downpayment to keep your project schedule.`,
       href: "/customer/dream-house", kind: "construction-project", entityId: project._id, createdAt: now,
     }], session);
   }
@@ -484,9 +487,10 @@ export async function verifyPaymentInSession(db: Db, session: ClientSession, { p
       const issued = await autoIssueDownpayment(db, session, verifier, waiting, now);
       if (!issued) continue;
       const clerks = await db.collection<UserDocument>(collections.users).find({ role: "billing-clerk", status: "active" }, { session, projection: { _id: 1 } }).toArray();
+      const firstPayment = waiting.paymentTerms === "full" ? "full payment" : "downpayment";
       await insertNotifications(db, clerks.map((clerk) => ({
-        _id: new ObjectId(), userId: clerk._id, title: "Downpayment invoice issued",
-        body: `${customer.name} fully paid blueprint fee ${invoice.invoiceNumber}, so downpayment invoice ${issued.invoiceNumber} for ${waiting.reference} was issued automatically.`,
+        _id: new ObjectId(), userId: clerk._id, title: waiting.paymentTerms === "full" ? "Full payment invoice issued" : "Downpayment invoice issued",
+        body: `${customer.name} fully paid blueprint fee ${invoice.invoiceNumber}, so ${firstPayment} invoice ${issued.invoiceNumber} for ${waiting.reference} was issued automatically.`,
         href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: waiting._id, createdAt: now,
       })), session);
     }

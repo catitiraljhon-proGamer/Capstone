@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, CheckCircle2, ChevronRight, ClipboardCheck, Hourglass, MessageSquareText, X } from "lucide-react";
+import { ArrowLeftRight, Banknote, CheckCircle2, ChevronRight, ClipboardCheck, Hourglass, Layers, MessageSquareText, X, type LucideIcon } from "lucide-react";
 import { BillingDialog, BillingErrorMessage, BillingPanel, billingJson } from "@/components/billing/billing-primitives";
-import { constructionFieldClass, constructionLabelClass, dateOrDash, Eyebrow, Fact, ScheduleTable } from "@/components/customer/construction-shared";
+import { acceptedTermsText, constructionFieldClass, constructionLabelClass, dateOrDash, Eyebrow, Fact, ScheduleTable, WorkStagesTable } from "@/components/customer/construction-shared";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { RequiredIndicator } from "@/components/ui/required-indicator";
-import { buildPaymentSchedule, MIN_DOWNPAYMENT_PERCENT } from "@/lib/construction";
+import { buildPaymentSchedule, installmentDownpaymentError, MIN_DOWNPAYMENT_PERCENT, workStagesOf } from "@/lib/construction";
 import { numberError, textError } from "@/lib/form-validation";
 import { formatPeso } from "@/lib/house-design-data";
 import { materialNameKey, materialNameMax } from "@/lib/materials";
-import type { CostEstimateDto, EstimateAction, EstimateRevisionChange } from "@/types/construction";
+import type { CostEstimateDto, EstimateAction, EstimateRevisionChange, PaymentTerms } from "@/types/construction";
+
+const paymentChoices: { value: PaymentTerms; label: string; icon: LucideIcon; detail: (total: string, minimum: number) => string }[] = [
+  { value: "full", label: "Full Payment", icon: Banknote, detail: (total) => `Pay the whole ${total} in one payment. One invoice, one receipt, and no more bills during construction.` },
+  { value: "installment", label: "Installment", icon: Layers, detail: (_total, minimum) => `Pay a downpayment of at least ${minimum}%, then the rest in stages as construction progresses.` },
+];
 
 async function sendAction(id: string, action: EstimateAction) {
   const response = await fetch(`/api/construction/estimates/${encodeURIComponent(id)}`, {
@@ -230,6 +235,9 @@ function RequestedChanges({ changes }: { changes: EstimateRevisionChange[] }) {
 
 function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onChanged: (message?: string) => void }) {
   const minPercent = Math.max(MIN_DOWNPAYMENT_PERCENT, estimate.scheduleTemplate[0]?.percentage ?? 0);
+  const [terms, setTerms] = useState<PaymentTerms>("installment");
+  const full = terms === "full";
+  const termsName = useId();
   const [percentText, setPercentText] = useState(String(minPercent));
   const [dialog, setDialog] = useState<"accept" | "revise" | null>(null);
   const [reason, setReason] = useState("");
@@ -246,13 +254,15 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
   const percent = percentText.trim() === "" ? NaN : Number(percentText);
   const percentError =
     numberError(percentText, { label: "Downpayment", max: 100, maxDecimals: 2, unit: "%" }) ??
-    (percent < minPercent ? `Your downpayment must be at least ${minPercent}% of the contract total.` : null);
+    installmentDownpaymentError(percent, minPercent);
   const shownPercentError = percentTouched ? percentError : null;
   const schedule = useMemo(
     () => buildPaymentSchedule(estimate.total, estimate.scheduleTemplate, percentError ? minPercent : percent),
     [estimate.total, estimate.scheduleTemplate, percent, percentError, minPercent],
   );
+  const workStages = useMemo(() => workStagesOf(estimate.scheduleTemplate), [estimate.scheduleTemplate]);
   const downpayment = schedule[0]?.amount ?? 0;
+  const amountDue = full ? estimate.total : downpayment;
 
   async function run(action: EstimateAction, message: string) {
     if (busy) return;
@@ -274,7 +284,7 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
 
   function openAccept() {
     setError(null);
-    if (percentError) {
+    if (!full && percentError) {
       setPercentTouched(true);
       percentRef.current?.focus();
       return;
@@ -351,8 +361,54 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
       )}
 
       <div>
+        <h3 className="text-base font-semibold tracking-tight">How will you pay?</h3>
+        <p className="mt-1 text-sm text-stone-600">Choose Full Payment to pay the whole contract at once, or Installment to pay in stages as construction progresses.</p>
+        <fieldset className="mt-4">
+          <legend className="sr-only">Payment terms</legend>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {paymentChoices.map((choice) => {
+              const selected = terms === choice.value;
+              const Icon = choice.icon;
+              return (
+                <label
+                  key={choice.value}
+                  className={`flex min-w-0 cursor-pointer flex-col gap-2 rounded-xl border-2 p-4 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-600/30 ${selected ? "border-red-700 bg-rose-50" : "border-stone-200 bg-white hover:border-stone-300"}`}
+                >
+                  <input
+                    type="radio" name={termsName} value={choice.value} checked={selected} className="sr-only"
+                    aria-label={choice.label} aria-describedby={`${termsName}-${choice.value}`}
+                    onChange={() => { setTerms(choice.value); setError(null); }}
+                  />
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-100 text-red-700"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+                      <span className="text-base font-semibold text-stone-950">{choice.label}</span>
+                    </span>
+                    {selected ? <CheckCircle2 className="h-5 w-5 shrink-0 text-red-700" aria-hidden="true" /> : null}
+                  </span>
+                  <span id={`${termsName}-${choice.value}`} className="text-sm leading-6 text-stone-600">{choice.detail(formatPeso(estimate.total), minPercent)}</span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      </div>
+
+      {full ? (
+        <div>
+          <div className="rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-5 text-white">
+            <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Full Payment</p>
+            <p className="mt-2 break-words text-3xl font-semibold tracking-tight">{formatPeso(estimate.total)}</p>
+            <p className="mt-1 text-xs leading-5 text-rose-100">The whole contract total in one payment. Pay online, by bank deposit or cheque, or in cash at the G4 Builders office.</p>
+          </div>
+          <h3 className="mt-5 text-base font-semibold tracking-tight">Construction Stages</h3>
+          <p className="mt-1 text-sm text-stone-600">Your full payment covers every stage, so none of them is billed. The dates show when each part of the work is planned.</p>
+          <div className="mt-3"><WorkStagesTable stages={workStages} /></div>
+        </div>
+      ) : (
+      <div>
         <h3 className="text-base font-semibold tracking-tight">Payment Schedule</h3>
-        <p className="mt-1 text-sm text-stone-600">You pay in stages as construction progresses. Choose how much to pay as your downpayment. A larger downpayment lowers the later stages.</p>
+        <p className="mt-1 text-sm text-stone-600">Choose how much to pay as your downpayment. A larger downpayment lowers the later stages.</p>
         <div className="mt-4 grid gap-4 rounded-xl bg-gradient-to-r from-red-950 to-red-800 p-5 text-white sm:grid-cols-[minmax(0,1fr)_minmax(0,14rem)] sm:items-end">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-widest text-rose-200">Your Downpayment</p>
@@ -374,9 +430,10 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
         </div>
         {shownPercentError
           ? <FieldError id="estimate-downpayment-percent-error" message={shownPercentError} />
-          : <p className="mt-2 text-xs text-stone-500">{`Minimum downpayment is ${minPercent}%.`}</p>}
+          : <p className="mt-2 text-xs text-stone-500">{`Minimum downpayment is ${minPercent}%. To pay everything at once, choose Full Payment.`}</p>}
         <div className="mt-3"><ScheduleTable rows={schedule} /></div>
       </div>
+      )}
 
       {requests.length ? (
         <p className="border-t border-stone-200 pt-5 text-right text-sm text-stone-600">Send or remove your requested changes before accepting this estimate.</p>
@@ -392,15 +449,26 @@ function ReviewSection({ estimate, onChanged }: { estimate: CostEstimateDto; onC
           <div className="space-y-4 text-sm leading-6 text-stone-600">
             <p>You are accepting estimate <span className="font-semibold text-stone-950">{estimate.reference}</span> for a contract total of <span className="font-semibold text-stone-950">{formatPeso(estimate.total)}</span>.</p>
             <div className="rounded-lg bg-rose-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Downpayment Due</p>
-              <p className="mt-1 text-2xl font-semibold text-red-700">{formatPeso(downpayment)}</p>
-              <p className="mt-1 text-xs text-stone-600">{percent}% of the contract total</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{full ? "Full Payment Due" : "Downpayment Due"}</p>
+              <p className="mt-1 text-2xl font-semibold text-red-700">{formatPeso(amountDue)}</p>
+              <p className="mt-1 text-xs text-stone-600">{full ? "100% of the contract total, in one payment" : `${percent}% of the contract total`}</p>
             </div>
-            <p>Your downpayment invoice is issued automatically, so you can pay it in Billing right after you accept. Construction is scheduled once that payment is verified.</p>
+            <p>
+              {full
+                ? "Your full payment invoice is issued automatically, so you can pay it in Billing right after you accept. You will not be billed again during construction. Construction is scheduled once your payment is verified."
+                : "Your downpayment invoice is issued automatically, so you can pay it in Billing right after you accept. Construction is scheduled once that payment is verified."}
+            </p>
             <BillingErrorMessage message={error} />
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
               <Button variant="outline" className="min-h-11" disabled={busy} onClick={() => setDialog(null)}>Go Back</Button>
-              <Button className="min-h-11" disabled={busy} onClick={() => void run({ action: "accept", downpaymentPercent: percent }, "Estimate accepted. Your project is created and your downpayment invoice is ready in Billing.")}>{busy ? "Accepting…" : "Confirm and Accept"}</Button>
+              <Button
+                className="min-h-11" disabled={busy}
+                onClick={() => void (full
+                  ? run({ action: "accept", paymentTerms: "full" }, "Estimate accepted. Your project is created and your full payment invoice is ready in Billing.")
+                  : run({ action: "accept", paymentTerms: "installment", downpaymentPercent: percent }, "Estimate accepted. Your project is created and your downpayment invoice is ready in Billing."))}
+              >
+                {busy ? "Accepting…" : "Confirm and Accept"}
+              </Button>
             </div>
           </div>
         </BillingDialog>
@@ -509,7 +577,7 @@ export function ConstructionEstimateCard({ estimate, highlighted, onChanged }: {
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-red-900">Estimate accepted {estimate.acceptedAt ? dateOrDash(estimate.acceptedAt) : ""}</p>
-                  <p className="mt-1 text-sm leading-6 text-stone-600">Contract total {formatPeso(estimate.total)}{estimate.downpaymentPercent ? ` · ${estimate.downpaymentPercent}% downpayment` : ""}.</p>
+                  <p className="mt-1 text-sm leading-6 text-stone-600">Contract total {formatPeso(estimate.total)}{acceptedTermsText(estimate.paymentTerms, estimate.downpaymentPercent) ? ` · ${acceptedTermsText(estimate.paymentTerms, estimate.downpaymentPercent)}` : ""}.</p>
                 </div>
               </div>
               {estimate.projectId && <Button asChild variant="outline"><a href={`#project-${estimate.projectId}`}>View Project</a></Button>}

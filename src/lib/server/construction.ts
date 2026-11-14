@@ -16,10 +16,13 @@ import {
 import { fromCentavos, manilaDate, toCentavos } from "@/lib/billing";
 import {
   MIN_DOWNPAYMENT_PERCENT,
+  buildFullPaymentSchedule,
   buildPaymentSchedule,
   estimateTotals,
+  installmentDownpaymentError,
   lineAmount,
   scheduleTemplateError,
+  workStagesOf,
 } from "@/lib/construction";
 import { BillingError, audit, autoIssueDownpayment, billingTransaction, nextReference } from "@/lib/server/billing";
 import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
@@ -33,11 +36,12 @@ import { loadProjectBilling, milestoneDtos, promoteScheduledProjects } from "@/l
 import { addressDetailsSchema, formatAddress } from "@/lib/server/ph-address";
 import { ensureVatRemoved } from "@/lib/server/vat-cleanup";
 import { ensureWarrantyDates, projectWarranty, warrantyOnCompletion, warrantySummary } from "@/lib/server/warranty";
-import type {
-  ConstructionProjectDto,
-  CostEstimateDto,
-  EstimateLineItem,
-  EstimateRevisionChange,
+import {
+  paymentTermsOptions,
+  type ConstructionProjectDto,
+  type CostEstimateDto,
+  type EstimateLineItem,
+  type EstimateRevisionChange,
 } from "@/types/construction";
 import type { SessionUser, UserRole } from "@/types/domain";
 
@@ -126,8 +130,12 @@ const estimateActionSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("accept"),
-    downpaymentPercent: z.number().finite().max(100).refine(twoDecimals, "Use at most two decimal places."),
-  }).strict(),
+    // Older clients sent only a downpayment percentage, which is installment.
+    paymentTerms: z.enum(paymentTermsOptions).default("installment"),
+    downpaymentPercent: z.number().finite().max(100).refine(twoDecimals, "Use at most two decimal places.").optional(),
+  }).strict().refine((value) => value.paymentTerms === "full" || value.downpaymentPercent !== undefined, {
+    message: "Enter your downpayment percentage.", path: ["downpaymentPercent"],
+  }),
 ]);
 
 const projectActionSchema = z.object({
@@ -203,6 +211,7 @@ async function toEstimateDtos(db: Db, estimates: EstimateDocument[], viewer: Use
       revisionNote: estimate.revisionNote ?? null,
       revisionChanges: estimate.revisionChanges ?? [],
       sentAt: estimate.sentAt?.toISOString() ?? null, acceptedAt: estimate.acceptedAt?.toISOString() ?? null,
+      paymentTerms: estimate.paymentTerms ?? (estimate.status === "Accepted" ? "installment" : null),
       downpaymentPercent: estimate.downpaymentPercent ?? null, projectId: estimate.projectId?.toHexString() ?? null,
       createdAt: estimate.createdAt.toISOString(), updatedAt: estimate.updatedAt.toISOString(),
     };
@@ -306,7 +315,7 @@ export async function changeEstimate(db: Db, actor: SessionUser, id: string, raw
     if (input.action === "save") return { estimateId: estimate._id, ...(await saveEstimate(db, session, actor, estimate, input)) };
     if (input.action === "send") return { estimateId: estimate._id, ...(await sendEstimate(db, session, actor, estimate)) };
     if (input.action === "request-revision") return { estimateId: estimate._id, ...(await requestRevision(db, session, actor, estimate, input)) };
-    return { estimateId: estimate._id, ...(await acceptEstimate(db, session, actor, estimate, input.downpaymentPercent)) };
+    return { estimateId: estimate._id, ...(await acceptEstimate(db, session, actor, estimate, input)) };
   });
   return {
     estimate: await estimateResponse(db, actor, result.estimateId),
@@ -385,7 +394,7 @@ async function sendEstimate(db: Db, session: ClientSession, actor: SessionUser, 
   }, "This estimate changed while you were sending it. Reload it and try again.");
   await notify(db, session, [estimate.customerId], {
     title: "Your construction cost estimate is ready",
-    body: `${estimate.reference} totals ${estimate.total.toLocaleString("en-PH", { style: "currency", currency: "PHP" })}. Review it and choose your downpayment.`,
+    body: `${estimate.reference} totals ${estimate.total.toLocaleString("en-PH", { style: "currency", currency: "PHP" })}. Review it and choose how you will pay.`,
     href: `/customer/dream-house?estimate=${estimate._id.toHexString()}`, kind: "construction-estimate", entityId: estimate._id,
   });
   await audit(db, session, actor, "estimate.sent", "estimate", estimate._id, { reference: estimate.reference, total: estimate.total });
@@ -431,32 +440,44 @@ async function requestRevision(
   return {};
 }
 
+type AcceptChoice = Extract<EstimateAction, { action: "accept" }>;
+
 /**
- * Accepting creates the project, its payment schedule, the downpayment invoice, and calendar events together. The
- * downpayment invoice is issued at once, or as soon as the blueprint fee is fully paid if it is not yet.
+ * Accepting creates the project, its payment schedule, the first invoice, and calendar events together. Full Payment
+ * bills the whole contract once and keeps the stages as the work schedule; Installment bills the downpayment, then
+ * each stage. The first invoice is issued at once, or as soon as the blueprint fee is fully paid if it is not yet.
  */
-async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, downpaymentPercent: number) {
+async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser, estimate: EstimateDocument, choice: AcceptChoice) {
   if (estimate.status !== "Sent") throw new BillingError("This estimate is not awaiting your response.", 409);
   const template = estimate.scheduleTemplate ?? [];
-  const minimum = Math.max(MIN_DOWNPAYMENT_PERCENT, template[0]?.percentage ?? 0);
-  if (downpaymentPercent < minimum) throw new BillingError(`The downpayment must be at least ${minimum}% of the contract total.`);
+  const full = choice.paymentTerms === "full";
+  const downpaymentPercent = full ? undefined : choice.downpaymentPercent!;
+  if (downpaymentPercent !== undefined) {
+    const problem = installmentDownpaymentError(downpaymentPercent, Math.max(MIN_DOWNPAYMENT_PERCENT, template[0]?.percentage ?? 0));
+    if (problem) throw new BillingError(problem);
+  }
   if (scheduleTemplateError(template) || !estimate.preferredStartDate || !estimate.neededBy || !estimate.designRequestId) {
     throw new BillingError("This estimate is incomplete. Ask us to revise it.", 409);
   }
   const now = new Date();
   const projectId = new ObjectId();
+  const terms = { paymentTerms: choice.paymentTerms, ...(downpaymentPercent === undefined ? {} : { downpaymentPercent }) };
   const updated = await db.collection<EstimateDocument>(collections.estimates).updateOne(
     { _id: estimate._id, status: "Sent" },
-    { $set: { status: "Accepted", acceptedAt: now, downpaymentPercent, projectId, updatedAt: now } }, { session },
+    { $set: { status: "Accepted", acceptedAt: now, ...terms, projectId, updatedAt: now } }, { session },
   );
   if (!updated.matchedCount) throw new BillingError("This estimate was already answered.", 409);
 
   const design = await db.collection<DesignRequestDocument>(collections.designRequests).findOne({ _id: estimate.designRequestId }, { session });
-  const schedule: ProjectMilestoneDocument[] = buildPaymentSchedule(estimate.total, template, downpaymentPercent).map((row) => ({
+  const rows = downpaymentPercent === undefined
+    ? buildFullPaymentSchedule(estimate.total, template)
+    : buildPaymentSchedule(estimate.total, template, downpaymentPercent);
+  const schedule: ProjectMilestoneDocument[] = rows.map((row) => ({
     id: randomUUID(), label: row.label, description: row.description, percentage: row.percentage, amount: row.amount,
     targetDate: dateOnly(row.targetDate), isDownpayment: row.isDownpayment,
   }));
   const downpayment = schedule[0];
+  const firstPayment = full ? "full payment" : "downpayment";
   const startDate = isoDate(estimate.preferredStartDate)!;
   const today = manilaDate(now);
   const lowest = addDays(today, 1);
@@ -469,13 +490,14 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
     ...(estimate.houseDesignId ? { houseDesignId: estimate.houseDesignId } : {}),
     name: `${designLabelOf(design)} – Construction`, status: "Awaiting downpayment", contractPrice: estimate.total,
     subtotal: estimate.subtotal, startDate: estimate.preferredStartDate, targetCompletionDate: estimate.neededBy,
-    estimateId: estimate._id, designRequestId: estimate.designRequestId, downpaymentPercent, paymentSchedule: schedule,
+    estimateId: estimate._id, designRequestId: estimate.designRequestId, ...terms, paymentSchedule: schedule,
+    ...(full ? { workStages: workStagesOf(template).map((stage) => ({ label: stage.label, targetDate: dateOnly(stage.targetDate) })) } : {}),
     createdAt: now, updatedAt: now,
   };
   const invoice: InvoiceDocument = {
     _id: invoiceId, invoiceNumber: await nextReference(db, session, "INV", now), customerId: estimate.customerId,
     projectId, milestoneId: downpayment.id, label: downpayment.label,
-    basis: `Downpayment per accepted estimate ${estimate.reference}`, progressPercentage: 0, amount: downpayment.amount,
+    basis: `${full ? "Full payment" : "Downpayment"} per accepted estimate ${estimate.reference}`, progressPercentage: 0, amount: downpayment.amount,
     dueDate: dateOnly(dueDate), status: "Draft", createdAt: now, updatedAt: now,
   };
   await db.collection<ProjectDocument>(collections.projects).insertOne(project, { session });
@@ -497,19 +519,21 @@ async function acceptEstimate(db: Db, session: ClientSession, actor: SessionUser
     body: `${actor.name} accepted ${estimate.reference}. Once the admin submits the blueprint, set the blueprint fee and issue its invoice. The ${downpayment.label} invoice (${invoice.invoiceNumber}) is issued automatically once the blueprint is paid.`,
     href: "/billing-clerk/progress-billings", kind: "blueprint-fee", entityId: estimate.designRequestId,
   } : {
-    title: "Downpayment invoice issued",
+    title: full ? "Full payment invoice issued" : "Downpayment invoice issued",
     body: `${actor.name} accepted ${estimate.reference}. The ${downpayment.label} invoice (${invoice.invoiceNumber}) for ${project.reference} was issued automatically and awaits payment.`,
     href: "/billing-clerk/progress-billings", kind: "construction-project", entityId: projectId,
   });
+  const acceptedWith = full ? "Full Payment" : `a ${downpaymentPercent}% downpayment`;
   await notify(db, session, admins.map((admin) => admin._id), {
     title: "Cost estimate accepted",
     body: blueprintFirst
-      ? `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. Upload the blueprint files in Approvals, then submit them so the Billing Clerk can bill the blueprint fee.`
-      : `${actor.name} accepted ${estimate.reference} with a ${downpaymentPercent}% downpayment. ${project.reference} is awaiting its downpayment.`,
+      ? `${actor.name} accepted ${estimate.reference} with ${acceptedWith}. Upload the blueprint files in Approvals, then submit them so the Billing Clerk can bill the blueprint fee.`
+      : `${actor.name} accepted ${estimate.reference} with ${acceptedWith}. ${project.reference} is awaiting its ${firstPayment}.`,
     href: blueprintFirst ? "/admin/approvals" : `/admin/cost-estimates?estimate=${estimate._id.toHexString()}`, kind: "construction-project", entityId: projectId,
   });
   await audit(db, session, actor, "estimate.accepted", "estimate", estimate._id, {
-    reference: estimate.reference, projectReference: project.reference, downpaymentPercent, total: estimate.total,
+    reference: estimate.reference, projectReference: project.reference, paymentTerms: choice.paymentTerms,
+    downpaymentPercent: downpaymentPercent ?? null, total: estimate.total,
   });
   return { projectId };
 }
@@ -541,10 +565,12 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
       estimateId: project.estimateId?.toHexString() ?? null,
       estimateReference: project.estimateId ? estimateReferences.get(project.estimateId.toHexString()) ?? null : null,
       contractPrice: project.contractPrice, subtotal: project.subtotal ?? project.contractPrice,
+      paymentTerms: project.paymentTerms ?? "installment",
       downpaymentPercent: project.downpaymentPercent ?? null,
       startDate: isoDate(project.startDate), neededBy: isoDate(project.targetCompletionDate),
       paid, balance: Math.max(0, Math.round((project.contractPrice - paid) * 100) / 100),
       milestones, nextMilestone: milestones.find((milestone) => milestone.status !== "Paid") ?? null,
+      workStages: (project.workStages ?? []).map((stage) => ({ label: stage.label, targetDate: isoDate(stage.targetDate)! })),
       warranty: projectWarranty(project, warrantyMonths),
       createdAt: project.createdAt.toISOString(),
     };

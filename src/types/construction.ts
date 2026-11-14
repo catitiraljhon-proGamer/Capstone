@@ -4,7 +4,8 @@ import type { ProjectWarrantyDto } from "@/types/warranty";
 /**
  * Construction phase: after a design is unlocked, the customer asks to build it,
  * the admin prepares a cost estimate (scope of works + payment schedule, no VAT), the
- * customer accepts with a downpayment of at least 30%, and a project is created.
+ * customer accepts it with Full Payment (one bill for the whole contract) or Installment
+ * (a downpayment of at least 30%, then stage billings), and a project is created.
  *
  * API contract (all JSON, errors are `{ error: string }`):
  * - GET   /api/construction/estimates               customer: own · admin: all → { estimates: CostEstimateDto[] }
@@ -75,6 +76,16 @@ export type MilestoneTemplate = {
   targetDate: string;
 };
 
+/**
+ * How the customer pays the contract, chosen when accepting the estimate: `full` is one bill for the whole contract
+ * total, `installment` is a downpayment and then a bill per stage. Projects saved before the choice are installment.
+ */
+export const paymentTermsOptions = ["installment", "full"] as const;
+export type PaymentTerms = (typeof paymentTermsOptions)[number];
+
+/** A stage of a Full Payment project: its work schedule only, never billed. */
+export type WorkStage = { label: string; targetDate: string };
+
 export type PaymentMilestoneStatus = "Upcoming" | "Invoiced" | "Partially paid" | "Paid";
 
 export type PaymentMilestoneDto = {
@@ -124,6 +135,9 @@ export type CostEstimateDto = {
   revisionChanges: EstimateRevisionChange[];
   sentAt: string | null;
   acceptedAt: string | null;
+  /** Set once the estimate is accepted. */
+  paymentTerms: PaymentTerms | null;
+  /** Installment only. */
   downpaymentPercent: number | null;
   projectId: string | null;
   createdAt: string;
@@ -142,12 +156,17 @@ export type ConstructionProjectDto = {
   estimateReference: string | null;
   contractPrice: number;
   subtotal: number;
+  paymentTerms: PaymentTerms;
+  /** Installment only. */
   downpaymentPercent: number | null;
   startDate: string | null;
   neededBy: string | null;
   paid: number;
   balance: number;
+  /** The bills: one Full Payment row, or the downpayment and each stage for Installment. */
   milestones: PaymentMilestoneDto[];
+  /** Full Payment only: the construction stages from the estimate, shown as the work schedule. */
+  workStages: WorkStage[];
   /** First milestone that is not fully paid. */
   nextMilestone: PaymentMilestoneDto | null;
   /** Set once the project is Completed. */
@@ -168,7 +187,8 @@ export type EstimateAction =
   | { action: "send" }
   /** `changes` point at a scope (`lineId`) and one of its materials (`EstimateMaterial.id`). */
   | { action: "request-revision"; reason: string; changes?: { lineId: string; materialLineId: string; wants: string }[] }
-  | { action: "accept"; downpaymentPercent: number };
+  | { action: "accept"; paymentTerms: "installment"; downpaymentPercent: number }
+  | { action: "accept"; paymentTerms: "full" };
 
 export type ProjectStatusAction = {
   action: "status";

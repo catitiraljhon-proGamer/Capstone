@@ -1,7 +1,26 @@
 import { fromCentavos, toCentavos } from "@/lib/billing";
-import type { EstimateLineItemInput, MilestoneTemplate } from "@/types/construction";
+import type { EstimateLineItemInput, MilestoneTemplate, PaymentTerms, ProjectStatus, WorkStage } from "@/types/construction";
 
 export const MIN_DOWNPAYMENT_PERCENT = 30;
+
+/** The one bill of a Full Payment project, also its invoice label. */
+export const FULL_PAYMENT_LABEL = "Full Payment";
+
+export const paymentTermsLabel = (terms: PaymentTerms) => (terms === "full" ? "Full Payment" : "Installment");
+
+/** A Full Payment project waits for its "full payment"; every other status reads the same for both terms. */
+export const projectStatusLabel = (status: ProjectStatus, terms: PaymentTerms) =>
+  status === "Awaiting downpayment" && terms === "full" ? "Awaiting full payment" : status;
+
+/**
+ * An installment downpayment is at least the minimum and below 100%: paying the whole contract at once is Full
+ * Payment, so it is never called a downpayment. Returns an error message, or null.
+ */
+export function installmentDownpaymentError(percent: number, minimum = MIN_DOWNPAYMENT_PERCENT) {
+  if (percent < minimum) return `Your downpayment must be at least ${minimum}% of the contract total.`;
+  if (percent >= 100) return "An installment downpayment must be below 100%. To pay the whole contract at once, choose Full Payment.";
+  return null;
+}
 
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -81,4 +100,29 @@ export function buildPaymentSchedule(total: number, template: MilestoneTemplate[
   });
   // A 100% downpayment leaves zero-amount milestones; keep only billable rows.
   return rows.filter((row) => row.isDownpayment || row.amount > 0);
+}
+
+/**
+ * Full Payment bills the whole contract total once, due on the first stage's date. The row is marked as the first
+ * payment (`isDownpayment`), so it is issued on acceptance and moves the project to Scheduled once fully paid.
+ */
+export function buildFullPaymentSchedule(total: number, template: MilestoneTemplate[]) {
+  return [{
+    label: FULL_PAYMENT_LABEL,
+    description: "The whole contract total in one payment. Construction is scheduled once it is verified.",
+    percentage: 100,
+    amount: fromCentavos(toCentavos(total)),
+    targetDate: template[0]?.targetDate ?? "",
+    isDownpayment: true,
+  }];
+}
+
+/** The first stage without its downpayment wording: "Downpayment / Mobilization" becomes "Mobilization". */
+export function workStageLabel(label: string) {
+  return label.replace(/^\s*down\s*-?\s*payment\b[\s/&,:;–—-]*/i, "").trim() || "Mobilization";
+}
+
+/** A Full Payment project keeps the estimate's stages as its work schedule, without amounts. */
+export function workStagesOf(template: MilestoneTemplate[]): WorkStage[] {
+  return template.map((row, index) => ({ label: index === 0 ? workStageLabel(row.label) : row.label.trim(), targetDate: row.targetDate }));
 }

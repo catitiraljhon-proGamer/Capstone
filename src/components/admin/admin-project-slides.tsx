@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { BillingBadge, billingDate } from "@/components/billing/billing-primitives";
+import { projectStatusLabel } from "@/lib/construction";
 import { formatPeso } from "@/lib/house-design-data";
 import type {
   ConstructionProjectDto,
@@ -217,6 +218,12 @@ function ProjectCard({
   const canActivate = project.status === "Scheduled" || project.status === "On hold";
   const canHold = project.status === "Active" || project.status === "Scheduled";
   const isActive = project.status === "Active";
+  const full = project.paymentTerms === "full";
+  const nextPayment = project.nextMilestone
+    ? `${project.nextMilestone.label} · ${formatPeso(project.nextMilestone.amount)} · ${date(project.nextMilestone.targetDate)}`
+    : project.milestones.length > 0
+      ? full ? "Paid in full" : "All milestones paid"
+      : "—";
 
   async function changeStatus(status: StatusChange) {
     setBusy(status);
@@ -247,7 +254,10 @@ function ProjectCard({
             <p className="mt-1 text-sm text-stone-600">{project.customer.name}</p>
           </div>
           <div className="text-right">
-            <span className={`${pillBase} ${projectTone[project.status] ?? projectTone.Pending}`}>{project.status}</span>
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {full ? <span className={`${pillBase} bg-white text-red-800 ring-rose-300`}>Full Payment</span> : null}
+              <span className={`${pillBase} ${projectTone[project.status] ?? projectTone.Pending}`}>{projectStatusLabel(project.status, project.paymentTerms)}</span>
+            </div>
             <p className="mt-3 text-xl font-semibold tabular-nums tracking-tight">{formatPeso(project.contractPrice)}</p>
           </div>
         </div>
@@ -283,14 +293,8 @@ function ProjectCard({
             <dd className="mt-1">{date(project.neededBy)}</dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Next Milestone</dt>
-            <dd className="mt-1 break-words">
-              {project.nextMilestone
-                ? `${project.nextMilestone.label} · ${formatPeso(project.nextMilestone.amount)} · ${date(project.nextMilestone.targetDate)}`
-                : project.milestones.length > 0
-                  ? "All milestones paid"
-                  : "—"}
-            </dd>
+            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">{full ? "Payment" : "Next Milestone"}</dt>
+            <dd className="mt-1 break-words">{nextPayment}</dd>
           </div>
         </dl>
 
@@ -323,7 +327,7 @@ function ProjectCard({
             </Button>
           ) : null}
           {isActive && !allPaid ? (
-            <p className="text-xs text-stone-500">Completion unlocks once every milestone is fully paid.</p>
+            <p className="text-xs text-stone-500">{full ? "Completion unlocks once the full payment is paid." : "Completion unlocks once every milestone is fully paid."}</p>
           ) : null}
           {project.milestones.length > 0 ? (
             <Button
@@ -334,7 +338,7 @@ function ProjectCard({
               aria-expanded={expanded}
               onClick={() => setExpanded((value) => !value)}
             >
-              Payment Schedule
+              {full ? "Payment and Stages" : "Payment Schedule"}
               <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
             </Button>
           ) : null}
@@ -379,6 +383,35 @@ function ProjectCard({
               ))}
             </tbody>
           </table>
+        </div>
+      ) : null}
+      {expanded && project.workStages.length > 0 ? (
+        <div className="border-t border-stone-200">
+          <div className="px-5 pb-2 pt-4">
+            <h3 className="text-sm font-semibold">Construction Stages</h3>
+            <p className="mt-1 text-xs text-stone-600">Covered by the full payment, so none of them is invoiced. The dates are the work schedule.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse text-sm">
+              <caption className="sr-only">Construction stages for {project.name}</caption>
+              <thead className="bg-stone-50">
+                <tr>
+                  <th className={head}>Stage</th>
+                  <th className={head}>Target Date</th>
+                  <th className={head}>Payment</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {project.workStages.map((stage) => (
+                  <tr key={stage.label + stage.targetDate}>
+                    <td className="px-3 py-3 font-medium">{stage.label}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-stone-600">{date(stage.targetDate)}</td>
+                    <td className="px-3 py-3"><span className={`${pillBase} bg-stone-100 text-stone-600 ring-stone-200`}>Covered by full payment</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
       {isCompleting ? (

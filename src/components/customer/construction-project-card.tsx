@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { Check, HardHat } from "lucide-react";
 import { BillingPanel } from "@/components/billing/billing-primitives";
-import { dateOrDash, Eyebrow, Fact, ScheduleTable } from "@/components/customer/construction-shared";
+import { dateOrDash, Eyebrow, Fact, ScheduleTable, WorkStagesTable } from "@/components/customer/construction-shared";
 import { ProjectWarranty } from "@/components/customer/project-warranty";
 import { Button } from "@/components/ui/button";
+import { projectStatusLabel } from "@/lib/construction";
 import { formatPeso } from "@/lib/house-design-data";
 import type { ConstructionProjectDto, PaymentMilestoneDto } from "@/types/construction";
 
 const steps = ["Awaiting downpayment", "Scheduled", "Active", "Completed"] as const;
+
+function paymentTermsFact(project: ConstructionProjectDto) {
+  if (project.paymentTerms === "full") return "Full Payment";
+  return project.downpaymentPercent ? `Installment · ${project.downpaymentPercent}% downpayment` : "—";
+}
 
 function stepIndex(project: ConstructionProjectDto) {
   const index = steps.indexOf(project.status as (typeof steps)[number]);
@@ -30,7 +36,7 @@ function Stepper({ project }: { project: ConstructionProjectDto }) {
               <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full text-[10px] font-bold ${done ? "bg-red-700 text-white" : active ? "bg-red-700 text-white ring-2 ring-rose-200" : "bg-stone-100 text-stone-500"}`}>
                 {done ? <Check className="h-3 w-3" /> : index + 1}
               </span>
-              <span className={`min-w-0 break-words text-xs leading-4 ${active ? "font-semibold text-stone-950" : done ? "font-medium text-stone-700" : "text-stone-500"}`}>{step}</span>
+              <span className={`min-w-0 break-words text-xs leading-4 ${active ? "font-semibold text-stone-950" : done ? "font-medium text-stone-700" : "text-stone-500"}`}>{projectStatusLabel(step, project.paymentTerms)}</span>
             </div>
           </li>
         );
@@ -39,12 +45,14 @@ function Stepper({ project }: { project: ConstructionProjectDto }) {
   );
 }
 
-function NextPayment({ milestone }: { milestone: PaymentMilestoneDto | null }) {
+function NextPayment({ milestone, full }: { milestone: PaymentMilestoneDto | null; full: boolean }) {
   if (!milestone) {
     return (
       <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <p className="text-sm font-semibold">All Payments Received</p>
-        <p className="mt-1 text-sm text-stone-600">Every milestone on your payment schedule has been paid.</p>
+        <p className="text-sm font-semibold">{full ? "Paid in Full" : "All Payments Received"}</p>
+        <p className="mt-1 text-sm text-stone-600">
+          {full ? "Your full payment has been received. There are no more bills for this project." : "Every milestone on your payment schedule has been paid."}
+        </p>
       </div>
     );
   }
@@ -96,7 +104,7 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
         <dl className="grid gap-4 sm:grid-cols-3">
           <Fact label="Start Date" value={dateOrDash(project.startDate)} />
           <Fact label="Needed by" value={dateOrDash(project.neededBy)} />
-          <Fact label="Downpayment" value={project.downpaymentPercent ? `${project.downpaymentPercent}%` : "—"} />
+          <Fact label="Payment Terms" value={paymentTermsFact(project)} />
         </dl>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -120,12 +128,19 @@ export function ConstructionProjectCard({ project }: { project: ConstructionProj
 
         {project.milestones.length > 0 && (
           <>
-            <NextPayment milestone={project.nextMilestone} />
+            <NextPayment milestone={project.nextMilestone} full={project.paymentTerms === "full"} />
             <div>
-              <h3 className="text-base font-semibold tracking-tight">Payment Milestones</h3>
+              <h3 className="text-base font-semibold tracking-tight">{project.paymentTerms === "full" ? "Payment" : "Payment Milestones"}</h3>
               <div className="mt-3"><ScheduleTable rows={project.milestones} /></div>
             </div>
           </>
+        )}
+        {project.workStages.length > 0 && (
+          <div>
+            <h3 className="text-base font-semibold tracking-tight">Construction Stages</h3>
+            <p className="mt-1 text-sm text-stone-600">Covered by your full payment, so none of them is billed. The dates show when each part of the work is planned.</p>
+            <div className="mt-3"><WorkStagesTable stages={project.workStages} /></div>
+          </div>
         )}
       </BillingPanel>
       {project.warranty ? <ProjectWarranty project={{ ...project, warranty: project.warranty }} /> : null}

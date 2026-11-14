@@ -68,17 +68,26 @@ function constructionStep(design: DesignRequestDto, estimate?: CostEstimateDto, 
         action: { label: "Pay Now", href: billingLink(due.invoice.id) },
       };
     }
+    const full = project.paymentTerms === "full";
     if (project.status === "Awaiting downpayment") {
-      return { tone: "waiting", title: "Preparing your downpayment invoice", detail: "It is issued automatically once your blueprint fee is fully paid. You will be notified when it is ready to pay." };
+      return { tone: "waiting", title: `Preparing your ${full ? "full payment" : "downpayment"} invoice`, detail: "It is issued automatically once your blueprint fee is fully paid. You will be notified when it is ready to pay." };
     }
     if (project.status === "On hold") return { tone: "waiting", title: "Construction is on hold", detail: "G4 Builders will contact you before work resumes." };
-    return { tone: "waiting", title: "Construction in progress", detail: "G4 Builders is building your house. The next billing is issued when the next milestone is reached.", action: { label: "View Project", target: `project-${project.id}` } };
+    return {
+      tone: "waiting", title: "Construction in progress",
+      detail: full
+        ? "G4 Builders is building your house. Your contract is paid in full, so there are no more bills."
+        : "G4 Builders is building your house. The next billing is issued when the next milestone is reached.",
+      action: { label: "View Project", target: `project-${project.id}` },
+    };
   }
   if (estimate) {
     if (estimate.status === "Sent") {
       return { tone: "action", title: "Review your cost estimate", detail: "Accept it to start construction, or ask G4 Builders for a revision. Reviewing is free.", action: { label: "Review Estimate", target: `estimate-${estimate.id}` } };
     }
-    if (estimate.status === "Accepted") return { tone: "waiting", title: "Setting up your project", detail: "Your estimate is accepted. Your project and downpayment invoice are being prepared." };
+    if (estimate.status === "Accepted") {
+      return { tone: "waiting", title: "Setting up your project", detail: `Your estimate is accepted. Your project and ${estimate.paymentTerms === "full" ? "full payment" : "downpayment"} invoice are being prepared.` };
+    }
     return { tone: "waiting", title: estimate.status === "Revision requested" ? "Revising your estimate" : "Preparing your cost estimate", detail: "G4 Builders is pricing your construction. You will be notified when it is ready to review." };
   }
   if (!canRequestEstimate(design)) return null;

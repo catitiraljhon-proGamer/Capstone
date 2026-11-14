@@ -5,6 +5,10 @@ import type { PaymentDueDto } from "@/types/billing";
 
 const invoiceStatus = { Sent: "Due", "Partially Paid": "Partially paid", Paid: "Paid", Overdue: "Overdue" } as const;
 
+/** What a construction bill is called on the calendars: a Full Payment project's one bill is not a downpayment. */
+const milestoneKind = (project: Pick<ProjectDocument, "paymentTerms"> | undefined, isDownpayment?: boolean): PaymentDueDto["kind"] =>
+  !isDownpayment ? "Progress billing" : project?.paymentTerms === "full" ? "Full payment" : "Downpayment";
+
 /**
  * Every customer payment date for the staff calendars, or one customer's with `customerId`: issued invoices (with their
  * live paid status) plus scheduled construction milestones that are not invoiced yet. Drafts and void invoices are left out.
@@ -24,7 +28,7 @@ export async function listPaymentDues(db: Db, { customerId, now = new Date() }: 
         .find({ invoiceId: { $in: invoices.map((invoice) => invoice._id) }, status: "Verified" }, { projection: { invoiceId: 1, amount: 1 } }).toArray()
       : [],
     invoicedProjectIds.length
-      ? db.collection<ProjectDocument>(collections.projects).find({ _id: { $in: invoicedProjectIds } }, { projection: { reference: 1, name: 1, paymentSchedule: 1 } }).toArray()
+      ? db.collection<ProjectDocument>(collections.projects).find({ _id: { $in: invoicedProjectIds } }, { projection: { reference: 1, name: 1, paymentSchedule: 1, paymentTerms: 1 } }).toArray()
       : [],
     db.collection<UserDocument>(collections.users).find(customerId ? { _id: customerId } : { role: "customer" }, { projection: { name: 1 } }).toArray(),
   ]);
@@ -44,7 +48,7 @@ export async function listPaymentDues(db: Db, { customerId, now = new Date() }: 
     const designLabel = invoice.designRequestId ? `Design request ${invoice.designRequestId.toHexString().slice(-8).toUpperCase()}` : "";
     return {
       id: `invoice-${invoice._id.toHexString()}`,
-      kind: invoice.designRequestId ? (invoice.feeType === "blueprint" ? "Blueprint fee" : "Design fee") : milestone?.isDownpayment ? "Downpayment" : "Progress billing",
+      kind: invoice.designRequestId ? (invoice.feeType === "blueprint" ? "Blueprint fee" : "Design fee") : milestoneKind(project, milestone?.isDownpayment),
       label: invoice.label,
       clientId: invoice.customerId.toHexString(),
       clientName: customerNames.get(invoice.customerId.toHexString()) ?? "Unknown customer",
@@ -61,7 +65,7 @@ export async function listPaymentDues(db: Db, { customerId, now = new Date() }: 
     .filter((milestone) => !milestone.invoiceId || !issuedInvoiceIds.has(milestone.invoiceId.toHexString()))
     .map((milestone): PaymentDueDto => ({
       id: `milestone-${project._id.toHexString()}-${milestone.id}`,
-      kind: milestone.isDownpayment ? "Downpayment" : "Progress billing",
+      kind: milestoneKind(project, milestone.isDownpayment),
       label: milestone.label,
       clientId: project.customerId.toHexString(),
       clientName: customerNames.get(project.customerId.toHexString()) ?? "Unknown customer",

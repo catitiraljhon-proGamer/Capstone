@@ -1,11 +1,17 @@
 import { billingDate } from "@/components/billing/billing-primitives";
 import { formatPeso } from "@/lib/house-design-data";
-import type { PaymentMilestoneStatus } from "@/types/construction";
+import type { PaymentMilestoneStatus, PaymentTerms, WorkStage } from "@/types/construction";
 
 export const constructionFieldClass = "mt-2 min-h-11 w-full rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-base text-stone-950 outline-none placeholder:text-stone-500 focus:border-red-600 focus:ring-2 focus:ring-red-600/15 disabled:bg-stone-100 sm:text-sm";
 export const constructionLabelClass = "block text-sm font-medium text-stone-700";
 
 export const dateOrDash = (value: string | null | undefined) => (value ? billingDate(value) : "—");
+
+/** "Full Payment" or "30% downpayment", for the line that sums up an accepted estimate. */
+export function acceptedTermsText(terms: PaymentTerms | null, downpaymentPercent: number | null) {
+  if (terms === "full") return "Full Payment";
+  return downpaymentPercent ? `${downpaymentPercent}% downpayment` : "";
+}
 
 export function Eyebrow({ children }: { children: string }) {
   return <p className="text-xs font-semibold uppercase tracking-wide text-red-700">{children}</p>;
@@ -67,6 +73,34 @@ export function ScheduleTable({ rows }: { rows: ScheduleRow[] }) {
               <td className="whitespace-nowrap px-3 py-3 text-right align-top font-semibold tabular-nums">{formatPeso(row.amount)}</td>
               <td className="whitespace-nowrap px-3 py-3 align-top text-stone-600">{dateOrDash(row.targetDate)}</td>
               {showStatus && <td className="px-3 py-3 align-top">{row.status && <MilestonePill status={row.status} />}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** A Full Payment project's stages: the work schedule, with no amounts because the full payment covers them all. */
+export function WorkStagesTable({ stages }: { stages: WorkStage[] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-stone-200">
+      <table className="w-full min-w-[32rem] border-collapse text-left text-sm">
+        <thead className="bg-stone-50 text-xs font-semibold uppercase tracking-wide text-stone-500">
+          <tr>
+            <th scope="col" className="px-3 py-2.5">Stage</th>
+            <th scope="col" className="px-3 py-2.5">Target Date</th>
+            <th scope="col" className="px-3 py-2.5">Payment</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-200">
+          {stages.map((stage) => (
+            <tr key={stage.label + stage.targetDate}>
+              <td className="px-3 py-3 align-top font-semibold text-stone-950">{stage.label}</td>
+              <td className="whitespace-nowrap px-3 py-3 align-top text-stone-600">{dateOrDash(stage.targetDate)}</td>
+              <td className="px-3 py-3 align-top">
+                <span className="inline-flex whitespace-nowrap rounded-md bg-stone-100 px-2 py-1 text-xs font-semibold text-stone-700 ring-1 ring-inset ring-stone-200">Covered by full payment</span>
+              </td>
             </tr>
           ))}
         </tbody>

@@ -4,7 +4,7 @@ import { CheckCircle2, HardHat, LockKeyhole } from "lucide-react";
 import { ConstructionEstimateCard } from "@/components/customer/construction-estimate-card";
 import { ConstructionProjectCard } from "@/components/customer/construction-project-card";
 import { ConstructionRequestForm } from "@/components/customer/construction-request-form";
-import { dateOrDash, Eyebrow } from "@/components/customer/construction-shared";
+import { acceptedTermsText, dateOrDash, Eyebrow } from "@/components/customer/construction-shared";
 import { canRequestEstimate } from "@/components/customer/dream-house-journey";
 import { Button } from "@/components/ui/button";
 import { formatPeso } from "@/lib/house-design-data";
@@ -18,7 +18,7 @@ function AcceptedEstimateSummary({ estimate }: { estimate: CostEstimateDto }) {
       <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
       <p className="min-w-0 text-sm leading-6 text-stone-700">
         <span className="font-semibold text-red-900">Estimate {estimate.reference} accepted{estimate.acceptedAt ? ` ${dateOrDash(estimate.acceptedAt)}` : ""}</span>
-        {" · "}Contract total {formatPeso(estimate.total)}{estimate.downpaymentPercent ? ` · ${estimate.downpaymentPercent}% downpayment` : ""}
+        {" · "}Contract total {formatPeso(estimate.total)}{acceptedTermsText(estimate.paymentTerms, estimate.downpaymentPercent) ? ` · ${acceptedTermsText(estimate.paymentTerms, estimate.downpaymentPercent)}` : ""}
       </p>
     </div>
   );
@@ -57,7 +57,7 @@ export function DreamHouseConstructionSection({ design, estimate, project, start
       {project && blueprintPending && (
         <p className="flex items-start gap-2 rounded-lg bg-stone-50 p-4 text-sm leading-6 text-stone-600">
           <LockKeyhole className="mt-1 h-4 w-4 shrink-0" />
-          Your downpayment invoice is issued after the blueprint fee above is fully paid and verified.
+          Your {project.paymentTerms === "full" ? "full payment" : "downpayment"} invoice is issued after the blueprint fee above is fully paid and verified.
         </p>
       )}
       {estimate && !project && <ConstructionEstimateCard estimate={estimate} highlighted={false} onChanged={onChanged} />}

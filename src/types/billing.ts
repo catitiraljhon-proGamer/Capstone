@@ -160,7 +160,7 @@ export type BillingData = {
 /** A customer payment date shown read-only on the admin calendar; billing itself stays with the Billing Clerk. */
 export type PaymentDueDto = {
   id: string;
-  kind: "Downpayment" | "Progress billing" | "Blueprint fee" | "Design fee";
+  kind: "Downpayment" | "Full payment" | "Progress billing" | "Blueprint fee" | "Design fee";
   label: string;
   clientId: string;
   clientName: string;

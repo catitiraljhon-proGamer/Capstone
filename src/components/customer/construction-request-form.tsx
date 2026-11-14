@@ -175,7 +175,7 @@ export function ConstructionRequestForm({ design, onSubmitted, onCancel, showDes
               />
               {startMessage
                 ? <FieldError id="request-start-date-error" message={startMessage} />
-                : <span className="mt-1 block text-xs font-normal text-stone-500">Construction starts after your downpayment is verified.</span>}
+                : <span className="mt-1 block text-xs font-normal text-stone-500">Construction starts after your first payment is verified.</span>}
             </label>
             <label className={`min-w-0 ${constructionLabelClass}`}>
               Needed By <RequiredIndicator />
