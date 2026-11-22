@@ -3,8 +3,8 @@ import { type Db, type Filter, ObjectId } from "mongodb";
 import { after, type NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  collections, type DesignRequestDocument, type EstimateDocument, type InvoiceDocument, type NotificationDocument,
-  type PaymentDocument, type ProjectDocument, type UserDocument, type WarrantyClaimDocument,
+  collections, type DesignRequestDocument, type EstimateDocument, type InvoiceDocument, type MeetingRequestDocument, type NotificationDocument,
+  type PaymentDocument, type ProjectDocument, type ScheduleDocument, type UserDocument, type WarrantyClaimDocument,
 } from "@/lib/database/collections";
 import {
   closureReasons, dayMs, deleteConfirmWord, longManilaDate,
@@ -18,6 +18,7 @@ import {
   accountDeactivatedEmail, accountDeletedEmail, accountDeletionReminderEmail, emailErrorDetails, isEmailConfigured,
   sendEmail, type EmailMessage,
 } from "@/lib/server/email";
+import { feeInvoiceState } from "@/lib/server/design-requests";
 import { getSystemSettings } from "@/lib/server/maintenance";
 import { insertNotifications } from "@/lib/server/notifications";
 import { projectWarranty } from "@/lib/server/warranty";
@@ -49,17 +50,26 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 const andMore = (count: number) => (count > 1 ? ` (and ${count - 1} more)` : "");
 
 /** Anything still open with G4 Builders keeps the account from being deactivated or deleted. */
-async function closureChecks(db: Db, customerId: ObjectId): Promise<ClosureCheck[]> {
-  const [projects, invoices, pendingPayments, designs, estimates, claims] = await Promise.all([
+async function closureChecks(db: Db, customerId: ObjectId, now: Date): Promise<ClosureCheck[]> {
+  const [projects, invoices, pendingPayments, designs, approvedDesigns, estimates, claims, meetings, meetingRequests] = await Promise.all([
     db.collection<ProjectDocument>(collections.projects)
       .find({ customerId, status: { $ne: "Completed" } }, { projection: { name: 1, status: 1 } }).toArray(),
     db.collection<InvoiceDocument>(collections.invoices)
       .find({ customerId, status: { $in: ["Sent", "Partially Paid", "Overdue"] } }).sort({ dueDate: 1 }).toArray(),
     db.collection<PaymentDocument>(collections.payments).countDocuments({ customerId, status: "Pending" }),
     db.collection<DesignRequestDocument>(collections.designRequests).countDocuments({ customerId, status: { $in: [...openDesignStatuses] } }),
+    db.collection<DesignRequestDocument>(collections.designRequests).find({ customerId, status: "Design approved" }).toArray(),
     db.collection<EstimateDocument>(collections.estimates).countDocuments({ customerId, status: { $in: [...openEstimateStatuses] } }),
     db.collection<WarrantyClaimDocument>(collections.warrantyClaims).countDocuments({ customerId, status: { $in: [...openWarrantyClaimStatuses] } }),
+    db.collection<ScheduleDocument>(collections.schedules)
+      .countDocuments({ clientId: customerId, eventType: "Client meeting", status: "Scheduled", scheduledFor: { $gte: now } }),
+    db.collection<MeetingRequestDocument>(collections.meetingRequests).countDocuments({ customerId, status: "Pending" }),
   ]);
+  // After the customer approves a design, the blueprint is still being prepared and billed until its fee is paid.
+  let blueprints = 0;
+  for (const design of approvedDesigns) {
+    if (!(await feeInvoiceState(db, design)).unlocked) blueprints += 1;
+  }
   const unpaid: { invoiceNumber: string; balance: number }[] = [];
   for (const invoice of invoices) {
     const payments = await db.collection<PaymentDocument>(collections.payments)
@@ -67,7 +77,15 @@ async function closureChecks(db: Db, customerId: ObjectId): Promise<ClosureCheck
     const { balance } = invoiceState(invoice, sumMoney(payments.map((payment) => payment.amount)));
     if (balance > 0) unpaid.push({ invoiceNumber: invoice.invoiceNumber, balance });
   }
-  const openRequests = [designs ? plural(designs, "design request") : "", estimates ? plural(estimates, "estimate") : ""].filter(Boolean);
+  const openRequests = [
+    designs ? plural(designs, "design request") : "",
+    blueprints ? plural(blueprints, "blueprint") : "",
+    estimates ? plural(estimates, "estimate") : "",
+  ].filter(Boolean);
+  const openMeetings = [
+    meetings ? `${plural(meetings, "meeting")} scheduled` : "",
+    meetingRequests ? `${plural(meetingRequests, "meeting or pickup request")} waiting for the team` : "",
+  ].filter(Boolean);
 
   return [
     {
@@ -91,6 +109,11 @@ async function closureChecks(db: Db, customerId: ObjectId): Promise<ClosureCheck
       href: designs ? "/customer/design-requests" : "/customer/dream-house", linkLabel: designs ? "Design Requests" : "Dream House",
     },
     {
+      key: "meetings", title: "No upcoming meeting or pickup", ok: openMeetings.length === 0,
+      detail: openMeetings.length ? `${openMeetings.join(" and ")}.` : "Nothing is on your schedule.",
+      href: "/customer/schedule", linkLabel: "My Schedule",
+    },
+    {
       key: "claims", title: "No open warranty claim", ok: claims === 0,
       detail: claims ? `${plural(claims, "warranty claim")} still open.` : "No problems reported.",
       href: "/customer/dream-house", linkLabel: "Dream House",
@@ -110,7 +133,7 @@ async function activeCustomer(db: Db, actor: SessionUser) {
 export async function getAccountClosure(db: Db, actor: SessionUser, now = new Date()): Promise<AccountClosureDto> {
   const customer = await activeCustomer(db, actor);
   const settings = await getSystemSettings(db);
-  const checks = await closureChecks(db, customer._id);
+  const checks = await closureChecks(db, customer._id, now);
   const completed = await db.collection<ProjectDocument>(collections.projects).find({ customerId: customer._id, status: "Completed" }).toArray();
   const warrantyEnds = completed
     .map((project) => projectWarranty(project, settings.warrantyMonths, now))
@@ -201,8 +224,8 @@ async function deleteAccount(db: Db, customer: UserDocument, actor: Actor, now: 
 export async function closeAccount(db: Db, actor: SessionUser, raw: unknown, now = new Date()) {
   const input = closeSchema.parse(raw);
   const customer = await activeCustomer(db, actor);
-  if (!(await closureChecks(db, customer._id)).every((check) => check.ok)) {
-    throw new AccountClosureError("Finish your open project, payments, and requests first. Then you can deactivate or delete your account.", 409);
+  if (!(await closureChecks(db, customer._id, now)).every((check) => check.ok)) {
+    throw new AccountClosureError("Finish your open project, payments, requests, and meetings first. Then you can deactivate or delete your account.", 409);
   }
 
   if (input.action === "delete") {

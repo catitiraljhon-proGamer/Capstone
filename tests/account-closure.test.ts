@@ -5,7 +5,9 @@ import { ObjectId, type Db } from "mongodb";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { getDatabase } from "@/lib/database/mongodb";
-import type { InvoiceDocument, ProjectDocument, UserDocument } from "@/lib/database/collections";
+import type {
+  DesignRequestDocument, InvoiceDocument, MeetingRequestDocument, PaymentDocument, ProjectDocument, ScheduleDocument, UserDocument,
+} from "@/lib/database/collections";
 import {
   AccountClosureError, closeAccount, findReactivation, getAccountClosure, processDeactivatedAccounts, reactivateAccount,
   reactivationCookieName, setReactivationCookie, signInAccountFilter,
@@ -30,7 +32,7 @@ before(async () => {
 });
 beforeEach(async () => {
   assert.equal(db.databaseName, "isolated_account_closure_tests");
-  await Promise.all(["users", "projects", "invoices", "payments", "design_requests", "cost_estimates", "warranty_claims", "notifications", "audit_logs", "system_settings"]
+  await Promise.all(["users", "projects", "invoices", "payments", "design_requests", "cost_estimates", "warranty_claims", "notifications", "audit_logs", "system_settings", "schedules", "meeting_requests"]
     .map((name) => db.collection(name).deleteMany({})));
   const now = new Date();
   await db.collection<UserDocument>("users").insertMany([
@@ -88,6 +90,51 @@ test("anything still open keeps the account from being deactivated or deleted", 
   await assert.rejects(closeAccount(db, customer, { action: "deactivate" }), isStatus(409));
   await assert.rejects(closeAccount(db, customer, { action: "delete", confirm: "DELETE" }), isStatus(409));
   assert.equal((await user())?.status, "active");
+});
+
+test("a blueprint still being prepared, an upcoming meeting, or a pending pickup request also keeps the account open", async () => {
+  const now = new Date();
+  const customerId = new ObjectId(customer.id);
+  const check = async (key: string) => (await getAccountClosure(db, customer, now)).checks.find((item) => item.key === key)!;
+
+  // The customer approved the design; the blueprint fee is not paid yet.
+  const designId = new ObjectId();
+  await db.collection<DesignRequestDocument>("design_requests").insertOne({
+    _id: designId, customerId, floorArea: 100, rooms: "3 bedrooms", notes: "", status: "Design approved",
+    designApprovedAt: now, createdAt: now, updatedAt: now,
+  });
+  assert.equal((await check("requests")).ok, false);
+  assert.equal((await check("requests")).detail, "1 blueprint still open.");
+  await assert.rejects(closeAccount(db, customer, { action: "deactivate" }, now), isStatus(409));
+  // Once its fee is paid, the blueprint is done.
+  const invoiceId = new ObjectId();
+  await db.collection<InvoiceDocument>("invoices").insertOne({
+    _id: invoiceId, invoiceNumber: "INV-BP-1", customerId, designRequestId: designId, label: "Blueprint fee", progressPercentage: 0,
+    amount: 20_000, dueDate: now, status: "Paid", createdAt: now, updatedAt: now,
+  });
+  await db.collection<PaymentDocument>("payments").insertOne({
+    _id: new ObjectId(), reference: "PAY-BP-1", customerId, invoiceId, amount: 20_000, method: "Cash", status: "Verified",
+    paidAt: now, createdAt: now, verifiedAt: now,
+  });
+  assert.equal((await check("requests")).ok, true);
+
+  // A meeting still ahead, then a pickup request the team hasn't answered.
+  const meetingId = new ObjectId();
+  await db.collection<ScheduleDocument>("schedules").insertOne({
+    _id: meetingId, title: "Site visit", eventType: "Client meeting", clientId: customerId, clientName: customer.name,
+    scheduledFor: new Date(now.getTime() + 3 * day), durationMinutes: 60, status: "Scheduled", paymentStatus: "Not applicable",
+    createdBy: new ObjectId(admin.id), createdByName: admin.name, createdAt: now, updatedAt: now,
+  });
+  assert.equal((await check("meetings")).detail, "1 meeting scheduled.");
+  await db.collection("schedules").updateOne({ _id: meetingId }, { $set: { status: "Completed" } });
+  await db.collection<MeetingRequestDocument>("meeting_requests").insertOne({
+    _id: new ObjectId(), customerId, customerName: customer.name, topic: "Blueprint pickup", mode: "In person",
+    purpose: "blueprint-pickup", designRequestId: designId, preferredTimes: [new Date(now.getTime() + day)], status: "Pending",
+    createdAt: now, updatedAt: now,
+  });
+  assert.equal((await check("meetings")).detail, "1 meeting or pickup request waiting for the team.");
+  await db.collection("meeting_requests").updateMany({}, { $set: { status: "Approved" } });
+  assert.equal((await getAccountClosure(db, customer, now)).canClose, true);
 });
 
 test("deleting needs DELETE typed, removes the sign-in and personal details, and keeps the record with the name", async () => {

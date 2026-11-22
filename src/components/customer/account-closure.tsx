@@ -2,14 +2,35 @@
 
 import { FormDialog } from "@/components/ui/form-dialog";
 import { closureReasons, deleteConfirmWord, type AccountClosureDto } from "@/lib/account-closure";
+import { phoneHref } from "@/lib/contact-details";
+import { useContactDetails } from "@/lib/use-contact-details";
 import {
-  Archive, ArrowUpRight, Check, CirclePause, Download, LoaderCircle, MessageCircleQuestion, ShieldCheck, Trash2, X,
+  Archive, ArrowUpRight, Check, CirclePause, Download, LoaderCircle, Mail, MessageCircleQuestion, Phone, ShieldCheck, Trash2, X,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
 type Choice = "deactivate" | "delete";
+
+/** The office phone and email from Maintenance > Contact Us. */
+function TalkToUs() {
+  const contact = useContactDetails(true);
+  if (!contact) return <p role="status" className="mt-4 text-sm text-stone-500">Loading contact details…</p>;
+  const link = "flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-950 transition hover:bg-rose-50";
+  return (
+    <div className="mt-4 grid gap-2">
+      <a href={phoneHref(contact.phone)} className={link}>
+        <Phone aria-hidden="true" className="h-4 w-4 shrink-0 text-red-700" />
+        <span className="sr-only">Call </span>{contact.phone}
+      </a>
+      <a href={`mailto:${contact.email}`} className={link}>
+        <Mail aria-hidden="true" className="h-4 w-4 shrink-0 text-red-700" />
+        <span className="sr-only">Email </span><span className="min-w-0 break-all">{contact.email}</span>
+      </a>
+    </div>
+  );
+}
 
 const panel = "min-w-0 rounded-xl border border-stone-200 bg-white p-5 shadow-sm";
 const primaryButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50";
@@ -60,7 +81,7 @@ function BeforeYouGo({ closure }: { closure: AccountClosureDto }) {
         ) : null
       ) : (
         <p role="alert" className="mt-2 rounded-lg bg-red-50 px-4 py-3 text-sm leading-6 text-red-800">
-          Finish your project, payments, and requests first. If you need help, message G4 Builders.
+          Finish the open items above first. If you need help, call or email G4 Builders.
         </p>
       )}
     </section>
@@ -275,7 +296,7 @@ export function AccountClosure() {
             <h2 className="font-semibold tracking-tight">Something wrong?</h2>
           </div>
           <p className="mt-3 text-sm leading-6 text-stone-600">If you&apos;re leaving because of your project or billing, talk to us first. We may be able to fix it.</p>
-          <Link href="/customer/messages" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-red-700 hover:text-red-800 hover:underline">Message G4 Builders</Link>
+          <TalkToUs />
         </section>
       </div>
 

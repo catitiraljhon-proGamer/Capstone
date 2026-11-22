@@ -16,7 +16,7 @@ export type ClosureReason = (typeof closureReasons)[number];
 export const deleteConfirmWord = "DELETE";
 
 export type ClosureCheck = {
-  key: "projects" | "balance" | "payments" | "requests" | "claims";
+  key: "projects" | "balance" | "payments" | "requests" | "meetings" | "claims";
   title: string;
   ok: boolean;
   detail: string;
