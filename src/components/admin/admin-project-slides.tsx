@@ -11,7 +11,7 @@ import type {
   ProjectStatusAction,
 } from "@/types/construction";
 import type { HouseType } from "@/lib/house-design-data";
-import { Building2, ChevronDown, Lock } from "lucide-react";
+import { Building2, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 const projectTone: Record<ProjectStatus, string> = {
@@ -168,8 +168,7 @@ function CompleteProjectDialog({
         {fixedType ? (
           <>
             <p className="mt-4 block text-sm font-semibold text-stone-950">House Type</p>
-            <p className="mt-1.5 flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm font-medium text-stone-950">
-              <Lock className="h-4 w-4 text-stone-500" aria-hidden="true" />
+            <p className="mt-1.5 flex h-10 items-center rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm font-medium text-stone-950">
               {fixedType}
             </p>
             <p className="mt-1.5 text-xs text-stone-500">

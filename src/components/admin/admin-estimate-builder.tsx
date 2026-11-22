@@ -24,7 +24,7 @@ import type {
   EstimateStatus,
   MilestoneTemplate,
 } from "@/types/construction";
-import { ChevronRight, EyeOff, FolderKanban, Lock, Plus, Send, Trash2, X } from "lucide-react";
+import { ChevronRight, EyeOff, FolderKanban, Plus, Send, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -857,10 +857,7 @@ function EditableEstimate({ estimate, onUpdated }: { estimate: CostEstimateDto; 
                                         ) : null}
                                       </td>
                                       <td className="px-2 py-2.5 text-right tabular-nums text-stone-700">
-                                        <span className="inline-flex items-center gap-1.5">
-                                          <Lock className="h-3 w-3 text-stone-400" aria-label="Price from Maintenance" />
-                                          {formatPeso(priceOf(material))}
-                                        </span>
+                                        {formatPeso(priceOf(material))}
                                       </td>
                                       <td className="px-2 py-1.5">
                                         <input
