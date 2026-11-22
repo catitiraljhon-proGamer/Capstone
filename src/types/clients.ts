@@ -31,6 +31,8 @@ export type ClientDto = {
   occupation: string;
   status: UserStatus;
   archivedAt: string | null;
+  /** Set while the client has deactivated their own account; dates are long Manila dates. */
+  deactivation: { deactivatedOn: string; deletesOn: string; reason: string | null } | null;
   profileComplete: boolean;
   createdAt: string;
   updatedAt: string;

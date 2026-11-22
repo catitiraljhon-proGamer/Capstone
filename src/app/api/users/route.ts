@@ -21,7 +21,8 @@ export async function GET() {
     const db = await getDatabase();
     const documents = await db
       .collection<UserDocument>(collections.users)
-      .find()
+      // Deleted customer accounts are kept only so their billing history has an owner.
+      .find({ deletedAt: { $exists: false } })
       .sort({ createdAt: -1, name: 1 })
       .limit(1000)
       .toArray();

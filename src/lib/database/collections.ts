@@ -71,14 +71,21 @@ export type UserDocument = {
   authVersion?: number;
   clientDetails?: ClientDetails;
   clientArchivedAt?: Date | null;
-  /** Set when the client was archived and disabled automatically after 30 days of inactivity. */
+  /**
+   * Legacy: set by the automatic archive of inactive clients that account deactivation replaced. Unarchiving such a
+   * client still restores their sign-in.
+   */
   autoArchivedAt?: Date;
-  /** Start of the inactivity period the 7-day "account will be archived" notice was sent for, so it is sent once. */
-  inactivityNoticeFor?: Date;
-  /** When that notice went out; archiving waits at least 7 days after it. */
-  inactivityNoticeSentAt?: Date;
-  /** When an admin last unarchived the client; the 30-day inactivity count restarts from here. */
-  reactivatedAt?: Date;
+  /**
+   * Set while a customer has deactivated their own account (status "disabled"). Signing in before `deletesAt`
+   * reactivates it; after that the daily job deletes it.
+   */
+  deactivation?: { at: Date; deletesAt: Date; reason?: string; reminderSentAt?: Date };
+  /**
+   * When the account was deleted. The sign-in, email, and personal details are removed; the record stays, with the
+   * name, so the client's projects, invoices, and payments keep their owner.
+   */
+  deletedAt?: Date;
   /** Customer's one-time agreement to the Terms and Conditions; the audit log keeps the exact text. */
   termsAcceptance?: { auditLogId: ObjectId; version: string; acceptedAt: Date };
   createdAt: Date;

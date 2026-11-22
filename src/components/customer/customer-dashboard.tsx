@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountClosure } from "@/components/customer/account-closure";
 import { AccountTermsGate } from "@/components/customer/account-terms-gate";
 import { BillingWorkspace } from "@/components/billing/billing-workspace";
 import { BrandLogo } from "@/components/ui/brand-logo";
@@ -31,7 +32,9 @@ import {
   Home,
   Menu,
   ReceiptText,
+  UserCog,
   UserRound,
+  UserX,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -45,7 +48,7 @@ type CustomerSection =
   | "requests"
   | "billing"
   | "schedule"
-  | "profile";
+  | "account";
 
 const houseImage = "/House/image.png";
 
@@ -63,8 +66,14 @@ const customerNav: {
 ];
 
 const customerAccountLinks: AccountMenuLink[] = [
-  { label: "My Profile", icon: UserRound, href: "/customer/profile" },
+  { label: "Manage Account", icon: UserCog, href: "/customer/account" },
 ];
+
+const accountTabs = [
+  { id: "profile", label: "My Profile", icon: UserRound, href: "/customer/account" },
+  { id: "close", label: "Deactivate or Delete", icon: UserX, href: "/customer/account/deactivate" },
+] as const;
+export type AccountTab = (typeof accountTabs)[number]["id"];
 
 function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -531,13 +540,33 @@ export function CustomerSchedulePage() {
   return <CustomerShell activeSection="schedule" title="My Schedule" description="See your meetings and payment due dates, and request a meeting with the team."><CustomerSchedule /></CustomerShell>;
 }
 
-export function CustomerProfilePage() {
+/** Manage Account: My Profile, and Deactivate or Delete, as tabs with their own addresses. */
+export function CustomerAccountPage({ tab }: { tab: AccountTab }) {
   return (
-    <CustomerShell activeSection="profile" title="My Profile" description="Manage customer account details.">
-      <Panel className="max-w-3xl p-4 sm:p-6">
-        <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
-        <div className="mt-5"><ClientProfileForm /></div>
-      </Panel>
+    <CustomerShell activeSection="account" title="Manage Account" description="Update your details, or deactivate or delete your account.">
+      <div className="max-w-6xl">
+        <nav aria-label="Manage Account" className="mb-6 flex gap-1 overflow-x-auto border-b border-stone-200">
+          {accountTabs.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={item.id === tab ? "page" : undefined}
+              className={`flex min-h-11 shrink-0 items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition ${item.id === tab ? "border-red-700 text-red-800" : "border-transparent text-stone-500 hover:text-stone-950"}`}
+            >
+              <item.icon aria-hidden="true" className="h-4 w-4" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        {tab === "profile" ? (
+          <Panel className="max-w-3xl p-4 sm:p-6">
+            <h1 className="text-xl font-semibold tracking-tight">Profile Details</h1>
+            <div className="mt-5"><ClientProfileForm /></div>
+          </Panel>
+        ) : (
+          <AccountClosure />
+        )}
+      </div>
     </CustomerShell>
   );
 }

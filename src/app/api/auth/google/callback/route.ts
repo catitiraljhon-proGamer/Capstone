@@ -1,4 +1,5 @@
 import { getDatabase } from "@/lib/database/mongodb";
+import { setReactivationCookie } from "@/lib/server/account-closure";
 import { getCurrentTerms, recordAccountTerms } from "@/lib/server/account-terms";
 import { recordAuditLog } from "@/lib/server/audit";
 import { signInDestination } from "@/lib/server/clients";
@@ -59,11 +60,16 @@ export async function GET(request: NextRequest) {
     stage = "database";
     const db = await getDatabase();
     stage = "account";
-    const { user, created, needsLink } = await resolveGoogleAccount(
+    const { user, created, needsLink, deactivated } = await resolveGoogleAccount(
       db,
       profile,
     );
     stage = "session";
+    if (deactivated) {
+      const response = redirectResponse(new URL("/login?reactivate=1", origin));
+      await setReactivationCookie(response, user, flow.rememberMe);
+      return response;
+    }
     if (needsLink) {
       const response = redirectResponse(
         new URL("/login?google_link=1", origin),

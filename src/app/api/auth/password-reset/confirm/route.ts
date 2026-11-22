@@ -1,6 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
+import { signInAccountFilter } from "@/lib/server/account-closure";
 import { recordAuditLog } from "@/lib/server/audit";
 import { requirePasswordPolicy } from "@/lib/server/maintenance";
 import {
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
     const db = await getDatabase();
     const users = db.collection<UserDocument>(collections.users);
-    const user = await users.findOne({ _id: new ObjectId(claims.userId), status: "active" });
+    const user = await users.findOne({ _id: new ObjectId(claims.userId), ...signInAccountFilter });
     if (!user || !resetTokenMatches(user, claims.fingerprint)) return expiredLink();
 
     await requirePasswordPolicy(db, password);

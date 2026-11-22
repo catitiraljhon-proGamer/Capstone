@@ -30,7 +30,7 @@ export async function PATCH(
     const db = await getDatabase();
     const users = db.collection<UserDocument>(collections.users);
     const userId = new ObjectId(id);
-    const existing = await users.findOne({ _id: userId });
+    const existing = await users.findOne({ _id: userId, deletedAt: { $exists: false } });
 
     if (!existing) {
       return NextResponse.json({ error: "User account not found." }, { status: 404 });
@@ -93,8 +93,10 @@ export async function PATCH(
     const update: UpdateFilter<UserDocument> = invalidatesSessions
       ? { $set: set, $inc: { authVersion: 1 } }
       : { $set: set };
+    // Turning a deactivated customer back on stops the countdown to deletion.
+    if (existing.deactivation && nextStatus === "active") update.$unset = { deactivation: "" };
     const updated = await users.findOneAndUpdate(
-      { _id: userId },
+      { _id: userId, deletedAt: { $exists: false } },
       update,
       { returnDocument: "after" },
     );

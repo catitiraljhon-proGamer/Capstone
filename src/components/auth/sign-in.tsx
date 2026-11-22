@@ -4,6 +4,8 @@ import { BackButton } from "@/components/ui/back-button";
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { AccountTermsNotice } from "@/components/auth/account-terms";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
+import { ReactivateAccount } from "@/components/auth/reactivate-account";
+import type { ReactivationDto } from "@/lib/account-closure";
 import { Building2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { FormEvent, ReactNode, useState } from "react";
@@ -23,6 +25,10 @@ interface SignInPageProps {
   initialError?: string;
   googleLinkEmail?: string;
   initialRememberMe?: boolean;
+  /** An information banner, such as "Your account is deactivated." */
+  notice?: string;
+  /** Set when a deactivated customer arrives back from Google sign-in. */
+  initialReactivation?: ReactivationDto;
 }
 
 /** Two of the services G4 offers, shown beside the sign-in form. */
@@ -77,11 +83,14 @@ export function SignInPage({
   initialError = "",
   googleLinkEmail,
   initialRememberMe = false,
+  notice,
+  initialReactivation,
 }: SignInPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberMe, setRememberMe] = useState(initialRememberMe);
+  const [reactivation, setReactivation] = useState(initialReactivation);
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     if (onSignIn) {
@@ -114,7 +123,13 @@ export function SignInPage({
       const payload = (await response.json()) as {
         error?: string;
         redirectTo?: string;
+        reactivate?: ReactivationDto;
       };
+
+      if (response.ok && payload.reactivate) {
+        setReactivation(payload.reactivate);
+        return;
+      }
 
       if (!response.ok || !payload.redirectTo) {
         setErrorMessage(payload.error ?? "Unable to sign in.");
@@ -144,6 +159,15 @@ export function SignInPage({
       <main className="mx-auto grid min-h-[calc(100dvh-5rem)] w-full max-w-[1244px] grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:px-8">
         <section className="flex min-w-0 items-center justify-center">
           <div className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-5 shadow-sm sm:p-8">
+            {reactivation ? (
+              <ReactivateAccount
+                reactivation={reactivation}
+                onCancel={() => {
+                  setReactivation(undefined);
+                  window.history.replaceState(null, "", "/login");
+                }}
+              />
+            ) : (
             <div className="flex flex-col gap-6">
               <div>
                 <h1 className="sr-only">Sign in</h1>
@@ -151,6 +175,12 @@ export function SignInPage({
                   {description}
                 </p>
               </div>
+
+              {notice ? (
+                <p role="status" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-stone-700">
+                  {notice}
+                </p>
+              ) : null}
 
               {googleLinkEmail ? (
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 break-words text-stone-700">
@@ -295,6 +325,7 @@ export function SignInPage({
               </p>
               <AccountTermsNotice />
             </div>
+            )}
           </div>
         </section>
 

@@ -76,8 +76,8 @@ export async function updateSystemSettings(db: Db, actor: SessionUser, raw: unkn
   const input = updateSchema.parse(raw) as Partial<SystemSettings>;
   const current = await getSystemSettings(db);
   const next = { ...current, ...input };
-  if (next.inactiveNoticeDays >= next.inactiveArchiveDays) {
-    throw new MaintenanceError("Warn inactive clients fewer days before archiving than the archive period itself.");
+  if (next.deactivationReminderDays >= next.deactivatedDeleteDays) {
+    throw new MaintenanceError("Remind before deletion must be fewer days than Delete deactivated accounts after.");
   }
   const changed = settingKeys.filter((key) => input[key] !== undefined && input[key] !== current[key]);
   if (!changed.length) return getSystemSettingsView(db);

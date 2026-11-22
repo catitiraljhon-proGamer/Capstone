@@ -9,6 +9,7 @@ import { AdminMaintenanceSlideshow } from "@/components/admin/admin-maintenance-
 import { AdminMaintenanceTerms } from "@/components/admin/admin-maintenance-terms";
 import { AdminMaintenanceWarranty } from "@/components/admin/admin-maintenance-warranty";
 import { Button } from "@/components/ui/button";
+import { dayMs, longManilaDate } from "@/lib/account-closure";
 import { manilaDate } from "@/lib/billing";
 import { addMonths, warrantyDate } from "@/lib/warranty";
 import {
@@ -34,6 +35,14 @@ function warrantyExample(draft: Draft) {
   return `Example: a project completed today is covered until ${warrantyDate(addMonths(manilaDate(), months))}.`;
 }
 
+function deactivationExample(draft: Draft) {
+  const deleteDays = Number(draft.deactivatedDeleteDays);
+  const reminderDays = Number(draft.deactivationReminderDays);
+  if (!Number.isInteger(deleteDays) || deleteDays < 1 || !Number.isInteger(reminderDays) || reminderDays < 1 || reminderDays >= deleteDays) return null;
+  const now = Date.now();
+  return `Example: an account deactivated today is deleted on ${longManilaDate(new Date(now + deleteDays * dayMs))}, with a reminder email on ${longManilaDate(new Date(now + (deleteDays - reminderDays) * dayMs))}, unless the customer signs back in.`;
+}
+
 const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingGroup[] }[] = [
   { id: "mode", label: "Maintenance mode", icon: Wrench, groups: [] },
   {
@@ -50,7 +59,13 @@ const sections: { id: Section; label: string; icon: LucideIcon; groups: SettingG
   {
     id: "notifications", label: "Notifications and reminders", icon: Bell, groups: [
       { title: "Email copies of notifications", description: "Every notification also shows inside the system.", keys: ["emailCopiesAdmin", "emailCopiesBillingClerk", "emailCopiesCustomer"] },
-      { title: "Reminders", keys: ["dueReminderDays", "inactiveNoticeDays", "inactiveArchiveDays"] },
+      { title: "Reminders", keys: ["dueReminderDays"] },
+      {
+        title: "Account deactivation",
+        description: "For customers who deactivate their account in Manage Account. Signing back in before the deletion date reactivates it.",
+        keys: ["deactivatedDeleteDays", "deactivationReminderDays"],
+        note: deactivationExample,
+      },
     ],
   },
   {

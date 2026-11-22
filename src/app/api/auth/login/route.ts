@@ -1,6 +1,12 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
+import {
+  isDeactivated,
+  setReactivationCookie,
+  signInAccountFilter,
+  toReactivationDto,
+} from "@/lib/server/account-closure";
 import { signInDestination } from "@/lib/server/clients";
 import { recordAuditLog } from "@/lib/server/audit";
 import { getSystemSettings } from "@/lib/server/maintenance";
@@ -86,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     const user = await db.collection<UserDocument>(collections.users).findOne({
       email: input.email,
-      status: "active",
+      ...signInAccountFilter,
     });
     const passwordMatches = await compare(
       input.password,
@@ -128,6 +134,13 @@ export async function POST(request: NextRequest) {
     }
 
     await clearRateLimit(db, accountKey);
+
+    // A deactivated customer is asked to reactivate before they are signed in.
+    if (isDeactivated(user)) {
+      const response = NextResponse.json({ reactivate: toReactivationDto(user) });
+      await setReactivationCookie(response, user, input.rememberMe);
+      return response;
+    }
 
     if (input.linkGoogle) {
       const link = await readGoogleLink(

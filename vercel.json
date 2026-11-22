@@ -6,7 +6,7 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/client-inactivity",
+      "path": "/api/cron/account-deactivation",
       "schedule": "30 0 * * *"
     },
     {

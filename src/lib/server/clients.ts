@@ -1,3 +1,4 @@
+import { longManilaDate } from "@/lib/account-closure";
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { recordAuditLog } from "@/lib/server/audit";
 import { requirePasswordPolicy } from "@/lib/server/maintenance";
@@ -95,6 +96,11 @@ export function toClientDto(user: UserDocument): ClientDto {
     occupation: details?.occupation ?? "",
     status: user.status,
     archivedAt: user.clientArchivedAt?.toISOString() ?? null,
+    deactivation: user.deactivation ? {
+      deactivatedOn: longManilaDate(user.deactivation.at),
+      deletesOn: longManilaDate(user.deactivation.deletesAt),
+      reason: user.deactivation.reason ?? null,
+    } : null,
     profileComplete: isClientProfileComplete(user),
     createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString(),
   };
@@ -106,6 +112,8 @@ export async function listClients(db: Db, actor: SessionUser, rawInput: unknown)
   const filter: Filter<UserDocument> = {
     role: "customer",
     clientArchivedAt: view === "archived" ? { $ne: null } : null,
+    // Deleted accounts keep their record for billing history, but are no longer clients.
+    deletedAt: { $exists: false },
   };
   if (q) {
     const literalQuery = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -122,7 +130,7 @@ export async function listClients(db: Db, actor: SessionUser, rawInput: unknown)
 
 export async function getClient(db: Db, actor: SessionUser, id: string) {
   requireClientAccess(actor, id);
-  const user = await db.collection<UserDocument>(collections.users).findOne({ _id: objectId(id), role: "customer" });
+  const user = await db.collection<UserDocument>(collections.users).findOne({ _id: objectId(id), role: "customer", deletedAt: { $exists: false } });
   if (!user) throw new ClientRequestError("Client record not found.", 404);
   return toClientDto(user);
 }
@@ -168,20 +176,20 @@ export async function setClientArchived(db: Db, actor: SessionUser, id: string, 
   const users = db.collection<UserDocument>(collections.users);
   const now = new Date();
   const updated = await users.findOneAndUpdate(
-    { _id: clientId, role: "customer", clientArchivedAt: archived ? null : { $ne: null } },
+    { _id: clientId, role: "customer", clientArchivedAt: archived ? null : { $ne: null }, deletedAt: { $exists: false } },
     archived
       ? { $set: { clientArchivedAt: now, updatedAt: now } }
-      // Unarchiving restores sign-in for accounts the 30-day inactivity job disabled (never for accounts an admin
-      // disabled in Users & Roles) and restarts the inactivity count.
+      // Unarchiving restores sign-in for accounts the old automatic inactivity archive disabled (never for accounts an
+      // admin disabled in Users & Roles, nor for customers who deactivated their own account).
       : [
-        { $set: { status: { $cond: [{ $ifNull: ["$autoArchivedAt", false] }, "active", "$status"] }, reactivatedAt: now, updatedAt: now } },
-        { $unset: ["clientArchivedAt", "autoArchivedAt", "inactivityNoticeFor", "inactivityNoticeSentAt"] },
+        { $set: { status: { $cond: [{ $ifNull: ["$autoArchivedAt", false] }, "active", "$status"] }, updatedAt: now } },
+        { $unset: ["clientArchivedAt", "autoArchivedAt"] },
       ],
     { returnDocument: "after" },
   );
   if (!updated) {
     // Repeated requests keep the original archive date and do not duplicate audit events.
-    const existing = await users.findOne({ _id: clientId, role: "customer" });
+    const existing = await users.findOne({ _id: clientId, role: "customer", deletedAt: { $exists: false } });
     if (!existing) throw new ClientRequestError("Client record not found.", 404);
     return toClientDto(existing);
   }

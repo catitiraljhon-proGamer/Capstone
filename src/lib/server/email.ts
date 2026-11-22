@@ -163,6 +163,61 @@ ${buttonLink(link, "Go to Sign In")}
   };
 }
 
+const paragraph = (text: string) =>
+  `<p style="margin:0 0 16px;font-size:14px;line-height:22px;color:#57534e">${text}</p>`;
+const recordsKept = "Your project, invoice, and payment records stay with G4 Builders for our books.";
+
+/** Sent when a customer deactivates their account in Manage Account. */
+export function accountDeactivatedEmail(to: string, recipientName: string, deletesOn: string): EmailMessage {
+  const link = appUrl("/login");
+  return {
+    to,
+    subject: "Your G4 Builders account is deactivated",
+    text: `Hi ${recipientName},\n\nYou deactivated your G4 Builders account. It will be deleted on ${deletesOn} unless you sign in before then. Signing in lets you reactivate it, with your project, billing, and files where you left them.\n\nSign in: ${link}\n\n${recordsKept}`,
+    html: layout(
+      "Your account is deactivated",
+      `${paragraph(`Hi ${escapeHtml(recipientName)},`)}
+${paragraph(`You deactivated your G4 Builders account. It will be deleted on <strong>${escapeHtml(deletesOn)}</strong> unless you sign in before then. Signing in lets you reactivate it, with your project, billing, and files where you left them.`)}
+${buttonLink(link, "Sign In to Reactivate")}
+<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#78716c">${recordsKept}</p>`,
+    ),
+  };
+}
+
+/** The last reminder before a deactivated account is deleted. */
+export function accountDeletionReminderEmail(to: string, recipientName: string, deletesOn: string): EmailMessage {
+  const link = appUrl("/login");
+  return {
+    to,
+    subject: `Your G4 Builders account will be deleted on ${deletesOn}`,
+    text: `Hi ${recipientName},\n\nYour G4 Builders account is deactivated and will be deleted on ${deletesOn}. To keep it, sign in before then and choose Reactivate.\n\nSign in: ${link}\n\nIf you want it deleted, you don't need to do anything.`,
+    html: layout(
+      `Your account will be deleted on ${deletesOn}`,
+      `${paragraph(`Hi ${escapeHtml(recipientName)},`)}
+${paragraph(`Your G4 Builders account is deactivated and will be deleted on <strong>${escapeHtml(deletesOn)}</strong>. To keep it, sign in before then and choose <strong>Reactivate</strong>.`)}
+${buttonLink(link, "Sign In to Reactivate")}
+<p style="margin:20px 0 0;font-size:13px;line-height:20px;color:#78716c">If you want it deleted, you don't need to do anything.</p>`,
+    ),
+  };
+}
+
+/** Sent to the customer's old address when their account is deleted, by them or after deactivation. */
+export function accountDeletedEmail(to: string, recipientName: string): EmailMessage {
+  const link = appUrl("/register");
+  return {
+    to,
+    subject: "Your G4 Builders account was deleted",
+    text: `Hi ${recipientName},\n\nYour G4 Builders account has been deleted, and you can no longer sign in with it. ${recordsKept}\n\nThank you for building with G4 Builders Inc. To start a new project, register again: ${link}`,
+    html: layout(
+      "Your account was deleted",
+      `${paragraph(`Hi ${escapeHtml(recipientName)},`)}
+${paragraph(`Your G4 Builders account has been deleted, and you can no longer sign in with it. ${recordsKept}`)}
+${paragraph("Thank you for building with G4 Builders Inc. To start a new project, register again anytime.")}
+${buttonLink(link, "Register")}`,
+    ),
+  };
+}
+
 export function notificationEmail(
   to: string,
   recipientName: string,

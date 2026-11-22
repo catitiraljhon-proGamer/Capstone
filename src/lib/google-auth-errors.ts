@@ -11,6 +11,8 @@ const messages: Record<string, string> = {
     "Please verify your email address with Google before continuing.",
   account_unavailable:
     "This account cannot use Google sign-in. Please contact G4 Builders for help.",
+  deactivated:
+    "This account is deactivated. Sign in with your email and password to reactivate it.",
 };
 
 export function googleAuthErrorMessage(code: string | string[] | undefined) {

@@ -14,8 +14,8 @@ export type SystemSettings = {
   emailCopiesBillingClerk: boolean;
   emailCopiesCustomer: boolean;
   dueReminderDays: number;
-  inactiveNoticeDays: number;
-  inactiveArchiveDays: number;
+  deactivatedDeleteDays: number;
+  deactivationReminderDays: number;
   autoBackup: boolean;
   keepAutomaticBackups: number;
   warrantyMonths: number;
@@ -39,8 +39,8 @@ export const defaultSystemSettings: SystemSettings = {
   emailCopiesBillingClerk: true,
   emailCopiesCustomer: true,
   dueReminderDays: 3,
-  inactiveNoticeDays: 7,
-  inactiveArchiveDays: 30,
+  deactivatedDeleteDays: 60,
+  deactivationReminderDays: 7,
   autoBackup: true,
   keepAutomaticBackups: 7,
   // The 1-year warranty the panel asked for.
@@ -67,8 +67,8 @@ export const settingFields: Record<SettingKey, SettingField> = {
   emailCopiesBillingClerk: { kind: "toggle", label: "Billing Clerk", hint: "Email a copy of each notification." },
   emailCopiesCustomer: { kind: "toggle", label: "Customer", hint: "Email a copy of each notification." },
   dueReminderDays: { kind: "number", label: "Payment due reminder", hint: "Days before an unpaid invoice is due.", unit: "day/s before", min: 1, max: 30 },
-  inactiveNoticeDays: { kind: "number", label: "Warn inactive clients", hint: "Days of warning before archiving.", unit: "day/s before", min: 1, max: 60 },
-  inactiveArchiveDays: { kind: "number", label: "Archive inactive clients after", hint: "Days with no open work after the last project's warranty ends.", unit: "day/s", min: 7, max: 365 },
+  deactivatedDeleteDays: { kind: "number", label: "Delete deactivated accounts after", hint: "Unless the customer signs back in. A change applies to accounts deactivated after it.", unit: "day/s", min: 7, max: 365 },
+  deactivationReminderDays: { kind: "number", label: "Remind before deletion", hint: "Emails the customer one last reminder.", unit: "day/s before", min: 1, max: 30 },
   autoBackup: { kind: "toggle", label: "Automatic daily backup" },
   keepAutomaticBackups: { kind: "number", label: "Keep the last", hint: "Older automatic backups are deleted. Manual ones are kept.", unit: "automatic backups", min: 1, max: 30 },
   warrantyMonths: { kind: "number", label: "Warranty length", hint: "Counted from the day a project is marked Completed. 12 months is 1 year.", unit: "months", min: 1, max: 60 },

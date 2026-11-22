@@ -7,8 +7,8 @@ import { getDatabase } from "@/lib/database/mongodb";
 import type { ProjectDocument, ScheduleDocument, UserDocument, WarrantyClaimDocument } from "@/lib/database/collections";
 import { manilaDate } from "@/lib/billing";
 import { addMonths, daysBetween } from "@/lib/warranty";
+import { getAccountClosure } from "@/lib/server/account-closure";
 import { BillingError } from "@/lib/server/billing";
-import { archiveInactiveClients } from "@/lib/server/client-inactivity";
 import { changeProjectStatus, listProjects } from "@/lib/server/construction";
 import { updateSystemSettings } from "@/lib/server/maintenance";
 import {
@@ -222,14 +222,14 @@ test("the warranty lists need different names and at least one shown problem typ
   assert.ok(saved.problemTypes.some((type) => type.name === "Water heater"));
 });
 
-test("homeowners stay active while their warranty runs or a claim is open, then are archived after it ends", async () => {
+test("an open warranty claim keeps a homeowner from closing their account, and a running warranty is shown", async () => {
   const project = await completedProject(10);
-  const warrantyOver = project.warrantyEndsAt!.getTime() + day;
-  // Thirty days after completion used to archive the client; the warranty keeps them able to report a problem.
-  assert.deepEqual(await archiveInactiveClients(db, new Date(Date.now() + 40 * day)), { noticed: 0, archived: 0 });
-  // An open claim keeps them active even after the warranty ends.
   const claim = await createWarrantyClaim(db, customer, report(project._id));
-  assert.deepEqual(await archiveInactiveClients(db, new Date(warrantyOver + 40 * day)), { noticed: 0, archived: 0 });
+  let closure = await getAccountClosure(db, customer);
+  assert.equal(closure.canClose, false);
+  assert.equal(closure.checks.find((check) => check.key === "claims")?.ok, false);
+  assert.ok(closure.warrantyUntil);
   await db.collection("warranty_claims").updateOne({ _id: new ObjectId(claim.id) }, { $set: { status: "Closed" } });
-  assert.deepEqual(await archiveInactiveClients(db, new Date(warrantyOver + 24 * day)), { noticed: 1, archived: 0 });
+  closure = await getAccountClosure(db, customer);
+  assert.equal(closure.checks.find((check) => check.key === "claims")?.ok, true);
 });

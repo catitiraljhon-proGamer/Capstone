@@ -118,14 +118,20 @@ export function AdminClientManager() {
         !error && <div className="rounded-xl border border-dashed border-stone-300 bg-white p-8 text-center"><Users className="mx-auto h-8 w-8 text-stone-400" /><h2 className="mt-3 font-semibold">{query ? "No Matching Clients" : view === "archived" ? "No Archived Clients" : "No Clients Yet"}</h2><p className="mt-2 text-sm text-stone-600">{query ? "Try a different name or contact detail." : view === "archived" ? "Clients you archive will appear here and can be unarchived anytime." : "Add a client or have them register for an account."}</p></div> :
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {payload.clients.map((client) => <article key={client.id} className="min-w-0 rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2><span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.archivedAt ? "Archived" : client.status === "active" ? "Active" : "Disabled"}</span></div>
+            <div className="flex flex-wrap items-start justify-between gap-2"><h2 className="min-w-0 font-semibold break-words text-stone-950">{client.name}</h2>{client.deactivation && !client.archivedAt
+              ? <span className="rounded bg-red-50 px-2 py-1 text-xs font-semibold text-red-800">Deactivated</span>
+              : <span className="rounded bg-stone-100 px-2 py-1 text-xs text-stone-600">{client.archivedAt ? "Archived" : client.status === "active" ? "Active" : "Disabled"}</span>}</div>
             <p className="mt-1 text-sm break-all text-stone-500">{client.email}</p>
             <dl className="mt-5 space-y-3 text-sm">
               <div><dt className="text-xs text-stone-500">Contact Number</dt><dd className="mt-1 break-words">{client.contactNumber || "Not provided"}</dd></div>
               <div><dt className="text-xs text-stone-500">Complete Address</dt><dd className="mt-1 whitespace-pre-wrap break-words">{client.address || "Not provided"}</dd></div>
               <div><dt className="text-xs text-stone-500">Occupation</dt><dd className="mt-1 break-words">{client.occupation || "Not provided"}</dd></div>
             </dl>
-            {!client.profileComplete && <p className="mt-4 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">Client information is incomplete.</p>}
+            {client.deactivation && <div className="mt-4 rounded-lg bg-rose-50 p-3 text-xs leading-5 text-stone-700">
+              <p>Deactivated on {client.deactivation.deactivatedOn}. <strong className="text-stone-950">Deleted on {client.deactivation.deletesOn}</strong> unless they sign back in.</p>
+              {client.deactivation.reason && <p className="mt-1 text-stone-500">Reason: {client.deactivation.reason}</p>}
+            </div>}
+            {!client.profileComplete && !client.deactivation && <p className="mt-4 rounded-lg bg-red-50 p-2 text-xs font-medium text-red-700">Client information is incomplete.</p>}
             {client.archivedAt && <p className="mt-4 text-xs text-stone-500">Archived on {new Date(client.archivedAt).toLocaleDateString("en-PH", { dateStyle: "medium" })}</p>}
             <div className="mt-5 flex flex-wrap gap-2">
               {client.archivedAt ? (

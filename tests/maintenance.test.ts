@@ -100,7 +100,7 @@ test("settings start at the system's previous fixed values and only the Admin ca
   await assert.rejects(updateSystemSettings(db, admin, { passwordMinLength: 12.5 }), ZodError);
   await assert.rejects(updateSystemSettings(db, admin, { unknownSetting: 1 }), ZodError);
   await assert.rejects(updateSystemSettings(db, admin, { autoBackup: "yes" }), ZodError);
-  await assert.rejects(updateSystemSettings(db, admin, { inactiveNoticeDays: 30 }), isStatus(400));
+  await assert.rejects(updateSystemSettings(db, admin, { deactivationReminderDays: 30, deactivatedDeleteDays: 30 }), isStatus(400));
 });
 
 test("saving records who changed each setting and audits old and new values", async () => {

@@ -1,6 +1,7 @@
 import { collections, type UserDocument } from "@/lib/database/collections";
 import { getDatabase } from "@/lib/database/mongodb";
 import { apiError } from "@/lib/server/api";
+import { signInAccountFilter } from "@/lib/server/account-closure";
 import {
   emailErrorDetails,
   googleSignInReminderEmail,
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
 
     const user = await db
       .collection<UserDocument>(collections.users)
-      .findOne({ email, status: "active" });
+      .findOne({ email, ...signInAccountFilter });
     let message: EmailMessage | null = null;
     if (user?.passwordHash) {
       message = passwordResetEmail(user.email, user.name, await createPasswordResetToken(user), passwordResetMinutes);

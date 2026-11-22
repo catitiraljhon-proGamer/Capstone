@@ -7,10 +7,16 @@ import {
   type GoogleLink,
   type GoogleProfile,
 } from "@/lib/server/google-oauth";
+import { isDeactivated } from "@/lib/server/account-closure";
 import { insertNotifications } from "@/lib/server/notifications";
 import { type Db, MongoServerError, ObjectId } from "mongodb";
 
 function classifyAccount(user: UserDocument, profile: GoogleProfile) {
+  // A deactivated customer whose Google account is linked can sign in to reactivate; others use their password.
+  if (isDeactivated(user)) {
+    if (user.googleSub !== profile.sub) throw new GoogleAuthError("deactivated");
+    return { user, created: false, needsLink: false, deactivated: true };
+  }
   if (
     user.status !== "active" ||
     (user.googleSub && user.googleSub !== profile.sub)
@@ -19,7 +25,7 @@ function classifyAccount(user: UserDocument, profile: GoogleProfile) {
   }
   if (!user.googleSub && !user.passwordHash)
     throw new GoogleAuthError("account_unavailable");
-  return { user, created: false, needsLink: !user.googleSub };
+  return { user, created: false, needsLink: !user.googleSub, deactivated: false };
 }
 
 export async function resolveGoogleAccount(db: Db, profile: GoogleProfile) {
@@ -70,7 +76,7 @@ export async function resolveGoogleAccount(db: Db, profile: GoogleProfile) {
       createdAt: now,
     })),
   );
-  return { user, created: true, needsLink: false };
+  return { user, created: true, needsLink: false, deactivated: false };
 }
 
 /** Call only after verifying this user's current password. */

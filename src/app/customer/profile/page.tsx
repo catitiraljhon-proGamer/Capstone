@@ -1,11 +1,6 @@
-import { CustomerProfilePage } from "@/components/customer/customer-dashboard";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "My Profile | G4 Builders Inc",
-  description: "Customer profile details.",
-};
-
+/** My Profile is now the first tab of Manage Account. */
 export default function ProfilePage() {
-  return <CustomerProfilePage />;
+  redirect("/customer/account");
 }
