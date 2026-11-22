@@ -25,7 +25,7 @@ import {
   workStagesOf,
 } from "@/lib/construction";
 import { BillingError, audit, autoIssueDownpayment, billingTransaction, nextReference } from "@/lib/server/billing";
-import { houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
+import { clientHouseTypes, houseDesignNameTaken, saveCompletedProjectDesign } from "@/lib/server/completed-project-designs";
 import { isActiveHouseType } from "@/lib/server/house-designs";
 import { customerDesignDto, designWorkflow } from "@/lib/server/design-requests";
 import { getSystemSettings } from "@/lib/server/maintenance";
@@ -544,23 +544,21 @@ async function toProjectDtos(db: Db, projects: ProjectDocument[], viewer: UserRo
   if (!projects.length) return [];
   const customerIds = [...new Set(projects.map((project) => project.customerId.toHexString()))].map((id) => new ObjectId(id));
   const estimateIds = projects.flatMap((project) => (project.estimateId ? [project.estimateId] : []));
-  const requestIds = projects.flatMap((project) => (project.designRequestId ? [project.designRequestId] : []));
-  const [billing, customers, estimates, requests, { warrantyMonths }] = await Promise.all([
+  const [billing, customers, estimates, houseTypes, { warrantyMonths }] = await Promise.all([
     loadProjectBilling(db, projects.map((project) => project._id), session),
     db.collection<UserDocument>(collections.users).find({ _id: { $in: customerIds } }, { session, projection: { name: 1 } }).toArray(),
     estimateIds.length ? db.collection<EstimateDocument>(collections.estimates).find({ _id: { $in: estimateIds } }, { session, projection: { reference: 1 } }).toArray() : [],
-    requestIds.length ? db.collection<DesignRequestDocument>(collections.designRequests).find({ _id: { $in: requestIds } }, { session, projection: { houseType: 1 } }).toArray() : [],
+    clientHouseTypes(db, projects, session),
     getSystemSettings(db),
   ]);
   const customerNames = new Map(customers.map((customer) => [customer._id.toHexString(), customer.name]));
   const estimateReferences = new Map(estimates.map((estimate) => [estimate._id.toHexString(), estimate.reference]));
-  const houseTypes = new Map(requests.map((request) => [request._id.toHexString(), request.houseType ?? null]));
   return projects.map((project) => {
     const milestones = milestoneDtos(project, billing, viewer === "customer");
     const paid = billing.paidByProject.get(project._id.toHexString()) ?? 0;
     return {
       id: project._id.toHexString(), reference: project.reference, name: project.name, status: project.status,
-      houseType: project.designRequestId ? houseTypes.get(project.designRequestId.toHexString()) ?? null : null,
+      houseType: houseTypes.get(project._id.toHexString()) ?? null,
       customer: { id: project.customerId.toHexString(), name: customerNames.get(project.customerId.toHexString()) ?? "Unknown customer" },
       estimateId: project.estimateId?.toHexString() ?? null,
       estimateReference: project.estimateId ? estimateReferences.get(project.estimateId.toHexString()) ?? null : null,
@@ -596,8 +594,19 @@ export async function changeProjectStatus(db: Db, actor: SessionUser, id: string
   if (design?.name && await houseDesignNameTaken(db, design.name)) {
     throw new BillingError(`A house design named "${design.name}" already exists. Use a different name.`, 409);
   }
-  if (design?.houseType && !(await isActiveHouseType(db, design.houseType))) {
-    throw new BillingError("Choose one of the available house types.", 400);
+  if (design) {
+    const current = await db.collection<ProjectDocument>(collections.projects)
+      .findOne({ _id: projectId }, { projection: { designRequestId: 1, houseDesignId: 1 } });
+    // The house type the client chose is fixed; the Admin picks one only when the client never did.
+    const fixed = current ? (await clientHouseTypes(db, [current])).get(current._id.toHexString()) : undefined;
+    if (fixed) {
+      if (design.houseType && design.houseType !== fixed) {
+        throw new BillingError(`This project's house type is fixed to ${fixed}, the type the client chose.`, 400);
+      }
+      design.houseType = fixed;
+    } else if (design.houseType && !(await isActiveHouseType(db, design.houseType))) {
+      throw new BillingError("Choose one of the available house types.", 400);
+    }
   }
   await promoteScheduledProjects(db);
   // The warranty length in force on the day of completion is saved with the project.

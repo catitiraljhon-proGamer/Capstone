@@ -1,4 +1,4 @@
-import { MongoServerError, ObjectId, type Db } from "mongodb";
+import { MongoServerError, ObjectId, type ClientSession, type Db } from "mongodb";
 import {
   collections,
   type AuditLogDocument,
@@ -61,6 +61,43 @@ export async function houseDesignNameTaken(db: Db, name: string) {
   ));
 }
 
+/**
+ * The house type the client chose for each project: the one picked on a custom design request, else the type of the
+ * published design they requested. Keyed by project id; projects without one are left out. Once a project has a
+ * client-chosen type, its house design is filed under it and the Admin can't change it.
+ */
+export async function clientHouseTypes(
+  db: Db,
+  projects: Pick<ProjectDocument, "_id" | "designRequestId" | "houseDesignId">[],
+  session?: ClientSession,
+) {
+  const requestIds = projects.flatMap((project) => (project.designRequestId ? [project.designRequestId] : []));
+  const requests = requestIds.length
+    ? await db.collection<DesignRequestDocument>(collections.designRequests)
+      .find({ _id: { $in: requestIds } }, { session, projection: { houseType: 1, houseDesignId: 1 } }).toArray()
+    : [];
+  const requestById = new Map(requests.map((request) => [request._id.toHexString(), request]));
+  const sourceDesignId = (project: (typeof projects)[number]) =>
+    project.houseDesignId ?? (project.designRequestId ? requestById.get(project.designRequestId.toHexString())?.houseDesignId : undefined);
+  const designIds = projects.flatMap((project) => {
+    const id = sourceDesignId(project);
+    return id ? [id] : [];
+  });
+  const designs = designIds.length
+    ? await db.collection<HouseDesignDocument>(collections.houseDesigns)
+      .find({ _id: { $in: designIds } }, { session, projection: { houseType: 1 } }).toArray()
+    : [];
+  const designTypes = new Map(designs.map((design) => [design._id.toHexString(), design.houseType]));
+
+  const types = new Map<string, string>();
+  for (const project of projects) {
+    const request = project.designRequestId ? requestById.get(project.designRequestId.toHexString()) : undefined;
+    const houseType = request?.houseType ?? designTypes.get(sourceDesignId(project)?.toHexString() ?? "");
+    if (houseType) types.set(project._id.toHexString(), houseType);
+  }
+  return types;
+}
+
 /** What the Admin chose when marking the project completed. */
 type DesignChoice = { name?: string; houseType?: string };
 
@@ -89,7 +126,8 @@ async function createDesignFromProject(
   const rooms = request?.rooms || sourceDesign?.rooms || "Not specified";
   const label = project.name.replace(constructionSuffix, "") || "Completed project";
   const completedAt = project.completedAt ?? project.updatedAt;
-  const houseType = choice.houseType ?? request?.houseType ?? sourceDesign?.houseType;
+  // The client's choice is fixed; the Admin's choice only files projects the client never chose a type for.
+  const houseType = request?.houseType ?? sourceDesign?.houseType ?? choice.houseType;
   // The finish the customer chose in a custom request, else the finish of the published design they requested.
   const finish = (request?.selectedDesign ? request.selectedDesign.finish : request?.finish) ?? sourceDesign?.finish;
 
@@ -101,7 +139,6 @@ async function createDesignFromProject(
     _id: new ObjectId(),
     name: await uniqueName(db, choice.name?.trim() || `${label} – ${project.reference}`),
     style: sourceDesign?.style ?? "Completed Project",
-    // Filed under the Admin's choice, else the house type the customer chose, else the chosen design's type.
     ...(houseType ? { houseType } : {}),
     ...(finish ? { finish } : {}),
     area,

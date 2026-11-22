@@ -42,6 +42,18 @@ export async function PATCH(
         );
       }
     }
+    // A design saved from a finished project keeps the house type it was filed under.
+    if (changes.houseType) {
+      const current = await db
+        .collection<HouseDesignDocument>(collections.houseDesigns)
+        .findOne({ _id: new ObjectId(id) }, { projection: { houseType: 1, sourceProject: 1 } });
+      if (current?.sourceProject && current.houseType && changes.houseType !== current.houseType) {
+        return NextResponse.json(
+          { error: `This design is from a finished project, so its house type stays ${current.houseType}.` },
+          { status: 400 },
+        );
+      }
+    }
     const now = new Date();
     const credit = designedBy ? { designedBy: await requireProfessionalId(db, designedBy) } : {};
     const document = await db

@@ -11,7 +11,7 @@ import type {
   ProjectStatusAction,
 } from "@/types/construction";
 import type { HouseType } from "@/lib/house-design-data";
-import { Building2, ChevronDown } from "lucide-react";
+import { Building2, ChevronDown, Lock } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 const projectTone: Record<ProjectStatus, string> = {
@@ -55,8 +55,10 @@ function CompleteProjectDialog({
   onClose: () => void;
   onCompleted: (project: ConstructionProjectDto) => void;
 }) {
+  // The house type the client chose is fixed; the Admin picks one only when the client never did.
+  const fixedType = project.houseType;
   const [name, setName] = useState(() => suggestedDesignName(project));
-  const [houseType, setHouseType] = useState(project.houseType ?? "");
+  const [houseType, setHouseType] = useState(fixedType ?? "");
   const [houseTypes, setHouseTypes] = useState<HouseType[]>([]);
   const [nameError, setNameError] = useState<string | null>(null);
   const [typeError, setTypeError] = useState<string | null>(null);
@@ -67,6 +69,7 @@ function CompleteProjectDialog({
 
   useEffect(() => {
     nameRef.current?.select();
+    if (fixedType) return;
     let active = true;
     fetch("/api/catalog/house-designs", { cache: "no-store" })
       .then((response) => response.json() as Promise<{ houseTypes?: HouseType[] }>)
@@ -79,7 +82,7 @@ function CompleteProjectDialog({
     return () => {
       active = false;
     };
-  }, []);
+  }, [fixedType]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -162,25 +165,39 @@ function CompleteProjectDialog({
         />
         {nameError ? <p id={`complete-${project.id}-name-error`} className="mt-1.5 text-sm text-red-700">{nameError}</p> : null}
 
-        <label htmlFor={`complete-${project.id}-type`} className="mt-4 block text-sm font-semibold text-stone-950">
-          House Type <span className="text-red-700" aria-hidden="true">*</span>
-        </label>
-        <select
-          ref={typeRef}
-          id={`complete-${project.id}-type`}
-          value={houseType}
-          onChange={(event) => { setHouseType(event.target.value); setTypeError(null); }}
-          aria-invalid={typeError ? true : undefined}
-          aria-describedby={`complete-${project.id}-type-hint${typeError ? ` complete-${project.id}-type-error` : ""}`}
-          className={fieldClass}
-        >
-          <option value="">Select a house type</option>
-          {houseType && !houseTypes.some((type) => type.heading === houseType) ? <option value={houseType}>{houseType}</option> : null}
-          {houseTypes.map((type) => <option key={type.heading} value={type.heading}>{type.heading}</option>)}
-        </select>
-        <p id={`complete-${project.id}-type-hint`} className="mt-1.5 text-xs text-stone-500">
-          {project.houseType ? "Chosen by the client on the design request." : "The client did not choose one on the design request."}
-        </p>
+        {fixedType ? (
+          <>
+            <p className="mt-4 block text-sm font-semibold text-stone-950">House Type</p>
+            <p className="mt-1.5 flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 text-sm font-medium text-stone-950">
+              <Lock className="h-4 w-4 text-stone-500" aria-hidden="true" />
+              {fixedType}
+            </p>
+            <p className="mt-1.5 text-xs text-stone-500">
+              Chosen by the client on the design request, so it can&apos;t be changed.
+            </p>
+          </>
+        ) : (
+          <>
+            <label htmlFor={`complete-${project.id}-type`} className="mt-4 block text-sm font-semibold text-stone-950">
+              House Type <span className="text-red-700" aria-hidden="true">*</span>
+            </label>
+            <select
+              ref={typeRef}
+              id={`complete-${project.id}-type`}
+              value={houseType}
+              onChange={(event) => { setHouseType(event.target.value); setTypeError(null); }}
+              aria-invalid={typeError ? true : undefined}
+              aria-describedby={`complete-${project.id}-type-hint${typeError ? ` complete-${project.id}-type-error` : ""}`}
+              className={fieldClass}
+            >
+              <option value="">Select a house type</option>
+              {houseTypes.map((type) => <option key={type.heading} value={type.heading}>{type.heading}</option>)}
+            </select>
+            <p id={`complete-${project.id}-type-hint`} className="mt-1.5 text-xs text-stone-500">
+              The client did not choose one on the design request.
+            </p>
+          </>
+        )}
         {typeError ? <p id={`complete-${project.id}-type-error`} className="mt-1 text-sm text-red-700">{typeError}</p> : null}
 
         <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">

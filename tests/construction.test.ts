@@ -687,7 +687,7 @@ test("an admin controls project status, and completion waits until every milesto
   const remaining = await submitPayment(db, customer, payInput(invoiceId, 500_000));
   await reviewPayment(db, clerk, remaining, { action: "verify" });
 
-  // The client chose Ranch on the design request; the Admin names the design and may file it elsewhere.
+  // The client chose Ranch on the design request; the Admin names the design, but its house type stays Ranch.
   assert.equal((await projectDto(projectId)).houseType, "Ranch");
   const now = new Date();
   await db.collection<HouseDesignDocument>("house_designs").insertOne({
@@ -695,11 +695,12 @@ test("an admin controls project status, and completion waits until every milesto
     createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
   });
   const complete = (extra: object) => changeProjectStatus(db, admin, projectId, { action: "status", status: "Completed", ...extra });
-  await assert.rejects(complete({ designName: "taken name", houseType: "Tudor" }), isError(409));
+  await assert.rejects(complete({ designName: "taken name", houseType: "Ranch" }), isError(409));
+  await assert.rejects(complete({ designName: "Courtyard Family Home", houseType: "Tudor" }), isError(400));
   await assert.rejects(complete({ designName: "Courtyard Family Home", houseType: "Castle" }), isError(400));
-  await assert.rejects(complete({ designName: "x", houseType: "Tudor" }), ZodError);
+  await assert.rejects(complete({ designName: "x", houseType: "Ranch" }), ZodError);
   assert.equal((await projectDto(projectId)).status, "Active");
-  const completed = (await complete({ designName: "  Courtyard Family Home ", houseType: "Tudor" })).project;
+  const completed = (await complete({ designName: "  Courtyard Family Home ", houseType: "Ranch" })).project;
   assert.equal(completed.status, "Completed");
   assert.equal(completed.paid, 6_000_000);
   assert.equal(completed.balance, 0);
@@ -712,9 +713,9 @@ test("an admin controls project status, and completion waits until every milesto
   assert.equal(designs.length, 1);
   const [design] = designs;
   assert.equal(design.status, "Draft");
-  // Saved under the name and house type the Admin entered when completing the project.
+  // Saved under the name the Admin entered and the house type the client chose.
   assert.equal(design.name, "Courtyard Family Home");
-  assert.equal(design.houseType, "Tudor");
+  assert.equal(design.houseType, "Ranch");
   assert.equal(design.area, 120);
   assert.equal(design.rooms, "3 bedrooms, 2 bathrooms");
   assert.deepEqual(design.images, ["data:image/png;base64,AAAA"]);
@@ -728,6 +729,28 @@ test("an admin controls project status, and completion waits until every milesto
   await db.collection<HouseDesignDocument>("house_designs").updateOne({ _id: design._id }, { $unset: { houseType: "" } });
   await syncCompletedProjectDesigns(db, admin);
   assert.equal((await db.collection<HouseDesignDocument>("house_designs").findOne({ _id: design._id }))?.houseType, "Ranch");
+});
+
+test("a project from a published design takes that design's house type; one with no type is left for the Admin", async () => {
+  const now = new Date();
+  const publishedId = new ObjectId();
+  await db.collection<HouseDesignDocument>("house_designs").insertOne({
+    _id: publishedId, name: "Published Bungalow", houseType: "Bungalow", area: 80, rooms: "2 bedrooms", rate: 1, images: [], notes: "",
+    status: "Published", createdAt: now, createdBy: new ObjectId(admin.id), createdByName: admin.name, updatedAt: now,
+  });
+  const fromDesignRequest = new ObjectId();
+  const untypedRequest = new ObjectId();
+  await db.collection<DesignRequestDocument>("design_requests").insertMany([
+    { _id: fromDesignRequest, customerId: new ObjectId(customer.id), houseDesignId: publishedId, floorArea: 80, rooms: "2 bedrooms", notes: "", status: "Completed", createdAt: now, updatedAt: now },
+    { _id: untypedRequest, customerId: new ObjectId(customer.id), floorArea: 90, rooms: "2 bedrooms", notes: "", status: "Completed", createdAt: now, updatedAt: now },
+  ]);
+  await db.collection<ProjectDocument>("projects").insertMany([
+    { _id: new ObjectId(), reference: "PRJ-PUB", name: "From a published design", customerId: new ObjectId(customer.id), designRequestId: fromDesignRequest, status: "Active", contractPrice: 1, createdAt: now, updatedAt: now },
+    { _id: new ObjectId(), reference: "PRJ-OLD", name: "Older request", customerId: new ObjectId(customer.id), designRequestId: untypedRequest, status: "Active", contractPrice: 1, createdAt: now, updatedAt: now },
+  ]);
+  const projects = await listProjects(db, admin);
+  assert.equal(projects.find((project) => project.reference === "PRJ-PUB")?.houseType, "Bungalow");
+  assert.equal(projects.find((project) => project.reference === "PRJ-OLD")?.houseType, null);
 });
 
 test("legacy projects without a payment schedule keep their existing billing rules", async () => {

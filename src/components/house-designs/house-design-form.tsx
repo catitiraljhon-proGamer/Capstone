@@ -219,8 +219,10 @@ export function HouseDesignForm({
   onSubmit: (design: NewHouseDesignInput) => void;
 }) {
   const isEditing = Boolean(design);
-  // A design added from inside a house type belongs to that type; editing keeps the choice so a design can be moved.
-  const fixedHouseType = !isEditing && defaultHouseType ? defaultHouseType : null;
+  // A design added from inside a house type belongs to that type, and one saved from a finished project keeps the
+  // type it was built as. Editing any other design keeps the choice so it can be moved.
+  const sourceProject = design?.houseType ? design.sourceProject : undefined;
+  const fixedHouseType = sourceProject ? design!.houseType! : !isEditing && defaultHouseType ? defaultHouseType : null;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [values, setValues] = useState<FormValues>({
@@ -434,9 +436,11 @@ export function HouseDesignForm({
               <Field
                 htmlFor={fieldIds.houseType}
                 label={fieldLabels.houseType}
-                hint={fixedHouseType
-                  ? "Set by the house type you opened."
-                  : "Controls which category card shows this design."}
+                hint={sourceProject
+                  ? `Fixed: project ${sourceProject.projectReference} was built as this type.`
+                  : fixedHouseType
+                    ? "Set by the house type you opened."
+                    : "Controls which category card shows this design."}
                 required
                 error={errors.houseType}
               >
