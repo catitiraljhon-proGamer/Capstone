@@ -57,9 +57,10 @@ const monthColumns: PrintColumn<MonthRow>[] = [
 ];
 
 /** The By Month export as a printable report: summaries, the months, and every invoice and payment in them. */
-export function CollectionsPrintReport({ data, onClose }: { data: CollectionsExport; onClose: () => void }) {
+export function CollectionsPrintReport({ data, tab, onClose }: { data: CollectionsExport; tab: Window | null; onClose: () => void }) {
   return (
     <PrintableReport
+      tab={tab}
       title="Collections Report"
       generated={data.generated}
       author={data.generatedBy}

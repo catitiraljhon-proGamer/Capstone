@@ -6,7 +6,7 @@ import { ChevronDown, Download, FileSpreadsheet, Printer, X } from "lucide-react
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { billingDate } from "@/components/billing/billing-primitives";
 import { Button } from "@/components/ui/button";
-import { defaultContactDetails } from "@/lib/contact-details";
+import { defaultContactDetails, type ContactDetails } from "@/lib/contact-details";
 import type { XlsxColumn } from "@/lib/export-xlsx";
 import { formatPeso } from "@/lib/house-design-data";
 import { useContactDetails } from "@/lib/use-contact-details";
@@ -26,8 +26,24 @@ export function useReportAuthor(): ReportAuthor {
 export const reportGeneratedAt = () =>
   new Date().toLocaleString("en-PH", { timeZone: "Asia/Manila", dateStyle: "long", timeStyle: "short" });
 
-/** Export Selected (n): a menu to download Excel or open the printable report. */
-export function ExportMenu({ count, disabled = false, onExcel, onPdf }: { count: number; disabled?: boolean; onExcel: () => void; onPdf: () => void }) {
+/** A blank tab for the printable report, opened during the click so the browser allows it; null when pop-ups are blocked. */
+function openReportTab(): Window | null {
+  const tab = window.open("", "_blank");
+  if (tab) {
+    tab.document.title = "Preparing report…";
+    tab.document.body.textContent = "Preparing report…";
+  }
+  return tab;
+}
+
+/** Export Selected (n): a menu to download Excel or open the printable report in a new tab. */
+export function ExportMenu({ count, disabled = false, onExcel, onPdf }: {
+  count: number;
+  disabled?: boolean;
+  onExcel: () => void;
+  /** Receives the new tab to pass to `PrintableReport`. */
+  onPdf: (tab: Window | null) => void;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   /** Opens the menu toward the right when the button sits near the left edge, as it does once a header wraps on phones. */
   const [alignLeft, setAlignLeft] = useState(false);
@@ -65,7 +81,7 @@ export function ExportMenu({ count, disabled = false, onExcel, onPdf }: { count:
   };
   const formats = [
     { label: "Excel (.xlsx)", hint: "A spreadsheet with a summary sheet and the selected rows", icon: FileSpreadsheet, action: onExcel },
-    { label: "PDF (printable)", hint: "A printable report to save as PDF or print", icon: Printer, action: onPdf },
+    { label: "PDF (printable)", hint: "Opens the report in a new tab to save as PDF or print", icon: Printer, action: () => onPdf(openReportTab()) },
   ];
 
   return (
@@ -98,26 +114,56 @@ export function ExportMenu({ count, disabled = false, onExcel, onPdf }: { count:
   );
 }
 
-// When printing, only the report shows; its tables print at full width, and headings stay with their tables.
+// On paper the toolbar hides, tables print at full width, and headings stay with their tables.
 const printStyles = `@media print {
-  body > *:not(.report-print) { display: none !important; }
-  .report-print { position: static !important; overflow: visible !important; background: #fff !important; padding: 0 !important; }
-  .report-print .print-toolbar { display: none !important; }
-  .report-print .print-sheet { max-width: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
-  .report-print .overflow-x-auto { overflow: visible !important; }
-  .report-print table { min-width: 0 !important; }
-  .report-print .report-section { break-inside: avoid; }
-  .report-print h2 { break-after: avoid; }
-  .report-print tr { break-inside: avoid; }
-  .report-print * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff !important; padding: 0 !important; }
+  .print-toolbar { display: none !important; }
+  .print-sheet { max-width: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+  .overflow-x-auto { overflow: visible !important; }
+  table { min-width: 0 !important; }
+  .report-section { break-inside: avoid; }
+  h2 { break-after: avoid; }
+  tr { break-inside: avoid; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: A4 landscape; margin: 12mm; }
 }`;
 
+const toolbarButton = "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition";
+
 /**
- * A report on top of the page with the letterhead, its details, and Prepared by / Checked by lines.
- * Print / Save PDF opens the browser's print window, where the clerk saves it as a PDF or prints it.
+ * Fills the new tab with a standalone copy of the report: the app's styles, the toolbar, and the sheet.
+ * The copy keeps working after the Reports page changes, and its buttons run in the tab itself.
  */
-export function PrintableReport({ title, generated, author, details, onClose, children }: {
+function writeReportTab(tab: Window, title: string, page: HTMLElement) {
+  const doc = tab.document;
+  doc.title = `${title} | G4 Builders Inc`;
+  doc.documentElement.lang = "en";
+  doc.documentElement.className = document.documentElement.className;
+  const base = doc.createElement("base");
+  base.href = `${window.location.origin}/`;
+  const viewport = doc.createElement("meta");
+  viewport.name = "viewport";
+  viewport.content = "width=device-width, initial-scale=1";
+  const print = doc.createElement("style");
+  print.textContent = printStyles;
+  const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'), (node) => doc.importNode(node, true));
+  doc.head.replaceChildren(base, viewport, ...styles, print);
+  doc.body.className = "px-4 py-6 text-stone-950 sm:px-8";
+  // Inline, because the app's own body rule outranks a background class; print styles still force white.
+  doc.body.style.backgroundColor = "#f5f5f4";
+  doc.body.replaceChildren(...Array.from(page.children, (child) => doc.importNode(child, true)));
+  doc.body.querySelector('[data-report-action="print"]')?.setAttribute("onclick", "window.print()");
+  doc.body.querySelector('[data-report-action="close"]')?.setAttribute("onclick", "window.close()");
+}
+
+/**
+ * Fills the tab from `ExportMenu` with the report: the letterhead, its details, and Prepared by / Checked by lines.
+ * Print / Save PDF there opens the browser's print window, where the clerk saves it as a PDF or prints it.
+ * The report is drawn here hidden, copied into the tab once the office details load, then `onClose` runs.
+ */
+export function PrintableReport({ tab, title, generated, author, details, onClose, children }: {
+  /** The tab `ExportMenu` opened, or null when the browser blocked it. */
+  tab: Window | null;
   title: string;
   generated: string;
   author: ReportAuthor;
@@ -126,57 +172,101 @@ export function PrintableReport({ title, generated, author, details, onClose, ch
   onClose: () => void;
   children: ReactNode;
 }) {
-  const contact = useContactDetails(true) ?? defaultContactDetails;
-  useModalBehavior(true, onClose);
+  const loadedContact = useContactDetails(Boolean(tab));
+  const contact = loadedContact ?? defaultContactDetails;
   const preparedBy = `${author.name}, ${author.role}`;
   const rows: [string, string][] = [["Generated", generated], ["Generated by", preparedBy], ...details];
+  const pageRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
 
-  return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={`Printable ${title}`} className="report-print fixed inset-0 z-50 overflow-y-auto bg-stone-100 px-4 py-6 sm:px-8">
-      <style>{printStyles}</style>
+  useEffect(() => {
+    if (!tab || !loadedContact || !pageRef.current) return;
+    // A tab the clerk already closed is skipped; either way the report is done here.
+    if (!tab.closed) writeReportTab(tab, title, pageRef.current);
+    closeRef.current();
+  }, [tab, loadedContact, title]);
+
+  if (!tab) return <PopupBlockedNotice onClose={onClose} />;
+
+  return (
+    <div ref={pageRef} hidden>
       <div className="print-toolbar mx-auto mb-4 flex max-w-5xl flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-600">Print / Save PDF opens the print window. Choose Save as PDF or a printer there.</p>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onClose}><X className="mr-2 h-4 w-4" />Close</Button>
-          <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" />Print / Save PDF</Button>
+          <button type="button" data-report-action="close" className={`${toolbarButton} border border-stone-300 bg-white text-stone-950 hover:bg-stone-50`}>
+            <X className="h-4 w-4" aria-hidden="true" />Close
+          </button>
+          <button type="button" data-report-action="print" className={`${toolbarButton} bg-red-700 text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-red-600`}>
+            <Printer className="h-4 w-4" aria-hidden="true" />Print / Save PDF
+          </button>
         </div>
       </div>
+      <ReportSheet title={title} contact={contact} rows={rows} author={author}>{children}</ReportSheet>
+    </div>
+  );
+}
 
-      <article className="print-sheet mx-auto max-w-5xl rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-950 shadow-sm sm:p-10">
-        <header>
-          <Image src="/G4/image.png" alt="G4 Builders Inc" width={1726} height={500} className="h-auto w-40 object-contain" />
-          <p className="mt-3 text-xl font-semibold tracking-tight">G4 Builders Inc</p>
-          <p className="mt-1 text-xs text-stone-600">{contact.address}</p>
-          <p className="text-xs text-stone-600">{contact.phone} | {contact.email}</p>
-          <h1 className="mt-6 text-2xl font-semibold tracking-tight text-red-700 print:mt-4">{title}</h1>
-        </header>
-
-        <dl className="mt-4 grid gap-x-8 gap-y-3 border-t-2 border-red-700 pt-4 sm:grid-cols-2">
-          {rows.map(([label, value]) => (
-            <div key={label} className="min-w-0">
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">{label}</dt>
-              <dd className="mt-0.5 break-words">{value || "—"}</dd>
-            </div>
-          ))}
-        </dl>
-
-        {children}
-
-        {/* Tighter on paper, so a short report keeps its signature lines on the same page. */}
-        {/* Signature blocks: the name sits above the line, the role below it; Checked by leaves the name blank. */}
-        <div className="report-section mt-12 grid gap-10 text-xs text-stone-600 sm:grid-cols-2 print:mt-6">
-          <div>
-            <p className="h-5 text-sm font-semibold text-stone-950">{author.name}</p>
-            <p className="mt-1 border-t border-stone-400 pt-2">Prepared by: {author.role}</p>
-          </div>
-          <div>
-            <p className="h-5" aria-hidden="true" />
-            <p className="mt-1 border-t border-stone-400 pt-2">Checked by:</p>
-          </div>
+/** Shown when the browser blocks the new tab, so the clerk knows to allow pop-ups and try again. */
+function PopupBlockedNotice({ onClose }: { onClose: () => void }) {
+  useModalBehavior(true, onClose);
+  return createPortal(
+    <div className="fixed inset-0 z-50 grid place-items-center bg-stone-950/40 p-4">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="popup-blocked-title" className="w-full max-w-sm rounded-xl bg-white p-5 shadow-lg ring-1 ring-stone-200">
+        <h2 id="popup-blocked-title" className="text-base font-semibold tracking-tight text-stone-950">The report tab was blocked</h2>
+        <p className="mt-2 text-sm text-stone-600">Your browser stopped the new tab. Allow pop-ups for this site, then choose PDF again.</p>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={onClose} autoFocus>Got it</Button>
         </div>
-      </article>
+      </div>
     </div>,
     document.body,
+  );
+}
+
+function ReportSheet({ title, contact, rows, author, children }: {
+  title: string;
+  contact: ContactDetails;
+  rows: [string, string][];
+  author: ReportAuthor;
+  children: ReactNode;
+}) {
+  return (
+    <article className="print-sheet mx-auto max-w-5xl rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-950 shadow-sm sm:p-10">
+      <header>
+        <Image src="/G4/image.png" alt="G4 Builders Inc" width={1726} height={500} loading="eager" className="h-auto w-40 object-contain" />
+        <p className="mt-3 text-xl font-semibold tracking-tight">G4 Builders Inc</p>
+        <p className="mt-1 text-xs text-stone-600">{contact.address}</p>
+        <p className="text-xs text-stone-600">{contact.phone} | {contact.email}</p>
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight text-red-700 print:mt-4">{title}</h1>
+      </header>
+
+      <dl className="mt-4 grid gap-x-8 gap-y-3 border-t-2 border-red-700 pt-4 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label} className="min-w-0">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">{label}</dt>
+            <dd className="mt-0.5 break-words">{value || "—"}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {children}
+
+      {/* Tighter on paper, so a short report keeps its signature lines on the same page. */}
+      {/* Signature blocks: the name sits above the line, the role below it; Checked by leaves the name blank. */}
+      <div className="report-section mt-12 grid gap-10 text-xs text-stone-600 sm:grid-cols-2 print:mt-6">
+        <div>
+          <p className="h-5 text-sm font-semibold text-stone-950">{author.name}</p>
+          <p className="mt-1 border-t border-stone-400 pt-2">Prepared by: {author.role}</p>
+        </div>
+        <div>
+          <p className="h-5" aria-hidden="true" />
+          <p className="mt-1 border-t border-stone-400 pt-2">Checked by:</p>
+        </div>
+      </div>
+    </article>
   );
 }
 

@@ -64,8 +64,8 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [selectedMonths, setSelectedMonths] = useState<ReadonlySet<string>>(new Set());
-  /** The export shown as a printable report, or null when it is closed. */
-  const [printData, setPrintData] = useState<CollectionsExport | null>(null);
+  /** The export being written into its new tab as a printable report, or null when none is. */
+  const [printing, setPrinting] = useState<{ data: CollectionsExport; tab: Window | null } | null>(null);
   const author = useReportAuthor();
 
   useEffect(() => {
@@ -259,9 +259,9 @@ export function CollectionsSummary({ view }: { view: CollectionsView }) {
             summary={`${isFiltered ? "Selected projects only" : "All projects, including design and blueprint fees"}. The export adds a summary and every invoice and payment in the checked months.`}
             exportCount={invalidRange ? 0 : exportMonths.length}
             onExcel={exportExcel}
-            onPdf={() => setPrintData(buildExport())}
+            onPdf={(tab) => setPrinting({ data: buildExport(), tab })}
           />
-          {printData ? <CollectionsPrintReport data={printData} onClose={() => setPrintData(null)} /> : null}
+          {printing ? <CollectionsPrintReport data={printing.data} tab={printing.tab} onClose={() => setPrinting(null)} /> : null}
           {invalidRange ? (
             <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">The From date must be on or before the To date.</p>
           ) : months.length === 0 ? <EmptyRow /> : (
@@ -322,7 +322,7 @@ function ReportHeader({ title, summary, exportCount, onExcel, onPdf }: {
   summary: string;
   exportCount: number;
   onExcel: () => void;
-  onPdf: () => void;
+  onPdf: (tab: Window | null) => void;
 }) {
   return (
     <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
