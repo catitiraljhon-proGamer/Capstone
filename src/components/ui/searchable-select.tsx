@@ -74,6 +74,9 @@ export function SearchableSelect({
   const [query, setQuery] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Set while a finger or mouse is pressing the list. iPad Safari still blurs the input on a tap, and the blur
+  // must not close the list before the tap's click picks the option.
+  const pressingListRef = useRef(false);
 
   const selected = options.find((option) => option.value === value);
   const matches = useMemo(() => findMatches(options, query ?? ""), [options, query]);
@@ -102,6 +105,7 @@ export function SearchableSelect({
   };
 
   const pick = (option: SearchableSelectOption) => {
+    pressingListRef.current = false;
     setQuery(null);
     setIsOpen(false);
     commit(option.value);
@@ -157,6 +161,8 @@ export function SearchableSelect({
         }}
         onKeyDown={handleKeyDown}
         onBlur={() => {
+          // A tap on a suggestion: leave the list open so its click can pick the option.
+          if (pressingListRef.current) return;
           if (query !== null) {
             // Typing an option's full name counts as picking it.
             const exact = options.find((option) => normalize(option.label) === normalize(query.trim()));
@@ -171,7 +177,25 @@ export function SearchableSelect({
       />
 
       {isOpen ? (
-        <ul ref={listRef} id={listId} role="listbox" className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-stone-200">
+        <ul
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          onPointerDown={() => {
+            pressingListRef.current = true;
+          }}
+          // Scrolling the list with a finger cancels the press, so it is not a pick.
+          onPointerCancel={() => {
+            pressingListRef.current = false;
+          }}
+          onClick={(event) => {
+            // A tap that picked nothing (e.g. on "No matches"): close as a blur would have.
+            if (!pressingListRef.current) return;
+            pressingListRef.current = false;
+            event.preventDefault();
+            if (document.activeElement !== inputRef.current) setIsOpen(false);
+          }}
+          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-lg bg-white py-1 text-sm shadow-lg ring-1 ring-stone-200">
           {matches.length === 0 ? (
             <li className="px-3 py-2 font-normal text-stone-500">{emptyMessage}</li>
           ) : (
@@ -186,7 +210,10 @@ export function SearchableSelect({
                   event.preventDefault();
                   pick(option);
                 }}
-                onMouseEnter={() => setActiveIndex(index)}
+                // Mouse only: a highlight change on touch makes iPad Safari treat the first tap as a hover and drop the click.
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") setActiveIndex(index);
+                }}
                 className={cn(
                   "flex cursor-pointer items-center justify-between gap-2 px-3 py-2 font-normal text-stone-950",
                   index === activeIndex && "bg-rose-50",
