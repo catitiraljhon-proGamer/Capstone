@@ -257,10 +257,13 @@ function DesignRequestForm({ houseDesignId }: {
   };
   const fieldOrder = ["houseType", "finish", "floorArea", "bedrooms", "bathrooms", "notes", "preferredDate", "neededBy", "images"];
   const touch = (name: string) => setTouched((current) => (current[name] ? current : { ...current, [name]: true }));
-  /** The message for a field, shown after it was left or a submit was attempted. */
+  /** Number fields check while typing, so an out-of-range value is flagged at once. */
+  const liveValues: Record<string, string> = { floorArea, bedrooms, bathrooms };
+  /** The message for a field, shown while typing a number, after it was left, or after a submit attempt. */
   const showError = (name: string) => {
     if (name === "images" && imageError) return imageError;
-    return (submitted || touched[name] ? fieldErrors[name] : null) ?? null;
+    const typed = Boolean(liveValues[name]?.trim());
+    return (submitted || touched[name] || typed ? fieldErrors[name] : null) ?? null;
   };
   const describe = (name: string) => {
     const message = showError(name);
