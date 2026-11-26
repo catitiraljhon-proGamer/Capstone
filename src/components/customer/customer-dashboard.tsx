@@ -102,7 +102,9 @@ function SidebarContent({
   return (
     <>
       <div className={`flex h-24 shrink-0 items-center border-b border-stone-200 px-5 ${onNavigate ? "pr-16" : ""}`}>
-        <BrandLogo compact />
+        <Link href="/customer" onClick={onNavigate} aria-label="Go to your dashboard" className="rounded-lg transition hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-600">
+          <BrandLogo compact />
+        </Link>
       </div>
       <nav aria-label="Customer navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-5">
         {customerNav.map((item) => (
