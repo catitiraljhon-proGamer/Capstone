@@ -385,7 +385,7 @@ function DesignRequestForm({ houseDesignId }: {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
       <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
@@ -768,12 +768,17 @@ function DesignRequestForm({ houseDesignId }: {
         </form>
       </section>
 
-      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+      {/* On wide screens the history stays beside the form and scrolls on its own, so a long list never stretches the form. */}
+      <section className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm xl:sticky xl:top-28 xl:flex xl:max-h-[calc(100dvh-8.5rem)] xl:flex-col">
         <h2 className="text-lg font-semibold tracking-tight">Request History</h2>
         <p className="mt-1 text-sm text-stone-600">
           Track approval and design work. Delivered designs are kept in Dream House and unlock after full payment is verified.
         </p>
-        <div className="mt-4 space-y-4">
+        <div
+          tabIndex={0}
+          aria-label="Your design requests"
+          className="mt-4 space-y-4 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 xl:-mr-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2"
+        >
           {requests.map((request) => (
             <article key={request.id} className="overflow-hidden rounded-xl border border-stone-200">
               {request.inspirationImages.length > 0 ? (
